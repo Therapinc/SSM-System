@@ -1776,6 +1776,18 @@ const addCellToColumn = (columnKey) => {
   const [editMode, setEditMode] = useState(false);
   const [teacherUsers, setTeacherUsers] = useState([]);
   const [editData, setEditData] = useState(null);
+  const [householdRows, setHouseholdRows] = useState([
+    {
+      id: 1,
+      name: "",
+      age: "",
+      education: "",
+      occupation: "",
+      health: "",
+      income: "",
+    },
+  ]);
+  const [drugRows, setDrugRows] = useState([{ id: 1, name: "", dose: "" }]);
   const [aadharEditError, setAadharEditError] = useState("");
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -1914,14 +1926,154 @@ const addCellToColumn = (columnKey) => {
 
   // Start editing: initialize editData
   const handleEditStart = () => {
+    if (student) {
+      setHouseholdRows(normalizeHouseholdRows(student.household));
+      setDrugRows(normalizeDrugRows(student.drug_history));
+    }
     setEditMode(true);
+  };
+
+  const createEmptyHouseholdRow = (id) => ({
+    id,
+    name: "",
+    age: "",
+    education: "",
+    occupation: "",
+    health: "",
+    income: "",
+  });
+
+  const createEmptyDrugRow = (id) => ({
+    id,
+    name: "",
+    dose: "",
+  });
+
+  const normalizeHouseholdRows = (rows = []) => {
+    const normalizedRows = rows.map((row, index) => ({
+      id: index + 1,
+      name: row?.name || "",
+      age: row?.age || "",
+      education: row?.education || "",
+      occupation: row?.occupation || "",
+      health: row?.health || "",
+      income: row?.income || "",
+    }));
+
+    return normalizedRows.length ? normalizedRows : [createEmptyHouseholdRow(1)];
+  };
+
+  const normalizeDrugRows = (rows = []) => {
+    const normalizedRows = rows.map((row, index) => ({
+      id: index + 1,
+      name: row?.name || "",
+      dose: row?.dose || "",
+    }));
+
+    return normalizedRows.length ? normalizedRows : [createEmptyDrugRow(1)];
+  };
+
+  useEffect(() => {
+    if (!student) return;
+    setHouseholdRows(normalizeHouseholdRows(student.household));
+    setDrugRows(normalizeDrugRows(student.drug_history));
+  }, [student]);
+
+  const updateHouseholdRow = (rowId, field, value) => {
+    setHouseholdRows((prev) =>
+      prev.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)),
+    );
+  };
+
+  const addHouseholdRow = () => {
+    setHouseholdRows((prev) => [
+      ...prev,
+      createEmptyHouseholdRow(prev.length + 1),
+    ]);
+  };
+
+  const removeHouseholdRow = (rowId) => {
+    setHouseholdRows((prev) => {
+      const remainingRows = prev
+        .filter((row) => row.id !== rowId)
+        .map((row, index) => ({ ...row, id: index + 1 }));
+
+      return remainingRows.length ? remainingRows : [createEmptyHouseholdRow(1)];
+    });
+  };
+
+  const updateDrugRow = (rowId, field, value) => {
+    setDrugRows((prev) =>
+      prev.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)),
+    );
+  };
+
+  const addDrugRow = () => {
+    setDrugRows((prev) => [...prev, createEmptyDrugRow(prev.length + 1)]);
+  };
+
+  const removeDrugRow = (rowId) => {
+    setDrugRows((prev) => {
+      const remainingRows = prev
+        .filter((row) => row.id !== rowId)
+        .map((row, index) => ({ ...row, id: index + 1 }));
+
+      return remainingRows.length ? remainingRows : [createEmptyDrugRow(1)];
+    });
+  };
+
+  const developmentHistoryMap = {
+    "Smiles at other": "smiles_at_other",
+    "Head Control": "head_control",
+    Sitting: "sitting",
+    "Responds to name": "responds_to_name",
+    Babbling: "babbling",
+    "First words": "first_words",
+    Standing: "standing",
+    Walking: "walking",
+    "Two word phrases": "two_word_phrases",
+    "Toilet control": "toilet_control",
+    Sentences: "sentences",
+    "Physical Deformity": "physical_deformity",
+  };
+
+  const setNestedEditValue = (target, path, value) => {
+    const keys = path.split(".");
+    const nextTarget = { ...(target || {}) };
+    let cursor = nextTarget;
+
+    for (let index = 0; index < keys.length - 1; index += 1) {
+      const key = keys[index];
+      const currentValue = cursor[key];
+      cursor[key] =
+        currentValue && typeof currentValue === "object"
+          ? Array.isArray(currentValue)
+            ? [...currentValue]
+            : { ...currentValue }
+          : {};
+      cursor = cursor[key];
+    }
+
+    cursor[keys[keys.length - 1]] = value;
+    return nextTarget;
   };
 
   // Handle input change in edit mode
   const handleEditChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     // Prevent editing studentId
     if (name === "studentId") return;
+
+    if (type === "checkbox") {
+      if (name.includes(".")) {
+        setEditData((prev) => setNestedEditValue(prev, name, checked));
+        return;
+      }
+
+      setEditData((prev) => ({ ...prev, [name]: checked }));
+      return;
+    }
+
     // Special handling for Aadhaar formatting/validation
     if (name === "aadharNumber") {
       const raw = String(value || "");
@@ -1949,6 +2101,11 @@ const addCellToColumn = (columnKey) => {
       return;
     }
 
+    if (name.includes(".")) {
+      setEditData((prev) => setNestedEditValue(prev, name, value));
+      return;
+    }
+
     setEditData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -1972,6 +2129,8 @@ const addCellToColumn = (columnKey) => {
       ...editableFields
     } = student;
     setEditData(editableFields);
+    setHouseholdRows(normalizeHouseholdRows(student.household));
+    setDrugRows(normalizeDrugRows(student.drug_history));
     setEditMode(false);
   };
 
@@ -2121,6 +2280,32 @@ const addCellToColumn = (columnKey) => {
         // Assessment - Other
         any_other: editData.assessment?.any_other,
         recommendation: editData.assessment?.recommendation,
+        household: householdRows
+          .map((row) => ({
+            name: row.name,
+            age: row.age,
+            education: row.education,
+            occupation: row.occupation,
+            health: row.health,
+            income: row.income,
+          }))
+          .filter((row) =>
+            Object.values(row).some(
+              (value) =>
+                value !== null && value !== undefined && String(value).trim() !== "",
+            ),
+          ),
+        // Remove empty placeholder drug rows before saving
+        drug_history: (drugRows || [])
+          .map((row) => ({
+            name: row.name,
+            dose: row.dose,
+          }))
+          .filter(
+            (row) =>
+              (row.name && String(row.name).trim()) ||
+              (row.dose && String(row.dose).trim()),
+          ),
         // Medical Information
         specific_diagnostic: editData.specific_diagnostic,
         medical_conditions: editData.medical_conditions,
@@ -2836,6 +3021,7 @@ const addCellToColumn = (columnKey) => {
       const { studentId, photoUrl, address, ...editableFields } =
         mappedForDisplay;
       setEditData(editableFields);
+      setDrugRows(normalizeDrugRows(mappedForDisplay.drug_history));
     } catch (e) {
       setStudent(null);
       console.error("Failed to fetch student data:", e);
@@ -9468,77 +9654,239 @@ const isPhaseUnlocked = (table, targetPhase) => {
                         <h3 className="text-lg font-semibold text-[#170F49] mb-4">
                           Household Composition
                         </h3>
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse rounded-xl overflow-hidden">
-                            <thead className="bg-[#E38B52]/10">
-                              <tr>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                  S.No
-                                </th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                  Name
-                                </th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                  Age
-                                </th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                  Education
-                                </th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                  Occupation
-                                </th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                  Health
-                                </th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                  Income
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white/70">
-                              {student?.household &&
-                              student.household.length > 0 ? (
-                                student.household.map((member, index) => (
+                        {editMode ? (
+                          <div className="overflow-x-auto pb-2">
+                            <table className="min-w-[980px] w-full table-fixed border border-[#E38B52]/20 rounded-xl backdrop-blur-xl overflow-hidden">
+                              <colgroup>
+                                <col className="w-[6%]" />
+                                <col className="w-[19%]" />
+                                <col className="w-[8%]" />
+                                <col className="w-[17%]" />
+                                <col className="w-[17%]" />
+                                <col className="w-[14%]" />
+                                <col className="w-[19%]" />
+                                <col className="w-[4%]" />
+                              </colgroup>
+                              <thead>
+                                <tr className="border-b border-[#E38B52]/20">
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    S.No
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Name
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Age
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Education
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Occupation
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Health
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Income
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {householdRows.map((row) => (
                                   <tr
-                                    key={index}
-                                    className="border-b border-[#E38B52]/10 last:border-b-0"
+                                    key={row.id}
+                                    className="border-b border-[#E38B52]/10"
                                   >
                                     <td className="px-4 py-3 text-sm text-[#170F49]">
-                                      {index + 1}
+                                      {row.id}
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-[#170F49]">
-                                      {member.name || "N/A"}
+                                    <td className="px-4 py-3 min-w-0">
+                                      <input
+                                        type="text"
+                                        value={row.name}
+                                        onChange={(e) =>
+                                          updateHouseholdRow(
+                                            row.id,
+                                            "name",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                      />
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-[#170F49]">
-                                      {member.age || "N/A"}
+                                    <td className="px-4 py-3 min-w-0">
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        placeholder="Age"
+                                        value={row.age}
+                                        onChange={(e) =>
+                                          updateHouseholdRow(
+                                            row.id,
+                                            "age",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="block w-full min-w-0 px-2.5 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                      />
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-[#170F49]">
-                                      {member.education || "N/A"}
+                                    <td className="px-4 py-3 min-w-0">
+                                      <input
+                                        type="text"
+                                        value={row.education}
+                                        onChange={(e) =>
+                                          updateHouseholdRow(
+                                            row.id,
+                                            "education",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                      />
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-[#170F49]">
-                                      {member.occupation || "N/A"}
+                                    <td className="px-4 py-3 min-w-0">
+                                      <input
+                                        type="text"
+                                        value={row.occupation}
+                                        onChange={(e) =>
+                                          updateHouseholdRow(
+                                            row.id,
+                                            "occupation",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                      />
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-[#170F49]">
-                                      {member.health || "N/A"}
+                                    <td className="px-4 py-3 min-w-0">
+                                      <input
+                                        type="text"
+                                        value={row.health}
+                                        onChange={(e) =>
+                                          updateHouseholdRow(
+                                            row.id,
+                                            "health",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                      />
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-[#170F49]">
-                                      {member.income || "N/A"}
+                                    <td className="px-4 py-3 min-w-0">
+                                      <input
+                                        type="text"
+                                        value={row.income}
+                                        onChange={(e) =>
+                                          updateHouseholdRow(
+                                            row.id,
+                                            "income",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="block w-full min-w-0 px-4 py-2.5 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                      />
+                                    </td>
+                                    <td className="px-2 py-3 text-center align-middle">
+                                      <button
+                                        type="button"
+                                        onClick={() => removeHouseholdRow(row.id)}
+                                        disabled={householdRows.length === 1}
+                                        aria-label="Delete household row"
+                                        title="Delete row"
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        <span className="text-base leading-none">×</span>
+                                      </button>
                                     </td>
                                   </tr>
-                                ))
-                              ) : (
+                                ))}
+                              </tbody>
+                            </table>
+                            <div className="mt-2 px-1 text-xs text-[#6F6C90] italic">
+                              Scroll horizontally to view all household columns.
+                            </div>
+                            <button
+                              type="button"
+                              onClick={addHouseholdRow}
+                              className="mt-4 w-full px-4 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B40] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
+                            >
+                              Add Row
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse rounded-xl overflow-hidden">
+                              <thead className="bg-[#E38B52]/10">
                                 <tr>
-                                  <td
-                                    colSpan="7"
-                                    className="px-4 py-8 text-sm text-[#6F6C90] text-center"
-                                  >
-                                    No household composition data available
-                                  </td>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    S.No
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Name
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Age
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Education
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Occupation
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Health
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                    Income
+                                  </th>
                                 </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
+                              </thead>
+                              <tbody className="bg-white/70">
+                                {student?.household && student.household.length > 0 ? (
+                                  student.household.map((member, index) => (
+                                    <tr
+                                      key={index}
+                                      className="border-b border-[#E38B52]/10 last:border-b-0"
+                                    >
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
+                                        {index + 1}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
+                                        {member.name || "N/A"}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
+                                        {member.age || "N/A"}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
+                                        {member.education || "N/A"}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
+                                        {member.occupation || "N/A"}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
+                                        {member.health || "N/A"}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
+                                        {member.income || "N/A"}
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td
+                                      colSpan="7"
+                                      className="px-4 py-8 text-sm text-[#6F6C90] text-center"
+                                    >
+                                      No household composition data available
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </div>
 
                       {/* Medical History */}
@@ -9701,36 +10049,66 @@ const isPhaseUnlocked = (table, targetPhase) => {
                       <h3 className="text-lg font-semibold text-[#170F49] mb-4">
                         Developmental History
                       </h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 p-4 bg-white/70 rounded-xl">
-                        {/* Check if developmentHistory exists and has entries */}
-                        {student?.developmentHistory &&
-                        Object.keys(student.developmentHistory).length > 0 ? (
-                          Object.entries(student.developmentHistory).map(
-                            ([key, value]) => (
-                              <div key={key} className="flex items-center">
-                                {/* Display a green check for true, red cross for false */}
-                                {value ? (
-                                  <span className="text-green-500 font-bold mr-2 text-xl">
-                                    ✓
-                                  </span>
-                                ) : (
-                                  <span className="text-red-500 font-bold mr-2 text-xl">
-                                    ✗
-                                  </span>
-                                )}
-                                {/* Format the key from snake_case to Title Case */}
-                                <p className="text-[#170F49] font-medium capitalize">
-                                  {key.replace(/_/g, " ")}
-                                </p>
-                              </div>
+                      {editMode ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-6 rounded-xl shadow-lg">
+                          {Object.entries(developmentHistoryMap).map(
+                            ([label, field]) => (
+                              <label
+                                key={field}
+                                className="flex items-center space-x-2"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="w-4 h-4 rounded border-gray-300 text-[#E38B52] focus:ring-[#E38B52]"
+                                  name={`developmentHistory.${field}`}
+                                  checked={
+                                    !!editData?.developmentHistory?.[field]
+                                  }
+                                  onChange={handleEditChange}
+                                />
+                                <span className="text-sm text-[#170F49]">
+                                  {label}
+                                </span>
+                              </label>
                             ),
-                          )
-                        ) : (
-                          <p className="col-span-full text-center text-[#6F6C90]">
-                            No development history recorded.
-                          </p>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 p-4 bg-white/70 rounded-xl">
+                          {/* Check if developmentHistory exists and has entries */}
+                          {student?.developmentHistory &&
+                          Object.keys(student.developmentHistory).length > 0 ? (
+                            Object.entries(developmentHistoryMap).map(
+                              ([label, field]) => {
+                                const value = student.developmentHistory[field];
+
+                                return (
+                                  <div key={field} className="flex items-center">
+                                    {/* Display a green check for true, red cross for false */}
+                                    {value ? (
+                                      <span className="text-green-500 font-bold mr-2 text-xl">
+                                        ✓
+                                      </span>
+                                    ) : (
+                                      <span className="text-red-500 font-bold mr-2 text-xl">
+                                        ✗
+                                      </span>
+                                    )}
+                                    {/* Format the label from snake_case to Title Case */}
+                                    <p className="text-[#170F49] font-medium capitalize">
+                                      {label}
+                                    </p>
+                                  </div>
+                                );
+                              },
+                            )
+                          ) : (
+                            <p className="col-span-full text-center text-[#6F6C90]">
+                              No development history recorded.
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {/* Additional Information Section */}
                     <div className="mt-6">
@@ -9752,32 +10130,76 @@ const isPhaseUnlocked = (table, targetPhase) => {
                         Additional Information
                       </h2>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Check if additionalInfo exists and has keys */}
-                        {student?.additionalInfo &&
-                        Object.keys(student.additionalInfo).length > 0 ? (
-                          Object.entries(student.additionalInfo).map(
-                            ([key, value]) => (
-                              <div
-                                key={key}
-                                className="bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]"
-                              >
-                                <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
-                                  {key.replace(/_/g, " ")}
-                                </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]">
+                              <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
+                                School History
+                              </h3>
+                              {editMode ? (
+                                <textarea
+                                  name="additionalInfo.school_history"
+                                  value={
+                                    editData?.additionalInfo?.school_history || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  rows="4"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                                  placeholder="Enter school history"
+                                />
+                              ) : (
                                 <p className="text-[#170F49] text-base leading-relaxed">
-                                  {value || "N/A"}
+                                  {student?.additionalInfo?.school_history || "N/A"}
                                 </p>
-                              </div>
-                            ),
-                          )
-                        ) : (
-                          <div className="md:col-span-2 text-center p-6 bg-white/50 rounded-2xl">
-                            <p className="text-[#6F6C90]">
-                              No additional information has been recorded.
-                            </p>
-                          </div>
-                        )}
+                              )}
+                            </div>
+
+                            <div className="bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]">
+                              <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
+                                Occupational History
+                              </h3>
+                              {editMode ? (
+                                <textarea
+                                  name="additionalInfo.occupational_history"
+                                  value={
+                                    editData?.additionalInfo?.occupational_history ||
+                                    ""
+                                  }
+                                  onChange={handleEditChange}
+                                  rows="4"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                                  placeholder="Enter occupational history"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] text-base leading-relaxed">
+                                  {student?.additionalInfo?.occupational_history ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="md:col-span-2 bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]">
+                              <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
+                                Behaviour Problems
+                              </h3>
+                              {editMode ? (
+                                <textarea
+                                  name="assessment.behaviour_problems"
+                                  value={
+                                    editData?.assessment?.behaviour_problems || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  rows="4"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                                  placeholder="Describe behaviour problems"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] text-base leading-relaxed">
+                                  {student?.assessment?.behaviour_problems ||
+                                    student?.additionalInfo?.behaviour_problems ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
                       </div>
                     </div>
                   </div>
@@ -10721,7 +11143,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
                             ></textarea>
                           ) : (
                             <p className="text-[#170F49] font-medium">
-                              {student?.assessment?.any_other || "N/A"}
+                              {student?.assessment?.any_other ?? student?.any_other ?? "N/A"}
                             </p>
                           )}
                         </div>
@@ -10740,7 +11162,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
                             ></textarea>
                           ) : (
                             <p className="text-[#170F49] font-medium">
-                              {student?.assessment?.recommendation || "N/A"}
+                              {student?.assessment?.recommendation ?? student?.recommendation ?? "N/A"}
                             </p>
                           )}
                         </div>
@@ -10824,24 +11246,6 @@ const isPhaseUnlocked = (table, targetPhase) => {
                               </div>
                             )}
                           </div>
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              On Regular Drugs
-                            </p>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="is_on_regular_drugs"
-                                value={editData?.is_on_regular_drugs || ""}
-                                onChange={handleEditChange}
-                                className="input-edit"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.is_on_regular_drugs || "N/A"}
-                              </p>
-                            )}
-                          </div>
                         </div>
                       </div>
 
@@ -10850,46 +11254,148 @@ const isPhaseUnlocked = (table, targetPhase) => {
                         <h3 className="text-lg font-semibold text-[#170F49] mb-4">
                           Drug History
                         </h3>
-                        <p className="text-[#170F49] mb-4">
-                          {student?.is_on_regular_drugs
-                            ? student.is_on_regular_drugs
-                            : "N/A"}
-                        </p>
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse rounded-xl overflow-hidden">
-                            <thead className="bg-[#E38B52]/10">
-                              <tr>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                  S.No
-                                </th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                  Name of drug
-                                </th>
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                  Dose
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white/70">
-                              {(student?.drug_history || []).map((d, i) => (
-                                <tr
-                                  key={i}
-                                  className="border-b border-[#E38B52]/10"
-                                >
-                                  <td className="px-4 py-3 text-sm text-[#170F49]">
-                                    {i + 1}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-[#170F49]">
-                                    {d?.name || "N/A"}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-[#170F49]">
-                                    {d?.dose || "N/A"}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        {editMode ? (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Is the child on regular drugs
+                              </label>
+                              <input
+                                type="text"
+                                name="is_on_regular_drugs"
+                                value={editData?.is_on_regular_drugs || ""}
+                                onChange={handleEditChange}
+                                placeholder="Yes / No or details"
+                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                              />
+                            </div>
+                            <div className="overflow-hidden">
+                              <table className="w-full border border-[#E38B52]/20 rounded-xl backdrop-blur-xl overflow-hidden">
+                                <thead>
+                                  <tr className="border-b border-[#E38B52]/20">
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      S.No
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Name of drug
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Dose if known
+                                    </th>
+                                    <th className="px-2 py-3 text-center text-sm font-semibold text-[#170F49] w-14"></th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white/70">
+                                  {drugRows.map((row) => (
+                                    <tr
+                                      key={row.id}
+                                      className="border-b border-[#E38B52]/10 last:border-b-0"
+                                    >
+                                      <td className="px-4 py-3 text-sm text-[#170F49] align-middle">
+                                        {row.id}
+                                      </td>
+                                      <td className="px-4 py-3 align-middle">
+                                        <input
+                                          type="text"
+                                          value={row.name}
+                                          onChange={(e) =>
+                                            updateDrugRow(
+                                              row.id,
+                                              "name",
+                                              e.target.value,
+                                            )
+                                          }
+                                          className="w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                          placeholder="Enter drug name"
+                                        />
+                                      </td>
+                                      <td className="px-4 py-3 align-middle">
+                                        <input
+                                          type="text"
+                                          value={row.dose}
+                                          onChange={(e) =>
+                                            updateDrugRow(
+                                              row.id,
+                                              "dose",
+                                              e.target.value,
+                                            )
+                                          }
+                                          className="w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                          placeholder="Enter dose"
+                                        />
+                                      </td>
+                                      <td className="px-2 py-3 text-center align-middle">
+                                        <button
+                                          type="button"
+                                          onClick={() => removeDrugRow(row.id)}
+                                          disabled={drugRows.length === 1}
+                                          aria-label="Delete drug row"
+                                          title="Delete row"
+                                          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                          <span className="text-base leading-none">×</span>
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              <button
+                                type="button"
+                                onClick={addDrugRow}
+                                className="mt-4 w-full px-4 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B40] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
+                              >
+                                Add Drug
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm text-[#6F6C90] mb-2">
+                              Is the child on regular drugs
+                            </p>
+                            <p className="text-[#170F49] mb-4">
+                              {student?.is_on_regular_drugs
+                                ? student.is_on_regular_drugs
+                                : "N/A"}
+                            </p>
+                            <div className="overflow-x-auto">
+                              <table className="w-full border-collapse rounded-xl overflow-hidden">
+                                <thead className="bg-[#E38B52]/10">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      S.No
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Name of drug
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Dose
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white/70">
+                                  {(student?.drug_history || []).map((d, i) => (
+                                    <tr
+                                      key={i}
+                                      className="border-b border-[#E38B52]/10"
+                                    >
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
+                                        {i + 1}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
+                                        {d?.name || "N/A"}
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
+                                        {d?.dose || "N/A"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* Allergies */}

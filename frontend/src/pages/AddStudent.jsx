@@ -752,6 +752,8 @@ const AddStudent = () => {
       school_history: studentForm.school_history,
       occupational_history: studentForm.occupational_history,
       behaviour_problems: studentForm.behaviour_problems,
+      any_other: studentForm.any_other,
+      recommendation: studentForm.recommendation,
       special_education_assessment: studentForm.special_education_assessment,
       psychological_assessment: studentForm.psychological_assessment,
       medical_examination: studentForm.medical_examination,

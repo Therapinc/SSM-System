@@ -171,6 +171,93 @@ const StudentViewPage = () => {
         guardianContact: data.guardian_contact,
         photoUrl: data.photo_url,
         caseRecord: data.case_record,
+        household: data.household || [],
+        drug_history: data.drug_history || [],
+        familyHistory: {
+          mental_illness: data.family_history_mental_illness,
+          mental_retardation: data.family_history_mental_retardation,
+          epilepsy: data.family_history_epilepsy,
+        },
+        birthHistory: {
+          prenatal: data.prenatal_history,
+          natal: data.natal_history,
+          postnatal: data.postnatal_history,
+        },
+        developmentHistory: {
+          smiles_at_other: data.smiles_at_other,
+          head_control: data.head_control,
+          sitting: data.sitting,
+          responds_to_name: data.responds_to_name,
+          babbling: data.babbling,
+          first_words: data.first_words,
+          standing: data.standing,
+          walking: data.walking,
+          two_word_phrases: data.two_word_phrases,
+          toilet_control: data.toilet_control,
+          sentences: data.sentences,
+          physical_deformity: data.physical_deformity,
+        },
+        additionalInfo: {
+          school_history: data.school_history,
+          occupational_history: data.occupational_history,
+          behaviour_problems: data.behaviour_problems,
+        },
+        assessment: {
+          self_help: {
+            food_habits: {
+              eating: data.eating_habits,
+              drinking: data.drinking_habits,
+            },
+            toilet_habits: data.toilet_habits,
+            brushing: data.brushing,
+            bathing: data.bathing,
+            dressing: {
+              removing_and_wearing: data.dressing_removing_wearing,
+              buttoning: data.dressing_buttoning,
+              footwear: data.dressing_footwear,
+              grooming: data.dressing_grooming,
+            },
+          },
+          motor: {
+            gross_motor: data.gross_motor,
+            fine_motor: data.fine_motor,
+          },
+          sensory: data.sensory,
+          socialization: {
+            language_communication: data.language_communication,
+            social_behaviour: data.social_behaviour,
+            mobility: data.mobility_in_neighborhood,
+          },
+          cognitive: {
+            attention: data.attention,
+            identification_of_objects: data.identification_of_objects,
+            use_of_objects: data.use_of_objects,
+            following_instruction: data.following_instruction,
+            awareness_of_danger: data.awareness_of_danger,
+            concept_formation: {
+              color: data.concept_color,
+              size: data.concept_size,
+              sex: data.concept_sex,
+              shape: data.concept_shape,
+              number: data.concept_number,
+              time: data.concept_time,
+              money: data.concept_money,
+            },
+          },
+          academic: {
+            reading: data.academic_reading,
+            writing: data.academic_writing,
+            arithmetic: data.academic_arithmetic,
+          },
+          prevocational: {
+            ability_and_interest: data.prevocational_ability,
+            items_of_interest: data.prevocational_interest,
+            items_of_dislike: data.prevocational_dislike,
+          },
+          behaviour_problems: data.behaviour_problems,
+          any_other: data.any_other,
+          recommendation: data.recommendation,
+        },
       });
       setLoading(false);
     } catch (err) {
@@ -1169,11 +1256,11 @@ const StudentViewPage = () => {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-[#170F49] mb-2">Any other</label>
-                          <p className="text-[#170F49] font-medium">{student?.assessment?.any_other || 'N/A'}</p>
+                          <p className="text-[#170F49] font-medium">{student?.assessment?.any_other ?? student?.any_other ?? 'N/A'}</p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-[#170F49] mb-2">Recommendation</label>
-                          <p className="text-[#170F49] font-medium">{student?.assessment?.recommendation || 'N/A'}</p>
+                          <p className="text-[#170F49] font-medium">{student?.assessment?.recommendation ?? student?.recommendation ?? 'N/A'}</p>
                         </div>
                       </div>
                     )}
