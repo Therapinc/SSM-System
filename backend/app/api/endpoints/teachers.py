@@ -10,73 +10,22 @@ from sqlalchemy import and_, or_
 from typing import Optional
 from app.schemas.student import Student as StudentSchema
 from app.models.student import Student as StudentModel
-from fastapi import status
-from app.crud.user import user as user_crud
-from app.schemas.user import UserCreate
-from app.models.user import UserRole
-from app.api import deps as api_deps
 
 router = APIRouter()
 
 @router.post("/", response_model=Teacher)
-def create_teacher(
-    teacher_in: TeacherCreate,
-    db: Session = Depends(get_db),
-    current_user = Depends(api_deps.get_current_active_user),
-):
-    # Only admin may create teachers (same rule as user creation endpoints)
-    if not current_user.is_superuser and current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Only admins can create new teacher accounts")
-
-    # Basic uniqueness checks for teacher fields
-    if teacher.get_by_aadhar(db, aadhar_number=teacher_in.aadhar_number):
+def create_teacher(teacher_in: TeacherCreate, db: Session = Depends(get_db)):
+    # Check if teacher with same Aadhar exists
+    db_teacher = teacher.get_by_aadhar(db, aadhar_number=teacher_in.aadhar_number)
+    if db_teacher:
         raise HTTPException(status_code=400, detail="Teacher with this Aadhar number already exists")
-    if teacher_in.rci_number and teacher.get_by_rci(db, rci_number=teacher_in.rci_number):
+    
+    # Check if teacher with same RCI number exists
+    db_teacher = teacher.get_by_rci(db, rci_number=teacher_in.rci_number)
+    if db_teacher:
         raise HTTPException(status_code=400, detail="Teacher with this RCI number already exists")
-
-    # Create teacher then attempt to create a linked user account.
-    # If user creation fails, remove the teacher to keep consistency.
-    new_teacher = None
-    try:
-        new_teacher = teacher.create(db=db, obj_in=teacher_in)
-
-        # Only create a login user when a valid email is provided
-        if teacher_in.email and "@" in teacher_in.email:
-            username = teacher_in.email.split("@")[0]
-            # derive default password same as frontend: Teacher + last 4 of Aadhaar
-            last_four = str(teacher_in.aadhar_number)[-4:]
-            generated_password = f"Teacher{last_four}"
-
-            # ensure username/email not already taken
-            if user_crud.get_by_username(db, username=username) or user_crud.get_by_email(db, email=teacher_in.email):
-                # rollback teacher and inform operator
-                teacher.remove(db=db, id=new_teacher.id)
-                raise HTTPException(status_code=400, detail="Username or email already exists for another user")
-
-            user_in = UserCreate(
-                username=username,
-                email=teacher_in.email,
-                password=generated_password,
-                role=UserRole.TEACHER,
-                is_active=True,
-                is_superuser=False,
-            )
-
-            user_crud.create(db=db, obj_in=user_in)
-
-        return new_teacher
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        # cleanup teacher if it was created
-        if new_teacher:
-            try:
-                teacher.remove(db=db, id=new_teacher.id)
-            except Exception:
-                pass
-        raise HTTPException(status_code=400, detail=str(exc))
+    
+    return teacher.create(db=db, obj_in=teacher_in)
 
 @router.get("/", response_model=List[Teacher])
 def read_teachers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
