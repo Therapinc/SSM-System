@@ -654,6 +654,8 @@ const getHighestFilledPhase = (table) => {
     }
   }
 
+
+
   return "1st assmt"; // fallback
 };
 
@@ -1089,6 +1091,40 @@ const performDeleteIepReport = () => {
     }));
   };
 
+
+  const handleQuarterEditDateChange = (targetTable, quarterPhase, value) => {
+    if (!targetTable) return;
+
+    const nowIso = new Date().toISOString();
+
+    setSavedTables((prev) => {
+      const updated = prev.map((t) => {
+        if (t !== targetTable) return t;
+
+        return {
+          ...t,
+          quarterEditDates: {
+            ...(t.quarterEditDates || {}),
+            [quarterPhase]: value,
+          },
+          last_edited_at: nowIso,
+        };
+      });
+
+      try {
+        if (typeof window !== "undefined" && id) {
+          window.localStorage.setItem(
+            `special-education-tables:${id}`,
+            JSON.stringify(updated),
+          );
+        }
+      } catch (err) {
+        console.warn("Failed to persist quarter edit date", err);
+      }
+
+      return updated;
+    });
+  };
   
 
   const loadIepData = () => {
@@ -3141,9 +3177,12 @@ const addCellToColumn = (columnKey) => {
         const normalized = parsed.map((t) => ({
           ...t,
           isEditable: t.isEditable === true,
-          // keep saved assessment_phase if present, otherwise compute highest filled
           assessment_phase: t.assessment_phase || getHighestFilledPhase(t),
           last_edited_at: t.last_edited_at || null,
+          table_year:
+            t.table_year ||
+            (t.report_date ? new Date(t.report_date).getFullYear() : null),
+          quarterEditDates: t.quarterEditDates || {},
         }));
         setSavedTables(normalized);
       }
@@ -3171,6 +3210,7 @@ const addCellToColumn = (columnKey) => {
     }
   
     const nowIso = new Date().toISOString();
+    const tableYear = new Date(reportDate).getFullYear();
   
     const baseMetaHeaders = [
       "Student Name",
@@ -3201,6 +3241,7 @@ const addCellToColumn = (columnKey) => {
       rows,
       assessment_phase: "1st assmt",
       report_date: reportDate || "",
+      table_year: tableYear,
       extracted_at: nowIso,
       isEditable: true,
       last_edited_at: nowIso,
@@ -3430,6 +3471,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
 
   const handleExportToPDF = async (table, index) => {
     if (!table || !table.rows || table.rows.length === 0) return;
+    const rows = table.rows || [];
   
     try {
       const doc = new jsPDF({
@@ -3448,9 +3490,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
       const marginBottom = 6;
   
       const studentName = table.rows?.[0]?.["Student Name"] || student?.name || "Unknown";
-      const phaseText = table.assessment_phase || "1st assmt";
-      const dateText = table.report_date || "N/A";
-      const phase = table.assessment_phase || "1st assmt";
+     
       
   
       const rawHeaders = table.headers || Object.keys(table.rows[0] || {});
@@ -3460,6 +3500,8 @@ const isPhaseUnlocked = (table, targetPhase) => {
           h !== "Register Number" &&
           h !== "Assessment Date",
       );
+
+      
   
       const skillHeader =
         headers.find((h) => String(h).toLowerCase().includes("skill")) ||
@@ -3528,23 +3570,17 @@ const isPhaseUnlocked = (table, targetPhase) => {
           header: "A",
           subLabel: "A",
           fieldName: key,
-          getValue: (row, rowIdx) => {
-            const phaseSnapshot = snapshots[quarterPhase];
-            if (!phaseSnapshot || Object.keys(phaseSnapshot).length === 0) return "-";
-            return getPhaseCounts(row, rowIdx, quarterPhase, sessionHeaders, snapshots).aCount;
-          },
+          getValue: (row, rowIdx) =>
+            getPhaseCounts(row, rowIdx, quarterPhase, sessionHeaders, snapshots).aCount,
         });
-  
+      
         visibleColumns.push({
           group: label,
           header: "B",
           subLabel: "B",
           fieldName: key,
-          getValue: (row, rowIdx) => {
-            const phaseSnapshot = snapshots[quarterPhase];
-            if (!phaseSnapshot || Object.keys(phaseSnapshot).length === 0) return "-";
-            return getPhaseCounts(row, rowIdx, quarterPhase, sessionHeaders, snapshots).bCount;
-          },
+          getValue: (row, rowIdx) =>
+            getPhaseCounts(row, rowIdx, quarterPhase, sessionHeaders, snapshots).bCount,
         });
       });
   
@@ -3610,20 +3646,115 @@ const isPhaseUnlocked = (table, targetPhase) => {
         y += 6;
       };
   
+      const quarterEditDates = table.quarterEditDates || {};
+      const centerX = pageWidth / 2;
+
+      
+      
+      const drawLegendCell = (x, yPos, mode) => {
+        const w = 5.2;
+        const h = 4.0;
+        doc.rect(x, yPos, w, h, "S");
+      
+        const left = x + 0.6;
+        const right = x + w - 0.6;
+        const top = yPos + 0.6;
+        const bottom = yPos + h - 0.6;
+        const midX = x + w / 2;
+        const midY = yPos + h / 2;
+      
+        if (mode === "horizontal") {
+          doc.line(left, top, right, top);
+          doc.line(left, midY, right, midY);
+          doc.line(left, bottom, right, bottom);
+        } else if (mode === "vertical") {
+          doc.line(left, top, left, bottom);
+          doc.line(midX, top, midX, bottom);
+          doc.line(right, top, right, bottom);
+        } else if (mode === "grid") {
+          doc.line(left, top, right, top);
+          doc.line(left, midY, right, midY);
+          doc.line(left, bottom, right, bottom);
+          doc.line(left, top, left, bottom);
+          doc.line(midX, top, midX, bottom);
+          doc.line(right, top, right, bottom);
+        } else if (mode === "diagonal") {
+
+          const offsetA = -0.35;
+          const offsetC = 0.85;
+
+          const yShiftt = 0.45;
+
+          
+
+          // same exact line length
+          const x1 = left;
+          const y1 = top + yShiftt;
+
+          const x2 = right - 0.4;
+          const y2 = bottom - 0.2;
+
+          // left line
+          doc.line(
+            x1 + offsetA,
+            y1,
+            x2 + offsetA,
+            y2
+          );
+
+          // right line
+          doc.line(
+            x1 + offsetC,
+            y1,
+            x2 + offsetC,
+            y2
+          );
+
+
+        }
+      };
+      
       const drawMeta = () => {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8.8);
-        doc.text("Special Education Table", marginLeft, y);
-  
+        const legendX = pageWidth - marginRight - 68;
+        const legendTextY = y;
+        const legendLineGap = 3.8;
+        const iconX = legendX + 34;
+      
         doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.2);
+      
+        doc.text(`Student: ${studentName}`, marginLeft, y, { align: "left" });
+      
+        doc.text(
+          [
+            `1st Asst : ${table.report_date || "N/A"}`,
+            `1st Qtr  : ${quarterEditDates["1st Qtr"] || "N/A"}`,
+            `2nd Qtr  : ${quarterEditDates["2nd Qtr"] || "N/A"}`,
+            `3rd Qtr  : ${quarterEditDates["3rd Qtr"] || "N/A"}`,
+            `4th Qtr  : ${quarterEditDates["4th Qtr"] || "N/A"}`,
+          ],
+          centerX,
+          y,
+          { align: "center" }
+        );
+      
         doc.setFontSize(6.8);
-        y += 3.6;
-        doc.text(`Student: ${studentName}`, marginLeft, y);
-        doc.text(`Phase: ${phaseText}`, pageWidth / 2 - 10, y);
-        doc.text(`Date: ${dateText}`, pageWidth - marginRight - 32, y);
-        y += 3.1;
-        doc.text(`Current edit phase: ${phase}`, marginLeft, y);
-        y += 3.4;
+        doc.text("Observers:", legendX, legendTextY, { align: "left" });
+        doc.text("shade 'A' in Blue and 'B' in Red", legendX, legendTextY + legendLineGap, { align: "left" });
+      
+        doc.text("Over the red [I Qtr]", legendX, legendTextY + legendLineGap * 2, { align: "left" });
+        drawLegendCell(iconX, legendTextY + legendLineGap * 2 - 2.2, "horizontal");
+      
+        doc.text("Over the red [II Qtr]", legendX, legendTextY + legendLineGap * 3, { align: "left" });
+        drawLegendCell(iconX, legendTextY + legendLineGap * 3 - 2.2, "vertical");
+      
+        doc.text("Over the red [III Qtr]", legendX, legendTextY + legendLineGap * 4, { align: "left" });
+        drawLegendCell(iconX, legendTextY + legendLineGap * 4 - 2.2, "grid");
+      
+        doc.text("Over the red [IV Qtr]", legendX, legendTextY + legendLineGap * 5, { align: "left" });
+        drawLegendCell(iconX, legendTextY + legendLineGap * 5 - 2.2, "diagonal");
+      
+        y += 22;
       };
   
       const drawCell = (x, yPos, width, height, text, style = {}) => {
@@ -3658,8 +3789,8 @@ const isPhaseUnlocked = (table, targetPhase) => {
       };
   
       const drawGroupedHeader = () => {
-        const topRowHeight = 5.5;
-        const secondRowHeight = 4.2;
+        const topRowHeight = 6.5;
+        const secondRowHeight = 5.2;
   
         let x = marginLeft;
         let i = 0;
@@ -3682,6 +3813,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
             i += 1;
             continue;
           }
+
   
           let span = 0;
           while (
@@ -3733,32 +3865,38 @@ const isPhaseUnlocked = (table, targetPhase) => {
       drawMeta();
       drawGroupedHeader();
   
-      const rowFontSize = 5.6;
-      const rowHeight = 4.2;
+      const skillFontSize = 7.6;
+      const rowFontSize = 7.2;
+      const rowHeight = 6.4;
+      const phase = exportPhase;
+
+      const getPdfCellValue = (row, rowIdx, col) => {
+        if (col.isSkill) {
+          return String(row[col.fieldName] ?? "");
+        }
+
+        const snapshots = table.quarterSnapshots || {};
+        const field = col.fieldName;
+        const isSessionCol =
+          !col.group &&
+          (/^session\s*/i.test(String(field)) || /^\d+$/.test(String(field)));
+
+        if (isSessionCol) {
+          const raw = row[field];
+          const baseVal = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+          const cellKey = `${rowIdx}:${field}`;
+          return getEffectiveValueForPhase(baseVal, cellKey, exportPhase, snapshots) || "";
+        }
+
+        return String(col.getValue(row, rowIdx) ?? "");
+      };
   
-      table.rows.forEach((row, rowIdx) => {
-      let x = marginLeft;
+      rows.forEach((row, rowIdx) => {
+        let x = marginLeft;
         
         visibleColumns.forEach((col, colIdx) => {
           // compute the visible value (apply snapshots for quarter edits)
-          let value;
-          if (col.isSkill) {
-            value = String(row[col.fieldName] ?? "");
-          } else {
-            const field = col.fieldName;
-            const isSessionCol =
-              !col.group &&
-              (/^session\s*/i.test(String(field)) || /^\d+$/.test(String(field)));
-        
-            if (isSessionCol) {
-              const raw = row[field];
-              const baseVal = typeof raw === "string" ? raw.trim().toUpperCase() : "";
-              const cellKey = `${rowIdx}:${field}`;
-              value = getEffectiveValueForPhase(baseVal, cellKey, phase, snapshots) || "";
-            } else {
-              value = String(col.getValue(row, rowIdx) ?? "");
-            }
-          }
+          const value = getPdfCellValue(row, rowIdx, col);
         
           const isSession =
             !col.group &&
@@ -3775,7 +3913,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
             });
           } else if (isSession) {
             const field = col.fieldName; // numeric string like "1","2",...
-            const raw = row[field] ?? row[`Session ${field}`] ?? "";
+            const raw = table.rows?.[rowIdx]?.[field] ?? table.rows?.[rowIdx]?.[`Session ${field}`] ?? "";
             const baseVal = typeof raw === "string" ? raw.trim().toUpperCase() : "";
           
             const keyVariants = [
@@ -3807,6 +3945,8 @@ const isPhaseUnlocked = (table, targetPhase) => {
                 }
               }
             }
+
+           
           
             // For 1st assmt: display A (no lines)
             // For quarters: display B but with pattern based on changePhase
@@ -3849,35 +3989,63 @@ const isPhaseUnlocked = (table, targetPhase) => {
               doc.setLineWidth(0.35);
           
               if (changePhase === "1st Qtr") {
-                // three horizontal lines
-                doc.line(startX, startY, endX, startY);
-                doc.line(startX, startY + gap, endX, startY + gap);
-                doc.line(startX, startY + gap * 2, endX, startY + gap * 2);
+                // three horizontal lines, slightly lower and extended
+                const hOffset = 0.6;      // push lines lower
+                const hExtend = 0.4;      // extend left/right a bit
+                doc.line(startX - hExtend, startY + hOffset, endX + hExtend, startY + hOffset);
+                doc.line(startX - hExtend, startY + gap + hOffset, endX + hExtend, startY + gap + hOffset);
+                doc.line(startX - hExtend, startY + gap * 2 + hOffset, endX + hExtend, startY + gap * 2 + hOffset);
               } else if (changePhase === "2nd Qtr") {
-                // three vertical lines
+                // three vertical lines (unchanged)
                 const mid = startX + (endX - startX) / 2;
                 doc.line(startX + 1, startY, startX + 1, endY);
                 doc.line(mid, startY, mid, endY);
                 doc.line(endX - 1, startY, endX - 1, endY);
+
               } else if (changePhase === "3rd Qtr") {
-                // three horizontal + three vertical (cross-hatch)
+                // grid = horizontal + vertical
+                const hOffset = 0.6;
+                const hExtend = 0.4;
+              
+                // horizontal lines
+                doc.line(startX - hExtend, startY + hOffset, endX + hExtend, startY + hOffset);
+                doc.line(startX - hExtend, startY + gap + hOffset, endX + hExtend, startY + gap + hOffset);
+                doc.line(startX - hExtend, startY + gap * 2 + hOffset, endX + hExtend, startY + gap * 2 + hOffset);
+              
+                // vertical lines
                 const mid = startX + (endX - startX) / 2;
-                doc.line(startX, startY, endX, startY);
-                doc.line(startX, startY + gap, endX, startY + gap);
-                doc.line(startX, startY + gap * 2, endX, startY + gap * 2);
                 doc.line(startX + 1, startY, startX + 1, endY);
                 doc.line(mid, startY, mid, endY);
                 doc.line(endX - 1, startY, endX - 1, endY);
               } else if (changePhase === "4th Qtr") {
-                // three diagonal lines (\)
-                const h = endY - startY;
-                const w = endX - startX;
-                // line 1: top-left to bottom-right
-                doc.line(startX, startY, startX + w / 2, startY + h);
-                // line 2: slightly offset
-                doc.line(startX + w / 4, startY, startX + w / 2 + w / 4, startY + h);
-                // line 3: another offset
-                doc.line(startX + w / 2, startY, endX, startY + h);
+
+                const offset1 = -0.55;
+                const offset3 = 0.85;
+
+                const lineLength = 0.78;
+                const yShift = 0.45; // moves all lines downward
+
+                doc.setLineWidth(0.45);
+
+                // left
+                doc.line(
+                  startX + offset1,
+                  startY + yShift,
+                  startX + offset1 + (endX - startX) * lineLength,
+                  startY + yShift + (endY - startY) * lineLength
+                );
+
+              
+
+                // right
+                doc.line(
+                  startX + offset3,
+                  startY + yShift,
+                  startX + offset3 + (endX - startX) * lineLength,
+                  startY + yShift + (endY - startY) * lineLength
+                );
+
+                doc.setLineWidth(0.35);
               }
             }
           } else if (isGroupCell) {
@@ -7660,7 +7828,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
                         <div className="flex-1">
                             {/* Primary Info - Always Visible */}
                             <h3 className="text-lg font-bold text-white">
-                              Table {tableIndex + 1}
+                              {table.table_year || (table.report_date ? new Date(table.report_date).getFullYear() : "Year")} Table
                             </h3>
                             <div className="text-sm text-white/90 mt-1.5 font-medium">
                               Report Date:{" "}
@@ -7989,48 +8157,64 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                   </button>
                               
                                   {table.isEditable && (
-                                    <select
-                                      value={table.assessment_phase || "1st assmt"}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onChange={(e) => {
-                                        const phase = e.target.value;
-                                        const tableKey = savedTables.indexOf(table);
-                                        
-                                        // Check if phase is unlocked
-                                        if (!isPhaseUnlocked(table, phase)) {
-                                          showToast(`Complete ${SPECIAL_EDU_ASSESSMENT_PHASES[SPECIAL_EDU_ASSESSMENT_PHASES.indexOf(phase) - 1]} before accessing this quarter`, "warning");
-                                          return;
-                                        }
-                                        
-                                        e.stopPropagation();
-                                        const nowIso = new Date().toISOString();
-                                        setSavedTables((prev) => {
-                                          const updated = prev.map((t) =>
-                                            t === table ? { ...t, assessment_phase: phase, last_edited_at: nowIso } : t,
-                                          );
-                                          try {
-                                            if (typeof window !== "undefined" && id) {
-                                              const key = `special-education-tables:${id}`;
-                                              window.localStorage.setItem(key, JSON.stringify(updated));
-                                            }
-                                          } catch (err) {
-                                            console.warn("Failed to persist assessment phase", err);
+                                    <div className="flex flex-col gap-2">
+                                      <select
+                                        value={table.assessment_phase || "1st assmt"}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => {
+                                          const phase = e.target.value;
+                                          const tableKey = savedTables.indexOf(table);
+                                  
+                                          if (!isPhaseUnlocked(table, phase)) {
+                                            showToast(
+                                              `Complete ${SPECIAL_EDU_ASSESSMENT_PHASES[SPECIAL_EDU_ASSESSMENT_PHASES.indexOf(phase) - 1]} before accessing this quarter`,
+                                              "warning",
+                                            );
+                                            return;
                                           }
-                                          return updated;
-                                        });
-                                      }}
-                                      className="text-[10px] bg-white text-[#170F49] border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#E38B52] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                      {SPECIAL_EDU_ASSESSMENT_PHASES.map((phase) => {
-                                        const tableKey = savedTables.indexOf(table);
-                                        const isUnlocked = isPhaseUnlocked(table, phase);
-                                        return (
-                                          <option key={phase} value={phase} disabled={!isUnlocked}>
-                                            {phase} {!isUnlocked ? "(Locked)" : ""}
-                                          </option>
-                                        );
-                                      })}
-                                    </select>
+                                  
+                                          e.stopPropagation();
+                                          const nowIso = new Date().toISOString();
+                                          setSavedTables((prev) => {
+                                            const updated = prev.map((t) =>
+                                              t === table ? { ...t, assessment_phase: phase, last_edited_at: nowIso } : t,
+                                            );
+                                            try {
+                                              if (typeof window !== "undefined" && id) {
+                                                const key = `special-education-tables:${id}`;
+                                                window.localStorage.setItem(key, JSON.stringify(updated));
+                                              }
+                                            } catch (err) {
+                                              console.warn("Failed to persist assessment phase", err);
+                                            }
+                                            return updated;
+                                          });
+                                        }}
+                                        className="text-[10px] bg-white text-[#170F49] border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#E38B52] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        {SPECIAL_EDU_ASSESSMENT_PHASES.map((phase) => {
+                                          const isUnlocked = isPhaseUnlocked(table, phase);
+                                          return (
+                                            <option key={phase} value={phase} disabled={!isUnlocked}>
+                                              {phase} {!isUnlocked ? "(Locked)" : ""}
+                                            </option>
+                                          );
+                                        })}
+                                      </select>
+                                  
+                                      {table.assessment_phase !== "1st assmt" && (
+                                        <input
+                                          type="date"
+                                          value={(table.quarterEditDates || {})[table.assessment_phase] || ""}
+                                          max={new Date().toISOString().slice(0, 10)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          onChange={(e) =>
+                                            handleQuarterEditDateChange(table, table.assessment_phase, e.target.value)
+                                          }
+                                          className="text-[10px] bg-white text-[#170F49] border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#E38B52] shadow-sm"
+                                        />
+                                      )}
+                                    </div>
                                   )}
                               
                                   {/* Show/Hide questions only makes sense when a skill is selected */}
@@ -8428,24 +8612,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                   
                                   // Function to calculate A/B counts for any specific phase
                                   const getCountsForPhase = (targetPhase) => {
-                                    let a = 0;
-                                    let b = 0;
-                                    sessionHeaders.forEach(colName => {
-                                      const raw = row[colName];
-                                      const baseVal =
-                                        typeof raw === 'string' ? raw.trim().toUpperCase() : '';
-                                      const cellKey = `${rowIdx}:${colName}`;
-                                  
-                                      const v = getEffectiveValueForPhase(
-                                        baseVal,
-                                        cellKey,
-                                        targetPhase,
-                                        snapshots
-                                      );
-                                      if (v === 'A') a += 1;
-                                      else if (v === 'B') b += 1;
-                                    });
-                                    return { aCount: a, bCount: b };
+                                    return getPhaseCounts(row, rowIdx, targetPhase, sessionHeaders, snapshots);
                                   };
                               
                                   return (
@@ -8612,15 +8779,6 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                                       style={{
                                                         transform:
                                                           "translateX(-50%) rotate(45deg)",
-                                                        transformOrigin:
-                                                          "center",
-                                                      }}
-                                                    />
-                                                    <span
-                                                      className="absolute w-[141%] h-[1px] bg-blue-600 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-                                                      style={{
-                                                        transform:
-                                                          "translate(-50%, -50%) rotate(45deg)",
                                                         transformOrigin:
                                                           "center",
                                                       }}
