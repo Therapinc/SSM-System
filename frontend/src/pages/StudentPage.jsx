@@ -722,6 +722,17 @@ const StudentPage = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePendingIndex, setDeletePendingIndex] = useState(null);
   const [tableSavedStatus, setTableSavedStatus] = useState({});
+  // Guard helpers: prevent interacting with other tables while one has unsaved edits
+  const isAnotherTableUnsaved = (tableIndex) =>
+    unsavedTableIndex !== null && unsavedTableIndex !== tableIndex;
+  
+  const warnIfUnsavedOther = (tableIndex, actionText = "open or modify another table") => {
+    if (isAnotherTableUnsaved(tableIndex)) {
+      showToast(`Save the current table before ${actionText}`, "warning");
+      return true;
+    }
+    return false;
+  };
 
   // Translation state
   const [translating, setTranslating] = useState(false);
@@ -3179,10 +3190,9 @@ const addCellToColumn = (columnKey) => {
           isEditable: t.isEditable === true,
           assessment_phase: t.assessment_phase || getHighestFilledPhase(t),
           last_edited_at: t.last_edited_at || null,
-          table_year:
-            t.table_year ||
-            (t.report_date ? new Date(t.report_date).getFullYear() : null),
+          table_year: t.table_year || (t.report_date ? new Date(t.report_date).getFullYear() : null),
           quarterEditDates: t.quarterEditDates || {},
+          savedPhases: t.savedPhases || {},
         }));
         setSavedTables(normalized);
       }
@@ -3294,7 +3304,7 @@ const addCellToColumn = (columnKey) => {
     return (
       date.toLocaleDateString("en-GB", {
         day: "2-digit",
-        month: "short",
+        month: "2-digit",
         year: "numeric",
       }) +
       ", " +
@@ -3305,19 +3315,21 @@ const addCellToColumn = (columnKey) => {
       })
     );
   };
-// Check if a phase is unlocked based on previous phases being saved
-const isPhaseUnlocked = (table, targetPhase) => {
-  if (targetPhase === "1st assmt") return true; // Always unlocked
-  
+  // Check if a phase is unlocked based on previous phases being saved
+  const isPhaseUnlocked = (table, targetPhase) => {
+  if (targetPhase === "1st assmt") return true;
+
+  // prefer persisted savedPhases stored on the table object
   const tableKey = savedTables.indexOf(table);
-  const phaseStatus = phaseSavedStatus[tableKey] || {};
-  
+  const persistedStatus = table && table.savedPhases ? table.savedPhases : null;
+  const phaseStatus = persistedStatus || (phaseSavedStatus[tableKey] || {});
+
   const phaseOrder = ["1st assmt", "1st Qtr", "2nd Qtr", "3rd Qtr", "4th Qtr"];
   const targetIdx = phaseOrder.indexOf(targetPhase);
   const prevPhase = phaseOrder[targetIdx - 1];
-  
-  return phaseStatus[prevPhase] === true; // Only unlocked if previous is saved
-};
+
+  return !!phaseStatus[prevPhase];
+  };
 
   const handleSetTableEditable = (targetTable, editable) => {
     if (editable) {
@@ -3341,10 +3353,16 @@ const isPhaseUnlocked = (table, targetPhase) => {
       const nowIso = !editable ? new Date().toISOString() : null;
       const updated = prev.map((t) => {
         if (t !== targetTable) return t;
+      
+        const savedPhases = !editable
+          ? { ...(t.savedPhases || {}), [t.assessment_phase || "1st assmt"]: true }
+          : (t.savedPhases || {});
+      
         return {
           ...t,
           isEditable: editable,
           last_edited_at: !editable ? nowIso : t.last_edited_at || nowIso,
+          savedPhases,
         };
       });
   
@@ -3493,33 +3511,64 @@ const isPhaseUnlocked = (table, targetPhase) => {
      
       
   
-      const rawHeaders = table.headers || Object.keys(table.rows[0] || {});
-      const headers = rawHeaders.filter(
+      const rawHeaders =
+        table.headers && table.headers.length
+          ? table.headers
+          : table.rows && table.rows.length
+            ? Object.keys(table.rows[0] || {})
+            : [];
+      
+      const allHeaders = rawHeaders.filter(
         (h) =>
           h !== "Student Name" &&
           h !== "Register Number" &&
           h !== "Assessment Date",
       );
-
       
-  
-      const skillHeader =
-        headers.find((h) => String(h).toLowerCase().includes("skill")) ||
-        headers[0];
-  
-      const sessionHeaders = Array.from({ length: 20 }, (_, i) =>
-        String(i + 1)
+      const normalize = (h) =>
+        String(h || "")
+          .toLowerCase()
+          .replace(/\s+/g, "")
+          .replace(/[^a-z0-9]/g, "");
+      
+      const totalAKey = allHeaders.find((h) => normalize(h) === "totala");
+      const totalBKey = allHeaders.find((h) => normalize(h) === "totalb");
+      
+      const quarterDefs = [
+        { pattern: "iqr", label: "I Qr", phase: "1st Qtr" },
+        { pattern: "iiqr", label: "II Qr", phase: "2nd Qtr" },
+        { pattern: "iiiqr", label: "III Qr", phase: "3rd Qtr" },
+        { pattern: "ivqr", label: "IV Qr", phase: "4th Qtr" },
+      ];
+      
+      const quarterKeys = quarterDefs
+        .map((def) => ({
+          def,
+          key: allHeaders.find((h) => normalize(h) === def.pattern) || null,
+          phase: def.phase,
+          label: def.label,
+        }))
+        .filter((item) => item.key);
+      
+      const summarySet = new Set(
+        [totalAKey, totalBKey, ...quarterKeys.map((q) => q.key)].filter(Boolean),
       );
+      
+      const baseHeaders = allHeaders.filter((h) => !summarySet.has(h));
+      const skillHeader =
+        baseHeaders.find((h) => String(h).toLowerCase().includes("skill")) ||
+        baseHeaders[0];
+      
+      const sessionHeaders = baseHeaders.filter((h) => h !== skillHeader);
   
-      const totalAKey = headers.find((h) => String(h).trim() === "Total A");
-      const totalBKey = headers.find((h) => String(h).trim() === "Total B");
-      const quarterKeys = [
-        { key: headers.find((h) => String(h).trim() === "I Qr"), phase: "1st Qtr", label: "I Qr" },
-        { key: headers.find((h) => String(h).trim() === "II Qr"), phase: "2nd Qtr", label: "II Qr" },
-        { key: headers.find((h) => String(h).trim() === "III Qr"), phase: "3rd Qtr", label: "III Qr" },
-        { key: headers.find((h) => String(h).trim() === "IV Qr"), phase: "4th Qtr", label: "IV Qr" },
-      ].filter((item) => item.key);
-  
+      const phaseTotalsByRow = (table.rows || []).map((row, rowIdx) => ({
+        "1st assmt": getPhaseCounts(row, rowIdx, "1st assmt", sessionHeaders, snapshots),
+        "1st Qtr": getPhaseCounts(row, rowIdx, "1st Qtr", sessionHeaders, snapshots),
+        "2nd Qtr": getPhaseCounts(row, rowIdx, "2nd Qtr", sessionHeaders, snapshots),
+        "3rd Qtr": getPhaseCounts(row, rowIdx, "3rd Qtr", sessionHeaders, snapshots),
+        "4th Qtr": getPhaseCounts(row, rowIdx, "4th Qtr", sessionHeaders, snapshots),
+      }));
+          
       const visibleColumns = [];
   
       visibleColumns.push({
@@ -3534,7 +3583,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
       sessionHeaders.forEach((h) => {
         visibleColumns.push({
           group: null,
-          header: h,
+          header: String(h).replace(/^Session\s+/i, ""),
           subLabel: null,
           fieldName: h,
           isSkill: false,
@@ -3549,7 +3598,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
           subLabel: "A",
           fieldName: totalAKey,
           getValue: (row, rowIdx) =>
-            getPhaseCounts(row, rowIdx, "1st assmt", sessionHeaders, snapshots).aCount,
+            phaseTotalsByRow[rowIdx]?.["1st assmt"]?.aCount ?? 0
         });
       }
   
@@ -3560,27 +3609,26 @@ const isPhaseUnlocked = (table, targetPhase) => {
           subLabel: "B",
           fieldName: totalBKey,
           getValue: (row, rowIdx) =>
-            getPhaseCounts(row, rowIdx, "1st assmt", sessionHeaders, snapshots).bCount,
+            phaseTotalsByRow[rowIdx]?.["1st assmt"]?.bCount ?? 0
         });
       }
   
-      quarterKeys.forEach(({ key, phase: quarterPhase, label }) => {
+      quarterKeys.forEach(({ key, phase, label }) => {
         visibleColumns.push({
           group: label,
           header: "A",
           subLabel: "A",
           fieldName: key,
           getValue: (row, rowIdx) =>
-            getPhaseCounts(row, rowIdx, quarterPhase, sessionHeaders, snapshots).aCount,
+            phaseTotalsByRow[rowIdx]?.[phase]?.aCount ?? 0,
         });
-      
         visibleColumns.push({
           group: label,
           header: "B",
           subLabel: "B",
           fieldName: key,
           getValue: (row, rowIdx) =>
-            getPhaseCounts(row, rowIdx, quarterPhase, sessionHeaders, snapshots).bCount,
+            phaseTotalsByRow[rowIdx]?.[phase]?.bCount ?? 0,
         });
       });
   
@@ -3713,11 +3761,24 @@ const isPhaseUnlocked = (table, targetPhase) => {
 
         }
       };
+
+      const formatDdMmYyyy = (value) => {
+        if (!value) return "N/A";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "N/A";
+        return date
+          .toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          })
+          .replace(/\//g, "-");
+      };
       
       const drawMeta = () => {
         const legendX = pageWidth - marginRight - 68;
         const legendTextY = y;
-        const legendLineGap = 3.8;
+        const legendLineGap = 4.3;
         const iconX = legendX + 34;
       
         doc.setFont("helvetica", "normal");
@@ -3727,11 +3788,11 @@ const isPhaseUnlocked = (table, targetPhase) => {
       
         doc.text(
           [
-            `1st Asst : ${table.report_date || "N/A"}`,
-            `1st Qtr  : ${quarterEditDates["1st Qtr"] || "N/A"}`,
-            `2nd Qtr  : ${quarterEditDates["2nd Qtr"] || "N/A"}`,
-            `3rd Qtr  : ${quarterEditDates["3rd Qtr"] || "N/A"}`,
-            `4th Qtr  : ${quarterEditDates["4th Qtr"] || "N/A"}`,
+            `1st Asst : ${formatDdMmYyyy(table.report_date)}`,
+            `1st Qtr  : ${formatDdMmYyyy(quarterEditDates["1st Qtr"])}`,
+            `2nd Qtr  : ${formatDdMmYyyy(quarterEditDates["2nd Qtr"])}`,
+            `3rd Qtr  : ${formatDdMmYyyy(quarterEditDates["3rd Qtr"])}`,
+            `4th Qtr  : ${formatDdMmYyyy(quarterEditDates["4th Qtr"])}`,
           ],
           centerX,
           y,
@@ -3739,20 +3800,20 @@ const isPhaseUnlocked = (table, targetPhase) => {
         );
       
         doc.setFontSize(6.8);
-        doc.text("Observers:", legendX, legendTextY, { align: "left" });
-        doc.text("shade 'A' in Blue and 'B' in Red", legendX, legendTextY + legendLineGap, { align: "left" });
-      
-        doc.text("Over the red [I Qtr]", legendX, legendTextY + legendLineGap * 2, { align: "left" });
-        drawLegendCell(iconX, legendTextY + legendLineGap * 2 - 2.2, "horizontal");
-      
-        doc.text("Over the red [II Qtr]", legendX, legendTextY + legendLineGap * 3, { align: "left" });
-        drawLegendCell(iconX, legendTextY + legendLineGap * 3 - 2.2, "vertical");
-      
-        doc.text("Over the red [III Qtr]", legendX, legendTextY + legendLineGap * 4, { align: "left" });
-        drawLegendCell(iconX, legendTextY + legendLineGap * 4 - 2.2, "grid");
-      
-        doc.text("Over the red [IV Qtr]", legendX, legendTextY + legendLineGap * 5, { align: "left" });
-        drawLegendCell(iconX, legendTextY + legendLineGap * 5 - 2.2, "diagonal");
+        
+        
+
+        doc.text("Over the red [I Qr]", legendX, legendTextY, { align: "left" });
+        drawLegendCell(iconX, legendTextY - 2.2, "horizontal");
+
+        doc.text("Over the red [II Qr]", legendX, legendTextY + legendLineGap, { align: "left" });
+        drawLegendCell(iconX, legendTextY + legendLineGap - 2.2, "vertical");
+
+        doc.text("Over the red [III Qr]", legendX, legendTextY + legendLineGap * 2, { align: "left" });
+        drawLegendCell(iconX, legendTextY + legendLineGap * 2 - 2.2, "grid");
+
+        doc.text("Over the red [IV Qr]", legendX, legendTextY + legendLineGap * 3, { align: "left" });
+        drawLegendCell(iconX, legendTextY + legendLineGap * 3 - 2.2, "diagonal");
       
         y += 22;
       };
@@ -3877,9 +3938,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
 
         const snapshots = table.quarterSnapshots || {};
         const field = col.fieldName;
-        const isSessionCol =
-          !col.group &&
-          (/^session\s*/i.test(String(field)) || /^\d+$/.test(String(field)));
+        const isSessionCol = !col.group && sessionHeaders.includes(field);
 
         if (isSessionCol) {
           const raw = row[field];
@@ -3898,9 +3957,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
           // compute the visible value (apply snapshots for quarter edits)
           const value = getPdfCellValue(row, rowIdx, col);
         
-          const isSession =
-            !col.group &&
-            (/^session\s*/i.test(String(col.fieldName)) || /^\d+$/.test(String(col.fieldName)));
+          const isSession = !col.group && sessionHeaders.includes(col.fieldName);
           const isGroupCell = !!col.group;
         
           if (col.isSkill) {
@@ -4933,10 +4990,23 @@ const isPhaseUnlocked = (table, targetPhase) => {
             <button
               onClick={() => {
                 if (unsavedTableIndex !== null) {
-                  showToast("Save the current table before changing tabs", "warning");
-                  return;
+                  const editingTable = savedTables[unsavedTableIndex];
+                  if (editingTable) {
+                    const phaseToSave = editingTable.assessment_phase || "1st assmt";
+                    if (phaseToSave !== "1st assmt") {
+                      const dateVal = (editingTable.quarterEditDates || {})[phaseToSave];
+                      if (!dateVal) {
+                        showToast("Please enter the date before saving this quarter", "warning");
+                        return;
+                      }
+                    }
+              
+                    handleSetTableEditable(editingTable, false);
+                    setUnsavedTableIndex(null);
+                  }
                 }
-                setActiveTab("student-details");
+              
+                setActiveTab("student-details"); // or case-record / therapy-reports / iep / special-education
               }}
               className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
                 activeTab === "student-details"
@@ -7814,10 +7884,15 @@ const isPhaseUnlocked = (table, targetPhase) => {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            if (unsavedTableIndex !== null && tableIndex === unsavedTableIndex) {
-                              showToast("Save edits before closing this table", "warning");
+                          
+                            // Block opening another table when a different table has unsaved edits
+                            if (warnIfUnsavedOther(tableIndex, "opening this table")) return;
+                          
+                            if (table.isEditable) {
+                              showToast("Save the table before closing it", "warning");
                               return;
                             }
+                          
                             setShowTableDetails((prev) => ({
                               ...prev,
                               [tableIndex]: !prev[tableIndex],
@@ -7840,10 +7915,14 @@ const isPhaseUnlocked = (table, targetPhase) => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                if (unsavedTableIndex !== null && tableIndex === unsavedTableIndex) {
-                                  showToast("Save edits before closing this table", "warning");
+                              
+                                if (warnIfUnsavedOther(tableIndex, "opening this table")) return;
+                              
+                                if (table.isEditable) {
+                                  showToast("Save the table before closing it", "warning");
                                   return;
                                 }
+                              
                                 setShowTableDetails((prev) => ({
                                   ...prev,
                                   [tableIndex]: !prev[tableIndex],
@@ -7893,8 +7972,29 @@ const isPhaseUnlocked = (table, targetPhase) => {
                               type="button"
                               aria-label="Export table as PDF"
                               title="Export PDF"
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.preventDefault();
+                                e.stopPropagation();
+                              
+                                if (warnIfUnsavedOther(tableIndex, "exporting this table")) return;
+                              
+                                if (table.isEditable) {
+                                  const phaseToSave = table.assessment_phase || "1st assmt";
+                                  if (phaseToSave !== "1st assmt") {
+                                    const dateVal = (table.quarterEditDates || {})[phaseToSave];
+                                    if (!dateVal) {
+                                      showToast("Please enter the date before saving this quarter", "warning");
+                                      return;
+                                    }
+                                  }
+                              
+                                  handleSetTableEditable(table, false);
+                                  setTableSavedStatus((prev) => ({ ...prev, [tableIndex]: true }));
+                                  setTimeout(() => {
+                                    setTableSavedStatus((prev) => ({ ...prev, [tableIndex]: false }));
+                                  }, 1000);
+                                }
+                              
                                 handleExportToPDF(table, tableIndex);
                               }}
                               className="w-11 h-11 rounded-full bg-white/95 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center text-[#E38B52]"
@@ -7920,6 +8020,8 @@ const isPhaseUnlocked = (table, targetPhase) => {
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                // Prevent deleting other table while there is an unsaved one open
+                                if (warnIfUnsavedOther(tableIndex, "deleting this table")) return;
                                 setDeletePendingIndex(tableIndex);
                                 setShowDeleteConfirm(true);
                               }}
@@ -8104,7 +8206,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
 
                           return (
                             <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
-                                                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center justify-between mb-2">
                                 <h4 className="text-xs font-semibold text-gray-700">
                                   Questionnaire (A = Yes, B = No)
                                 </h4>
@@ -8117,7 +8219,16 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                       e.stopPropagation();
                               
                                       if (table.isEditable) {
-                                        // Currently in edit mode, save the changes
+                                        const phaseToSave = table.assessment_phase || "1st assmt";
+                                      
+                                        if (phaseToSave !== "1st assmt") {
+                                          const dateVal = (table.quarterEditDates || {})[phaseToSave];
+                                          if (!dateVal) {
+                                            showToast("Please enter the date before saving this quarter", "warning");
+                                            return;
+                                          }
+                                        }
+                                      
                                         handleSetTableEditable(table, false);
                                         setTableSavedStatus((prev) => ({
                                           ...prev,
@@ -8130,7 +8241,6 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                           }));
                                         }, 1000);
                                       } else {
-                                        // Enter edit mode
                                         handleSetTableEditable(table, true);
                                       }
                                     }}
@@ -8160,7 +8270,33 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                     <div className="flex flex-col gap-2">
                                       <select
                                         value={table.assessment_phase || "1st assmt"}
-                                        onClick={(e) => e.stopPropagation()}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                        
+                                          if (table.isEditable) {
+                                            const phaseToSave = table.assessment_phase || "1st assmt";
+                                        
+                                            if (phaseToSave !== "1st assmt") {
+                                              const dateVal = (table.quarterEditDates || {})[phaseToSave];
+                                              if (!dateVal) {
+                                                showToast("Please enter the date before saving this quarter", "warning");
+                                                return;
+                                              }
+                                            }
+                                        
+                                            handleSetTableEditable(table, false);
+                                            setTableSavedStatus((prev) => ({ ...prev, [tableIndex]: true }));
+                                            setTimeout(() => {
+                                              setTableSavedStatus((prev) => ({ ...prev, [tableIndex]: false }));
+                                            }, 1000);
+                                          } else {
+                                            // Prevent entering edit mode on a different table when another is unsaved
+                                            if (warnIfUnsavedOther(tableIndex, "starting to edit this table")) return;
+                                            handleSetTableEditable(table, true);
+                                          }
+                                        }}
                                         onChange={(e) => {
                                           const phase = e.target.value;
                                           const tableKey = savedTables.indexOf(table);
@@ -8207,6 +8343,7 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                           type="date"
                                           value={(table.quarterEditDates || {})[table.assessment_phase] || ""}
                                           max={new Date().toISOString().slice(0, 10)}
+                                          onMouseDown={(e) => e.stopPropagation()}
                                           onClick={(e) => e.stopPropagation()}
                                           onChange={(e) =>
                                             handleQuarterEditDateChange(table, table.assessment_phase, e.target.value)
@@ -8221,12 +8358,10 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                   {activeKey && (
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        setQuestionsOpenByTable((prev) => ({
-                                          ...prev,
-                                          [tableKey]: !prev[tableKey],
-                                        }))
-                                      }
+                                      onClick={() => {
+                                        if (warnIfUnsavedOther(tableKey, "opening questions in this table")) return;
+                                        setQuestionsOpenByTable((prev) => ({ ...prev, [tableKey]: !prev[tableKey] }));
+                                      }}
                                       className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-100"
                                     >
                                       {questionsOpenByTable[tableKey] ? "Hide questions" : "Show questions"}
@@ -8640,8 +8775,11 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                           
                                           let showCounts = true;
                                           if (columnPhase !== '1st assmt') {
-                                            const phaseSnapshot = snapshots[columnPhase];
-                                            if (!phaseSnapshot || Object.keys(phaseSnapshot).length === 0) {
+                                            const phaseSaved =
+                                              table.savedPhases?.[columnPhase] ||
+                                              phaseSavedStatus[tableIndex]?.[columnPhase];
+                                          
+                                            if (!phaseSaved) {
                                               showCounts = false;
                                             }
                                           }
@@ -8804,6 +8942,10 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                           // Clicking the skill column selects the skill and opens questions
                                           if (col.isSkill && rowSkillKey) {
                                             onClick = () => {
+                                              if (isAnotherTableUnsaved(tableKey)) {
+                                                showToast("Save the current table before switching skills", "warning");
+                                                return;
+                                              }
                                               setActiveSkillByTable((prev) => {
                                                 const isSame =
                                                   prev[tableKey] ===
@@ -8849,7 +8991,11 @@ const isPhaseUnlocked = (table, targetPhase) => {
                                           ) {
                                             const questionIdx =
                                               sessionHeaders.indexOf(fieldName);
-                                            onClick = () => {
+                                              onClick = () => {
+                                              if (isAnotherTableUnsaved(tableKey)) {
+                                                showToast("Save the current table before switching skills", "warning");
+                                                return;
+                                              }
                                               // First, ensure the skill is selected and questions are open
                                               setActiveSkillByTable((prev) => ({
                                                 ...prev,
