@@ -160,6 +160,7 @@ const AddStudent = () => {
     gender: '',
     religion: '',
     caste: '',
+    ud_id: '',
     caste_text: '',
     class_name: '',
     roll_no: '',
@@ -679,6 +680,7 @@ const AddStudent = () => {
       aadhar_number: studentForm.aadhar_number
         ? String(studentForm.aadhar_number).replace(/\s+/g, "")
         : null,
+      ud_id: studentForm.ud_id || null,
       disability_type: studentForm.disability_type,
       disability_percentage: studentForm.disability_percentage,
       medical_conditions: studentForm.medical_conditions,
@@ -1545,8 +1547,8 @@ const AddStudent = () => {
                       </label>
                       <select
                         className={selectClass}
-                        value={studentForm.caste}
-                        onChange={handleFieldChange("caste")}
+                        value={studentForm.category}
+                        onChange={handleFieldChange("category")}
                       >
                         <option value="">Select category</option>
                         <option value="General">General</option>
@@ -1555,6 +1557,7 @@ const AddStudent = () => {
                         <option value="OBC">OBC</option>
                       </select>
                     </div>
+                    
                     <div>
                       <label className="block text-sm font-medium text-[#170F49] mb-2">
                         Caste

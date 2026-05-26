@@ -29,6 +29,7 @@ class Student(Base):
     phone_number = Column(String)
     email = Column(String)
     aadhar_number = Column(String, unique=True, index=True, nullable=True)
+    ud_id = Column(String, nullable=True)
     
     # Parent/Guardian Information
     father_name = Column(String)

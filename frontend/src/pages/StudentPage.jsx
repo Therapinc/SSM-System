@@ -64,6 +64,7 @@ const CLASS_OPTIONS = [
   "Vocational 18-35 years",
 ];
 const DIVISION_OPTIONS = ["A", "B", "C", "D"];
+const CATEGORY_OPTIONS = ["General", "OBC", "SC", "ST"];
 
 // Add styles to document head
 if (typeof document !== "undefined") {
@@ -2239,6 +2240,7 @@ const addCellToColumn = (columnKey) => {
         aadhar_number: editData.aadharNumber
           ? String(editData.aadharNumber).replace(/\s+/g, "")
           : null,
+        ud_id: editData.ud_id,
         blood_group: editData.bloodGroup,
         category: editData.category,
         // Case record specific fields
@@ -2902,6 +2904,7 @@ const addCellToColumn = (columnKey) => {
         religion: data.religion,
         caste: data.caste,
         category: data.category,
+        ud_id: data.ud_id,
         bloodGroup: data.blood_group,
         aadharNumber: formatAadhaar(data.aadhar_number),
         phoneNumber: data.phone_number,
@@ -4410,6 +4413,7 @@ const addCellToColumn = (columnKey) => {
     drawField("Blood Group", student.bloodGroup);
     drawField("Religion", student.religion);
     drawField("Category", student.category);
+    drawField("UD ID", student.ud_id);
     drawField("Aadhar Number", student.aadharNumber);
 
     // 2. Demographic Data
@@ -6674,6 +6678,8 @@ const addCellToColumn = (columnKey) => {
                       { label: "Gender", key: "gender", options: GENDER_OPTIONS },
                       { label: "Religion", key: "religion", options: RELIGION_OPTIONS },
                       { label: "Caste", key: "caste", type: "text" },
+                      { label: "Category", key: "category", options: CATEGORY_OPTIONS },
+                      { label: "UD ID", key: "ud_id", type: "text" },
                       { label: "Aadhar Number", key: "aadharNumber", type: "text" },
                     ].map((field) => (
                       <div key={field.key}>
