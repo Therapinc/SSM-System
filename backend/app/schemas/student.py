@@ -62,6 +62,7 @@ class StudentBase(BaseModel):
 
     # Identification & Medical
     aadhar_number: Optional[str] = None
+    ud_id: Optional[str] = None
     disability_type: Optional[str] = None
     disability_percentage: Optional[float] = None
     identification_marks: Optional[str] = None

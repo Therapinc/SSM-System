@@ -139,6 +139,8 @@ const StudentViewPage = () => {
         gender: data.gender,
         religion: data.religion,
         caste: data.caste,
+        category: data.category,
+        ud_id: data.ud_id,
         bloodGroup: data.blood_group,
         category: data.category,
         class: data.class_name,
@@ -447,6 +449,14 @@ const StudentViewPage = () => {
                     <div>
                       <p className="text-sm text-[#6F6C90]">Caste</p>
                       <p className="text-[#170F49] font-medium">{student?.caste || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#6F6C90]">Category</p>
+                      <p className="text-[#170F49] font-medium">{student?.category || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#6F6C90]">UD ID</p>
+                      <p className="text-[#170F49] font-medium">{student?.ud_id || "N/A"}</p>
                     </div>
                     <div>
                       <p className="text-sm text-[#6F6C90]">Aadhar Number</p>
