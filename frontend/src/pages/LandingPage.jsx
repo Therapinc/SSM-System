@@ -85,7 +85,7 @@ const LandingPage = () => {
         <div className="relative z-10 text-center max-w-3xl px-4"> {/* Increased max-width slightly */}
           {/* Main Heading */}
           <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-[#B3541E] mb-6 font-baskervville leading-tight"> {/* Improved contrast for hero title */}
-            Every Child Matters 🏫,<br/>Every Moment Counts
+            Every Child Matters ,<br/>Every Moment Counts
           </h2>
           {/* Subtitle */}
           <p className="text-lg sm:text-xl text-[#A86A3D] leading-relaxed"> {/* Adjusted size and color for palette harmony */}
@@ -333,11 +333,23 @@ const LandingPage = () => {
                 <div className="flex items-center justify-center h-8"><svg className="w-5 h-5 text-[#C76B1D]" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg></div>
                 <div className="flex items-center h-8">9388084403, 9388084401</div>
                 <div className="flex items-center justify-center h-8"><svg className="w-6 h-6 text-[#C76B1D]" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg></div>
-                <div className="flex items-center h-8">stmarthaspecialschool@gmail.com</div>
+                <a
+                  href="mailto:stmarthaspecialschool@gmail.com"
+                  className="flex items-center h-8 hover:underline"
+                >
+                  stmarthaspecialschool@gmail.com
+                </a>
                 <div className="flex items-center justify-center h-8"><i className="fa-brands fa-whatsapp fa-lg text-[#D3723B]"></i></div>
                 <div className="flex items-center h-8">9388084403</div>
                 <div className="flex items-center justify-center h-8"><i className="fa-brands fa-facebook fa-lg text-[#D3723B]"></i></div>
-                <div className="flex items-center h-8">stmarthaspecialschool@gmail.com</div>
+                <a
+                  href="https://www.facebook.com/p/StMarthas-Special-School-61580335061769/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center h-8 hover:underline"
+                >
+                  St.Martha's Special School
+                </a>
                 <div className="flex items-center justify-center h-8"><i className="fa-brands fa-telegram fa-lg text-[#D3723B]"></i></div>
                 <div className="flex items-center h-8">9388084403</div>
               </div>
