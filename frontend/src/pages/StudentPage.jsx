@@ -722,6 +722,11 @@ const StudentPage = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePendingIndex, setDeletePendingIndex] = useState(null);
   const [tableSavedStatus, setTableSavedStatus] = useState({});
+  const [questionsOpenByTable, setQuestionsOpenByTable] = useState({});
+  const [activeSkillByTable, setActiveSkillByTable] = useState({});
+  const [activeQuestionByTable, setActiveQuestionByTable] = useState({});
+  const [pulsatingEditButton, setPulsatingEditButton] = useState({});
+  const questionRefs = useRef({});
   // Guard helpers: prevent interacting with other tables while one has unsaved edits
   const isAnotherTableUnsaved = (tableIndex) =>
     unsavedTableIndex !== null && unsavedTableIndex !== tableIndex;
@@ -746,218 +751,277 @@ const StudentPage = () => {
   const [generatedSummaries, setGeneratedSummaries] = useState([]);
   const [expandedGeneratedSummaryId, setExpandedGeneratedSummaryId] = useState(null);
 
-  // IEP Report state
-  const [iepData, setIepData] = useState({
-    selectedMonth: "",
-    tableRows: [{ id: 1, adlSkills: "", academic: "", behaviouralSkills: "" }],
-    iepStudent: "",
-    remarks: "",
-    signatures: {
-      principal: "",
-      teacher: "",
-      parent: "",
-    },
-  });
-
-// per-month saved IEPs: { "January 2026": { ...iepData }, ... }
-const [savedIepByMonth, setSavedIepByMonth] = useState({});
-const MONTHS = [
-"January","February","March","April","May","June",
-"July","August","September","October","November","December"
-];
-
-// Add after the MONTHS constant:
-const [selectedYear, setSelectedYear] = useState(() => {
-  const savedYear = localStorage.getItem("iep_selected_year");
-  return savedYear ? Number(savedYear) : new Date().getFullYear();
+  const createEmptyIepData = () => ({
+  selectedMonth: "",
+  sections: {
+    adlSkills: [],
+    academic: [],
+    behaviouralSkills: [],
+  },
+  iepStudent: "",
+  remarks: "",
+  signatures: {
+    principal: "",
+    teacher: "",
+    parent: "",
+  },
 });
 
-useEffect(() => {
-  localStorage.setItem("iep_selected_year", String(selectedYear));
-}, [selectedYear]);
-const [expandedIepMonth, setExpandedIepMonth] = useState(null); // Track which month is expanded
-
-const [editingIepMonth, setEditingIepMonth] = useState(null);
-
-// Replace handleIepMonthChange with:
-const handleIepMonthChange = (month) => {
-  const monthYearKey = `${month} ${selectedYear}`;
-  setIepData((prev) => ({ ...prev, selectedMonth: month }));
-  
-  const key = `iep_data_student_${id}_by_month`;
-  try {
-    const mapping = JSON.parse(localStorage.getItem(key) || "{}");
-    if (mapping?.[monthYearKey]) {
-      setIepData(mapping[monthYearKey]);
-      setExpandedIepMonth(monthYearKey);
-    } else {
-      setIepData((prev) => ({
-        ...prev,
-        selectedMonth: month,
-        tableRows: [{ id: 1, adlSkills: "", academic: "", behaviouralSkills: "" }],
-        remarks: "",
-        signatures: { principal: "", teacher: "", parent: "" },
-      }));
-      setExpandedIepMonth(null);
-    }
-  } catch (e) {
-    console.error("Error loading month IEP:", e);
+const normalizeIepData = (data = {}) => {
+  if (data.sections) {
+    return {
+      ...createEmptyIepData(),
+      ...data,
+      sections: {
+        adlSkills: data.sections.adlSkills || [],
+        academic: data.sections.academic || [],
+        behaviouralSkills: data.sections.behaviouralSkills || [],
+      },
+    };
   }
+
+  const legacyRows = Array.isArray(data.tableRows) ? data.tableRows : [];
+  const mapLegacy = (key) =>
+    legacyRows.length
+      ? legacyRows.map((row, index) => ({
+          id: index + 1,
+          text: row?.[key] || "",
+        }))
+      : [];
+
+  return {
+    ...createEmptyIepData(),
+    ...data,
+    sections: {
+      adlSkills: mapLegacy("adlSkills"),
+      academic: mapLegacy("academic"),
+      behaviouralSkills: mapLegacy("behaviouralSkills"),
+    },
+  };
 };
 
-const saveIepData = async () => {
-  try {
-    if (!iepData?.selectedMonth) {
-      showToast("Please select a month before saving the IEP.", "error");
+const [iepData, setIepData] = useState(createEmptyIepData());
+
+  // per-month saved IEPs: { "January 2026": { ...iepData }, ... }
+  const [savedIepByMonth, setSavedIepByMonth] = useState({});
+  const MONTHS = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
+  ];
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  
+  const isValidYear = (() => {
+    if (!selectedYear) return false;
+    const num = Number(selectedYear);
+    return /^\d{4}$/.test(String(selectedYear)) && num >= 1900 && num <= 2100;
+  })();
+
+  const [expandedIepMonth, setExpandedIepMonth] = useState(null);
+  const [editingIepMonth, setEditingIepMonth] = useState(null);
+
+  // Replace handleIepMonthChange with:
+  const handleIepMonthChange = (month) => {
+    if (iepFormVisible || editingIepMonth) {
+      showToast("Save the current IEP report before changing the month.", "warning");
+      return;
+    }
+    const monthYearKey = `${month} ${selectedYear}`;
+    setIepData({
+      ...createEmptyIepData(),
+      selectedMonth: iepData.selectedMonth,
+    });
+  
+    const key = `iep_data_student_${id}_by_month`;
+    try {
+      const mapping = JSON.parse(localStorage.getItem(key) || "{}");
+      if (mapping?.[monthYearKey]) {
+        setExistingIepMonthKey(monthYearKey);
+        setIepFormVisible(false);
+        setExpandedIepMonth(null);
+        setEditingIepMonth(null);
+      } else {
+        setExistingIepMonthKey(null);
+      }
+    } catch (e) {
+      console.error("Error loading month IEP:", e);
+    }
+  };
+
+  const saveIepData = async () => {
+    try {
+      if (!iepData?.selectedMonth) {
+        showToast("Please select a month before saving the IEP.", "error");
+        return;
+      }
+
+      setSavingIep(true);
+
+      const monthYearKey = editingIepMonth || `${iepData.selectedMonth} ${selectedYear}`;
+      const key = `iep_data_student_${id}_by_month`;
+      const mapping = JSON.parse(localStorage.getItem(key) || "{}");
+
+      mapping[monthYearKey] = {
+        ...iepData,
+        selectedMonth: iepData.selectedMonth,
+      };
+
+      localStorage.setItem(key, JSON.stringify(mapping));
+      setSavedIepByMonth(mapping);
+
+      setExpandedIepMonth(monthYearKey);
+      setIepFormVisible(false);
+      setEditingIepMonth(null);
+      setIepData((prev) => ({
+        ...prev,
+        selectedMonth: "",
+      }));
+
+      showToast(`IEP saved for ${monthYearKey}`, "success");
+    } catch (error) {
+      console.error("Error saving IEP data:", error);
+      showToast("Failed to save IEP data", "error");
+    } finally {
+      setSavingIep(false);
+    }
+  };
+
+
+
+  // Add this helper to toggle collapse/expand:
+  const toggleIepExpand = (monthYearKey) => {
+    if (editingIepMonth === monthYearKey) {
+      showToast("Save the IEP report before collapsing it.", "warning");
       return;
     }
 
-    setSavingIep(true);
-
-    const monthYearKey = `${iepData.selectedMonth} ${selectedYear}`;
-    const key = `iep_data_student_${id}_by_month`;
-    const mapping = JSON.parse(localStorage.getItem(key) || "{}");
-
-    mapping[monthYearKey] = {
-      ...iepData,
-      selectedMonth: iepData.selectedMonth,
-    };
-
-    localStorage.setItem(key, JSON.stringify(mapping));
-    setSavedIepByMonth(mapping);
-
-    setExpandedIepMonth(monthYearKey);
-    setIepFormVisible(false);
-    setEditingIepMonth(null);
-
-    showToast(`IEP saved for ${monthYearKey}`, "success");
-  } catch (error) {
-    console.error("Error saving IEP data:", error);
-    showToast("Failed to save IEP data", "error");
-  } finally {
-    setSavingIep(false);
-  }
-};
-
-
-
-// Add this helper to toggle collapse/expand:
-const toggleIepExpand = (monthYearKey) => {
-  if (expandedIepMonth === monthYearKey) {
-    setExpandedIepMonth(null);
-  } else {
-    setExpandedIepMonth(monthYearKey);
-    const key = `iep_data_student_${id}_by_month`;
-    const mapping = JSON.parse(localStorage.getItem(key) || "{}");
-    if (mapping?.[monthYearKey]) {
-      setIepData(mapping[monthYearKey]);
+    if (editingIepMonth && editingIepMonth !== monthYearKey) {
+      showToast("Save the IEP report you are editing before opening another.", "warning");
+      return;
     }
-  }
-};
 
-// load per-month mapping on mount / when student id changes
-useEffect(() => {
-  const key = `iep_data_student_${id}_by_month`;
-  try {
-    const mapping = JSON.parse(localStorage.getItem(key) || "{}");
-    setSavedIepByMonth(mapping || {});
-    // if a month is already selected, load it
-    if (iepData?.selectedMonth && mapping?.[iepData.selectedMonth]) {
-      setIepData(mapping[iepData.selectedMonth]);
-    }
-  } catch (e) {
-    console.error("Failed to load IEPs by month:", e);
-  }
-}, [id]);
-
-// Load AI summaries from localStorage on mount
-useEffect(() => {
-  const summariesKey = `ai_summaries_student_${id}`;
-  try {
-    const stored = localStorage.getItem(summariesKey);
-    if (stored) {
-      const summaries = JSON.parse(stored);
-      setGeneratedSummaries(Array.isArray(summaries) ? summaries : []);
-    }
-  } catch (e) {
-    console.error("Failed to load AI summaries from localStorage:", e);
-  }
-}, [id]);
-
-const [iepFormVisible, setIepFormVisible] = useState(false);
-const [showIepDeleteConfirm, setShowIepDeleteConfirm] = useState(false);
-const [deletePendingIepKey, setDeletePendingIepKey] = useState(null);
-
-const createIepTable = () => {
-  if (!iepData?.selectedMonth) {
-    showToast("Please select a month before creating the IEP table.", "error");
-    return;
-  }
-
-  const monthYearKey = `${iepData.selectedMonth} ${selectedYear}`;
-  const storageKey = `iep_data_student_${id}_by_month`;
-
-  try {
-    const mapping = JSON.parse(localStorage.getItem(storageKey) || "{}");
-
-    if (mapping?.[monthYearKey]) {
-      setIepData(mapping[monthYearKey]);
+    if (expandedIepMonth === monthYearKey) {
+      setExpandedIepMonth(null);
     } else {
-      setIepData((prev) => ({
-        ...prev,
-        selectedMonth: iepData.selectedMonth,
-        tableRows: [{ id: 1, adlSkills: "", academic: "", behaviouralSkills: "" }],
-        remarks: "",
-        signatures: { principal: "", teacher: "", parent: "" },
-      }));
-    }
-
-    setIepFormVisible(true);
-    setExpandedIepMonth(null);
-  } catch (e) {
-    console.error("createIepTable error", e);
-    showToast("Failed to initialize IEP table", "error");
-  }
-};
-
-const confirmDeleteIepReport = (monthYearKey) => {
-  setDeletePendingIepKey(monthYearKey);
-  setShowIepDeleteConfirm(true);
-};
-
-const performDeleteIepReport = () => {
-  const monthYearKey = deletePendingIepKey;
-  if (!monthYearKey) return;
-  const storageKey = `iep_data_student_${id}_by_month`;
-  try {
-    const mapping = JSON.parse(localStorage.getItem(storageKey) || "{}");
-    if (mapping?.[monthYearKey]) {
-      delete mapping[monthYearKey];
-      localStorage.setItem(storageKey, JSON.stringify(mapping));
-      setSavedIepByMonth(mapping);
-      if (expandedIepMonth === monthYearKey) {
-        setExpandedIepMonth(null);
-        setIepFormVisible(false);
-        setIepData((prev) => ({
-          ...prev,
-          selectedMonth: "",
-          tableRows: [{ id: 1, adlSkills: "", academic: "", behaviouralSkills: "" }],
-          remarks: "",
-          signatures: { principal: "", teacher: "", parent: "" },
-        }));
+      setExpandedIepMonth(monthYearKey);
+      const key = `iep_data_student_${id}_by_month`;
+      const mapping = JSON.parse(localStorage.getItem(key) || "{}");
+      if (mapping?.[monthYearKey]) {
+        setIepData(normalizeIepData(savedIepByMonth[monthYearKey]));
       }
-      showToast(`Deleted IEP for ${monthYearKey}`, "success");
-    } else {
-      showToast("Report not found", "error");
     }
-  } catch (err) {
-    console.error("Failed to delete IEP report", err);
-    showToast("Failed to delete IEP report", "error");
-  } finally {
-    setShowIepDeleteConfirm(false);
-    setDeletePendingIepKey(null);
-  }
-};
+  };
+
+  // load per-month mapping on mount / when student id changes
+  useEffect(() => {
+    const key = `iep_data_student_${id}_by_month`;
+    try {
+      const mapping = JSON.parse(localStorage.getItem(key) || "{}");
+      setSavedIepByMonth(mapping || {});
+      // if a month is already selected, load it
+      if (iepData?.selectedMonth) {
+        const mKey = `${iepData.selectedMonth} ${selectedYear}`;
+        if (mapping?.[mKey]) {
+          setIepData(mapping[mKey]);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load IEPs by month:", e);
+    }
+  }, [id]);
+
+  // Load AI summaries from localStorage on mount
+  useEffect(() => {
+    const summariesKey = `ai_summaries_student_${id}`;
+    try {
+      const stored = localStorage.getItem(summariesKey);
+      if (stored) {
+        const summaries = JSON.parse(stored);
+        setGeneratedSummaries(Array.isArray(summaries) ? summaries : []);
+      }
+    } catch (e) {
+      console.error("Failed to load AI summaries from localStorage:", e);
+    }
+  }, [id]);
+
+  const [iepFormVisible, setIepFormVisible] = useState(false);
+  const [showIepDeleteConfirm, setShowIepDeleteConfirm] = useState(false);
+  const [deletePendingIepKey, setDeletePendingIepKey] = useState(null);
+  const [existingIepMonthKey, setExistingIepMonthKey] = useState(null);    
+
+  const createIepTable = () => {
+    if (!iepData?.selectedMonth) {
+      showToast("Please select a month before creating the IEP table.", "error");
+      return;
+    }
+    if (!selectedYear || !isValidYear) {
+      showToast("Please enter the year before creating the IEP table.", "error");
+      return;
+    }
+  
+    const monthYearKey = `${iepData.selectedMonth} ${selectedYear}`;
+    const storageKey = `iep_data_student_${id}_by_month`;
+  
+    try {
+      const mapping = JSON.parse(localStorage.getItem(storageKey) || "{}");
+  
+      if (mapping?.[monthYearKey]) {
+        setExistingIepMonthKey(monthYearKey);
+        setIepFormVisible(false);
+        setEditingIepMonth(null);
+        setExpandedIepMonth(null);
+        showToast("That IEP report already exists.", "warning");
+        return;
+      }
+  
+      setExistingIepMonthKey(null);
+      setIepData({
+        ...createEmptyIepData(),
+        selectedMonth: iepData.selectedMonth,
+      });
+      setIepFormVisible(true);
+      setExpandedIepMonth(null);
+      setEditingIepMonth(null);
+    } catch (e) {
+      console.error("createIepTable error", e);
+      showToast("Failed to initialize IEP table", "error");
+    }
+  };
+
+  const confirmDeleteIepReport = (monthYearKey) => {
+    setDeletePendingIepKey(monthYearKey);
+    setShowIepDeleteConfirm(true);
+  };
+
+  const performDeleteIepReport = () => {
+    const monthYearKey = deletePendingIepKey;
+    if (!monthYearKey) return;
+    const storageKey = `iep_data_student_${id}_by_month`;
+    try {
+      const mapping = JSON.parse(localStorage.getItem(storageKey) || "{}");
+      if (mapping?.[monthYearKey]) {
+        delete mapping[monthYearKey];
+        localStorage.setItem(storageKey, JSON.stringify(mapping));
+        setSavedIepByMonth(mapping);
+        if (expandedIepMonth === monthYearKey) {
+          setExpandedIepMonth(null);
+          setIepFormVisible(false);
+          setIepData({
+            ...createEmptyIepData(),
+            selectedMonth: iepData.selectedMonth,
+          });
+        }
+        showToast(`Deleted IEP for ${monthYearKey}`, "success");
+      } else {
+        showToast("Report not found", "error");
+      }
+    } catch (err) {
+      console.error("Failed to delete IEP report", err);
+      showToast("Failed to delete IEP report", "error");
+    } finally {
+      setShowIepDeleteConfirm(false);
+      setDeletePendingIepKey(null);
+    }
+  };
 
   const [savingIep, setSavingIep] = useState(false);
 
@@ -1063,33 +1127,49 @@ const performDeleteIepReport = () => {
     }));
   };
 
-  const handleTableRowChange = (rowId, column, value) => {
+  const handleIepSectionChange = (sectionKey, itemId, value) => {
     setIepData((prev) => ({
       ...prev,
-      tableRows: prev.tableRows.map((row) =>
-        row.id === rowId ? { ...row, [column]: value } : row,
-      ),
+      sections: {
+        ...prev.sections,
+        [sectionKey]: (prev.sections?.[sectionKey] || []).map((item) =>
+          item.id === itemId ? { ...item, text: value } : item,
+        ),
+      },
     }));
   };
-
-  const addTableRow = () => {
-    const newId = Math.max(...iepData.tableRows.map((row) => row.id)) + 1;
-    setIepData((prev) => ({
-      ...prev,
-      tableRows: [
-        ...prev.tableRows,
-        { id: newId, adlSkills: "", academic: "", behaviouralSkills: "" },
-      ],
-    }));
-  };
-
-  const removeTableRow = (rowId) => {
-    if (iepData.tableRows.length > 1) {
-      setIepData((prev) => ({
+  
+  const addIepSectionItem = (sectionKey) => {
+    setIepData((prev) => {
+      const currentItems = prev.sections?.[sectionKey] || [];
+      const nextId =
+        currentItems.length > 0
+          ? Math.max(...currentItems.map((item) => item.id)) + 1
+          : 1;
+  
+      return {
         ...prev,
-        tableRows: prev.tableRows.filter((row) => row.id !== rowId),
-      }));
-    }
+        sections: {
+          ...prev.sections,
+          [sectionKey]: [...currentItems, { id: nextId, text: "" }],
+        },
+      };
+    });
+  };
+  
+  const removeIepSectionItem = (sectionKey, itemId) => {
+    setIepData((prev) => {
+      const currentItems = prev.sections?.[sectionKey] || [];
+      if (currentItems.length === 0) return prev;
+  
+      return {
+        ...prev,
+        sections: {
+          ...prev.sections,
+          [sectionKey]: currentItems.filter((item) => item.id !== itemId),
+        },
+      };
+    });
   };
 
   const handleSignatureChange = (signatureType, value) => {
@@ -1152,239 +1232,179 @@ const performDeleteIepReport = () => {
     }
   };
 
-// confirm-then-remove helper
-const handleRemoveRowWithConfirm = (rowId) => {
-  const ok = window.confirm("Delete this row? This action cannot be undone.");
-  if (!ok) return;
-  removeTableRow(rowId);
-  showToast("Row deleted", "success");
-};
+
 
 // add a new row where only `columnKey` is intended to be edited (other cells empty)
 const addCellToColumn = (columnKey) => {
-  setIepData((prev) => {
-    const newId = Date.now();
-    const newRow = {
-      id: newId,
-      adlSkills: columnKey === "adlSkills" ? "" : "",
-      academic: columnKey === "academic" ? "" : "",
-      behaviouralSkills: columnKey === "behaviouralSkills" ? "" : "",
-    };
-    return { ...prev, tableRows: [...prev.tableRows, newRow] };
+  setIepData(prev => {
+    const sections = { ...prev.sections };
+    const list = [...(sections[columnKey] || [])];
+    const nextId = (list[list.length - 1]?.id || 0) + 1;
+    list.push({ id: nextId, text: "" });
+    sections[columnKey] = list;
+    return { ...prev, sections };
   });
 };
 
   const downloadIepAsPDF = () => {
-    const pdf = new jsPDF();
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 20;
-    let y = 15;
-  
-    // Add logo at top left
-    const logoWidth = 35;
-    const logoHeight = 35;
-    try {
-      pdf.addImage(schoolLogo, "PNG", margin, y, logoWidth, logoHeight);
-    } catch (e) {
-      // Retry with JPEG format
-      try {
-        pdf.addImage(schoolLogo, "JPEG", margin, y, logoWidth, logoHeight);
-      } catch (err) {
-        console.warn("Could not add logo to PDF:", err);
-      }
+    if (iepFormVisible || editingIepMonth) {
+      showToast("Please save or cancel the open IEP edit before downloading.", "error");
+      return;
     }
   
-    // Header with month name (positioned to right of logo)
-    pdf.setFontSize(18);
-    pdf.setFont("helvetica", "bold");
-    const monthName = iepData.selectedMonth ? iepData.selectedMonth.toUpperCase() : "N/A";
-    pdf.text("TRIMESTER REPORT", pageWidth / 2, y + 14, { align: "center" });
-    pdf.text(`OF ${monthName}`, pageWidth / 2, y + 22, { align: "center" });
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    // --- Layout & sizing tweaks: larger table, padding above title, moved components ---
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 40;
     
-    // Move y past logo and title
-    y = 65;
-  
-    // Student info row
-    pdf.setFontSize(11);
-    pdf.text(`Student: ${student?.name || "N/A"}`, margin, y);
-    pdf.text(`Class: ${student?.class || ""}`, pageWidth - margin - 60, y);
-    y += 10;
-  
-    // Table header
-    const tableX = margin;
-    const tableW = pageWidth - margin * 2;
-    const colW = tableW / 3;
-    const headerHeight = 10;
-    pdf.setFillColor(227, 139, 82);
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(11);
-    pdf.rect(tableX, y, colW, headerHeight, "F");
-    pdf.rect(tableX + colW, y, colW, headerHeight, "F");
-    pdf.rect(tableX + 2 * colW, y, colW, headerHeight, "F");
-    pdf.text("ADL SKILLS", tableX + colW / 2, y + 7, { align: "center" });
-    pdf.text("ACADEMIC", tableX + colW + colW / 2, y + 7, { align: "center" });
-    pdf.text("BEHAVIOURAL SKILLS", tableX + 2 * colW + colW / 2, y + 7, { align: "center" });
-    y += headerHeight + 4;
-    pdf.setTextColor(0, 0, 0);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
-  
-    // Rows
-    iepData.tableRows.forEach((row) => {
-      // if page break needed
-      if (y > pageHeight - 60) {
-        pdf.addPage();
-        y = 20;
-      }
-  
-      const rowHeight = 30; // allocate space for wrapped text
-      const adlLines = pdf.splitTextToSize(row.adlSkills || "", colW - 8);
-      const academicLines = pdf.splitTextToSize(row.academic || "", colW - 8);
-      const behLines = pdf.splitTextToSize(row.behaviouralSkills || "", colW - 8);
-      const neededHeight = Math.max(adlLines.length, academicLines.length, behLines.length) * 5 + 8;
-  
-      // ensure page break if row won't fit
-      if (y + neededHeight > pageHeight - 60) {
-        pdf.addPage();
-        y = 20;
-      }
-  
-      // Draw cell borders
-      pdf.rect(tableX, y, colW, neededHeight);
-      pdf.rect(tableX + colW, y, colW, neededHeight);
-      pdf.rect(tableX + 2 * colW, y, colW, neededHeight);
-  
-      // Draw text inside cells
-      pdf.text(adlLines, tableX + 4, y + 6);
-      pdf.text(academicLines, tableX + colW + 4, y + 6);
-      pdf.text(behLines, tableX + 2 * colW + 4, y + 6);
-  
-      y += neededHeight + 6;
-    });
-  
-    // Remarks and IEP content
-    if (y + 60 > pageHeight - 40) {
-      pdf.addPage();
-      y = 20;
-    }
-  
-    pdf.setFontSize(11);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("IEP OF THE STUDENT:", margin, y);
-    y += 8;
-    pdf.setFont("helvetica", "normal");
-    const iepLines = pdf.splitTextToSize(iepData.iepStudent || "", pageWidth - margin * 2);
-    pdf.text(iepLines, margin, y);
-    y += iepLines.length * 5 + 8;
-  
-    // Remarks section with box
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
-    pdf.text("REMARKS", margin, y);
-    y += 8;
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
+    // add padding above main heading
+    const titleTopPadding = 20;
+    const titleY = margin + titleTopPadding;
     
-    // Draw box for remarks
-    const remarksBoxHeight = 30;
-    pdf.rect(margin, y, pageWidth - margin * 2, remarksBoxHeight);
-    
-    // Add remarks text inside the box
-    const remarksLines = pdf.splitTextToSize(iepData.remarks || "", pageWidth - margin * 2 - 4);
-    if (remarksLines.length > 0) {
-      pdf.text(remarksLines, margin + 2, y + 6);
-    }
-    
-    y += remarksBoxHeight + 8;
-  
-    // Signatures section
-    if (y + 50 > pageHeight - 40) {
-      pdf.addPage();
-      y = 20;
-    }
-    y += 12;
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(10);
-    const sigW = (pageWidth - margin * 2) / 3;
-    
-    // Draw signature lines - three equal columns
-    const lineY = y;
-    const lineLength = sigW - 10;
-    pdf.line(margin + 5, lineY, margin + 5 + lineLength, lineY);
-    pdf.line(margin + sigW + 5, lineY, margin + sigW + 5 + lineLength, lineY);
-    pdf.line(margin + 2 * sigW + 5, lineY, margin + 2 * sigW + 5 + lineLength, lineY);
-    
-    // Labels below signature lines
-    y = lineY + 6;
-    pdf.setFontSize(9);
-    pdf.text("Signature of the Principal", margin + sigW / 2, y, { align: "center" });
-    pdf.text("Signature of the Teacher", margin + sigW + sigW / 2, y, { align: "center" });
-    pdf.text("Signature of the Parent", margin + 2 * sigW + sigW / 2, y, { align: "center" });
-  
-    // Save
-    const fileMonthLabel = `${monthName}_${selectedYear}`;
-    const fileName = `IEP_Report_${(student?.name || "student").replace(/\s+/g, "_")}_${fileMonthLabel}.pdf`;
-    pdf.save(fileName);
-  };
-
-  const [activeSkillByTable, setActiveSkillByTable] = useState({});
-  const [questionsOpenByTable, setQuestionsOpenByTable] = useState({});
-  const [activeQuestionByTable, setActiveQuestionByTable] = useState({}); // Track active question index per table
-  const questionRefs = useRef({}); // Refs for scrolling to questions
-  const [pulsatingEditButton, setPulsatingEditButton] = useState({}); // Track which table's edit button should pulsate
-
-  const normalizeAIProgressSummary = (summaryText) => {
-    if (!summaryText || typeof summaryText !== "string") return summaryText;
-
-    const lowQualityMarkers = [
-      "- Sarah",
-      "Sarah she",
-      "exdpress",
-      "gets really quiet when that happens",
-    ];
-    const isLowQuality = lowQualityMarkers.some((m) =>
-      summaryText.toLowerCase().includes(m.toLowerCase()),
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `TRIMESTER REPORT OF ${String(iepData?.selectedMonth || "").toUpperCase()}`,
+      pageW / 2,
+      titleY,
+      { align: "center" }
     );
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Name : ${student?.name || ""}`, margin, titleY + 20);
+    
+    // table sizing: larger overall table
+    const tableTop = titleY + 44; // increased gap under name/title
+    const tableLeft = margin;
+    const tableWidth = pageW - margin * 2;
+    const colWidth = Math.floor(tableWidth / 3);
+    
+    const cellPadding = 6; // consistent padding
+    const usableColW = colWidth - cellPadding * 2;
+    const lineHeight = 12;
+    const headerH = 26;
+    const minRowH = 28; // slightly taller rows for readability
+    
+    // build row data from the three columns (safe string conversion)
+    const adl = iepData?.sections?.adlSkills || [];
+    const academic = iepData?.sections?.academic || [];
+    const behavioural = iepData?.sections?.behaviouralSkills || [];
+    const rowsCount = Math.max(adl.length, academic.length, behavioural.length, 3); // ensure some rows
+    
+    const rowHeights = [];
+    const rowTextLines = [];
+    
+    for (let r = 0; r < rowsCount; r++) {
+      const c0 = String(adl[r]?.text ?? "");
+      const c1 = String(academic[r]?.text ?? "");
+      const c2 = String(behavioural[r]?.text ?? "");
+    
+      const l0 = doc.splitTextToSize(c0, usableColW);
+      const l1 = doc.splitTextToSize(c1, usableColW);
+      const l2 = doc.splitTextToSize(c2, usableColW);
+    
+      const rh = Math.max(
+        Math.max(l0.length, l1.length, l2.length) * lineHeight + cellPadding * 2,
+        minRowH
+      );
+      rowHeights.push(rh);
+      rowTextLines.push([l0, l1, l2]);
+    }
+    
+    const tableBodyHeight = rowHeights.reduce((a, b) => a + b, 0);
+    const tableHeight = headerH + tableBodyHeight;
+    
+    // draw outer table border (bigger table)
+    doc.setLineWidth(0.8);
+    doc.rect(tableLeft, tableTop, tableWidth, tableHeight, "S");
+    
+    // draw vertical dividers
+    const x1 = tableLeft + colWidth;
+    const x2 = tableLeft + colWidth * 2;
+    doc.line(x1, tableTop, x1, tableTop + tableHeight);
+    doc.line(x2, tableTop, x2, tableTop + tableHeight);
+    
+    // header
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    const headerTitles = ["ADL SKILLS", "ACADEMIC SKILLS", "BEHAVIOURAL SKILLS"];
+    for (let i = 0; i < 3; i++) {
+      const hx = tableLeft + i * colWidth + cellPadding;
+      const hy = tableTop + headerH / 2 + 4;
+      doc.text(headerTitles[i], hx, hy);
+    }
 
-    if (!isLowQuality) return summaryText;
-
-    const lines = summaryText.split("\n");
-    const normalized = lines.map((rawLine) => {
-      let line = (rawLine || "").trim();
-      if (!line) return "";
-
-      if (/progress summary/i.test(line)) {
-        return line.replace(" - Progress Summary", " � Progress Summary");
+        // draw horizontal line under header
+    doc.setLineWidth(0.7);
+    doc.line(tableLeft, tableTop + headerH, tableLeft + tableWidth, tableTop + headerH);
+    
+    // render rows
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    let y = tableTop + headerH;
+    for (let r = 0; r < rowsCount; r++) {
+      const rh = rowHeights[r];
+      const lines = rowTextLines[r];
+    
+      for (let c = 0; c < 3; c++) {
+        const x = tableLeft + c * colWidth + cellPadding;
+        // top-aligned inside row with a small top offset
+        doc.text(lines[c], x, y + cellPadding + 6);
       }
-
-      if (line.startsWith("**") && line.endsWith("**")) {
-        return line;
-      }
-
-      if (line.startsWith("- ")) {
-        line = line.slice(2).trim();
-        line = line.replace(/^Sarah\s+/i, "");
-        line = line.replace(/^she\s+/i, "");
-        line = line.replace(/^her\s+/i, "");
-        line = line.replace(/\bexdpress\b/gi, "express");
-        line = line.replace(/\s+,/g, ",");
-        line = line.replace(/,\s*/g, ", ");
-        line = line.replace(/\s{2,}/g, " ").trim();
-
-        if (!/^the student\b/i.test(line)) {
-          line = `The student ${line.charAt(0).toLowerCase()}${line.slice(1)}`;
-        }
-        if (!/[.!?]$/.test(line)) {
-          line += ".";
-        }
-        return `� ${line}`;
-      }
-
-      return line;
-    });
-
-    return normalized.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+      y += rh;
+    }
+    
+    // gap after table
+    y += 18;
+    
+    // IEP label + REMARKS (moved accordingly)
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("IEP OF THE STUDENT :", margin, y);
+    y += 80;
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("REMARKS :", margin, y);
+    y += 10;
+    
+    // increased remarks box height
+    const remarksBoxHeight = 140; // adjust as needed
+    const remarksBoxWidth = tableWidth;
+    doc.rect(margin, y, remarksBoxWidth, remarksBoxHeight);
+    
+    // write remarks text inside box with small left padding
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const remarksText = String(iepData?.remarks || "");
+    const remarksLines = doc.splitTextToSize(remarksText, remarksBoxWidth - cellPadding * 2);
+    doc.text(remarksLines, margin + cellPadding, y + 12);
+    
+    y += remarksBoxHeight + 26; // move cursor below box
+    
+    // signatures (computed after remarks box so they sit beneath it)
+    const sigW = Math.floor(tableWidth / 3);
+    const sigX0 = margin;
+    const sigX1 = margin + sigW;
+    const sigX2 = margin + sigW * 2;
+    const sigLineY = y + 18;
+    const sigLineLength = sigW - 40;
+    
+    doc.setLineWidth(0.7);
+    doc.line(sigX0 + 20, sigLineY, sigX0 + 20 + sigLineLength, sigLineY);
+    doc.line(sigX1 + 20, sigLineY, sigX1 + 20 + sigLineLength, sigLineY);
+    doc.line(sigX2 + 20, sigLineY, sigX2 + 20 + sigLineLength, sigLineY);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Principal", sigX0 + 20, sigLineY + 14);
+    doc.text("Class Teacher", sigX1 + 20, sigLineY + 14);
+    doc.text("Parent / Guardian", sigX2 + 20, sigLineY + 14);
+  
+    // Save PDF
+    doc.save(`${(student?.name || "student").replace(/\s+/g, "_")}-iep.pdf`);
   };
 
   const renderSummaryContent = (summaryText, isStreaming = false) => {
@@ -1429,7 +1449,7 @@ const addCellToColumn = (columnKey) => {
 
       if (isMainTitle) {
         const titleWithoutSuffix = cleanedHeading
-          .replace(/\s*[�-]\s*progress summary\s*$/i, "")
+          .replace(/\s*[ÃƒÂ¯Ã‚Â¿Ã‚Â½-]\s*progress summary\s*$/i, "")
           .replace(/\s*progress summary\s*$/i, "")
           .trim();
         summaryTitle = titleWithoutSuffix || summaryTitle;
@@ -1490,8 +1510,8 @@ const addCellToColumn = (columnKey) => {
                       return <div key={`${sectionKey}-spacer-${lineIndex}`} className="h-2" />;
                     }
 
-                    const isBullet = /^[-�*]\s+/.test(line);
-                    const bulletText = isBullet ? line.replace(/^[-�*]\s+/, "") : line;
+                    const isBullet = /^[-ÃƒÂ¯Ã‚Â¿Ã‚Â½*]\s+/.test(line);
+                    const bulletText = isBullet ? line.replace(/^[-ÃƒÂ¯Ã‚Â¿Ã‚Â½*]\s+/, "") : line;
                     const isFinalVisibleLine =
                       isStreaming &&
                       sectionIndex === sections.length - 1 &&
@@ -1507,7 +1527,7 @@ const addCellToColumn = (columnKey) => {
                         }`}
                       >
                         <p className="text-sm sm:text-[15px] text-gray-800 leading-7">
-                          {isBullet && <span className="text-[#E38B52] font-bold mr-2">�</span>}
+                          {isBullet && <span className="text-[#E38B52] font-bold mr-2">ÃƒÂ¯Ã‚Â¿Ã‚Â½</span>}
                           {bulletText}
                           {isFinalVisibleLine && (
                             <span className="inline-block ml-1 text-[#E38B52] font-semibold animate-pulse">
@@ -1548,6 +1568,13 @@ const addCellToColumn = (columnKey) => {
       }
       return true;
     });
+  };
+
+  const normalizeAIProgressSummary = (summary) => {
+    return String(summary || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   };
 
   const handleAISummarize = async () => {
@@ -3315,6 +3342,23 @@ const addCellToColumn = (columnKey) => {
       })
     );
   };
+
+
+  const parseMonthYearKey = (key) => {
+    // key format: "January 2026"
+    if (!key) return new Date(0);
+    const [month, year] = String(key).split(" ");
+    return new Date(`${month} 1, ${year}`);
+  };
+
+  const warnIfEditingIep = () => {
+    if (iepFormVisible || editingIepMonth) {
+      showToast("Save the IEP report before leaving or opening another report", "warning");
+      return true;
+    }
+    return false;
+  };
+
   // Check if a phase is unlocked based on previous phases being saved
   const isPhaseUnlocked = (table, targetPhase) => {
   if (targetPhase === "1st assmt") return true;
@@ -3657,7 +3701,7 @@ const addCellToColumn = (columnKey) => {
         const logoY = y;
       
         try {
-          // use local import (schoolLogo) — avoids CORS
+          // use local import (schoolLogo) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â avoids CORS
           doc.addImage(schoolLogo, "PNG", logoX, logoY, logoW, logoH);
         } catch (e) {
           console.warn("Logo draw failed:", e);
@@ -4820,30 +4864,176 @@ const addCellToColumn = (columnKey) => {
       className="min-h-screen w-full flex flex-col items-center bg-[#f7f7f7] relative overflow-hidden py-20"
     >
 
-        {showDocumentDeleteConfirm && pendingDocumentDelete && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-        <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
-          <h3 className="text-lg font-semibold text-[#170F49]">Confirm delete</h3>
-          <p className="mt-2 text-sm text-[#6F6C90]">
-            Are you sure you want to delete "{pendingDocumentDelete.documentName}"?
-            This action cannot be undone.
-          </p>
-          <div className="mt-5 flex justify-end gap-3">
-            <button
-              onClick={() => {
-                setShowDocumentDeleteConfirm(false);
-                setPendingDocumentDelete(null);
-              }}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDeleteDocument}
-              className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm"
-            >
-              Delete
-            </button>
+    {showDocumentDeleteConfirm && pendingDocumentDelete && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+          <div className="text-center">
+            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+              <svg
+                className="h-8 w-8 text-red-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                />
+              </svg>
+            </div>
+    
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              Delete Document
+            </h3>
+    
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-[#170F49]">
+                {pendingDocumentDelete.documentName}
+              </span>
+              ?
+              <br />
+              <span className="text-red-600 font-medium">
+                This action cannot be undone.
+              </span>
+            </p>
+    
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowDocumentDeleteConfirm(false);
+                  setPendingDocumentDelete(null);
+                }}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteDocument}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {showIepDeleteConfirm && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+          <div className="text-center">
+            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+              <svg
+                className="h-8 w-8 text-red-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                />
+              </svg>
+            </div>
+    
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              Delete IEP Report
+            </h3>
+    
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-[#170F49]">{deletePendingIepKey}</span>?
+              <br />
+              <span className="text-red-600 font-medium">
+                This action cannot be undone.
+              </span>
+            </p>
+    
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowIepDeleteConfirm(false);
+                  setDeletePendingIepKey(null);
+                }}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performDeleteIepReport}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {showDeleteConfirm && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+          <div className="text-center">
+            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+              <svg
+                className="h-8 w-8 text-red-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                />
+              </svg>
+            </div>
+    
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              Delete Table
+            </h3>
+    
+            <p className="text-sm text-gray-600 mb-6">
+              Are you sure you want to delete this table?
+              <br />
+              <span className="text-red-600 font-medium">
+                This action cannot be undone.
+              </span>
+            </p>
+    
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeletePendingIndex(null);
+                  showToast("Delete cancelled", "info");
+                }}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (deletePendingIndex !== null) {
+                    handleDeleteTable(deletePendingIndex);
+                    showToast("Table deleted", "success");
+                  }
+                  setShowDeleteConfirm(false);
+                  setDeletePendingIndex(null);
+                }}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -4989,6 +5179,7 @@ const addCellToColumn = (columnKey) => {
             {/* Student Details Tab */}
             <button
               onClick={() => {
+                if (warnIfEditingIep()) return;
                 if (unsavedTableIndex !== null) {
                   const editingTable = savedTables[unsavedTableIndex];
                   if (editingTable) {
@@ -5020,6 +5211,7 @@ const addCellToColumn = (columnKey) => {
             {/* Case Record Tab */}
             <button
               onClick={() => {
+                if (warnIfEditingIep()) return;
                 if (unsavedTableIndex !== null) {
                   showToast("Save the current table before changing tabs", "warning");
                   return;
@@ -5038,6 +5230,7 @@ const addCellToColumn = (columnKey) => {
             {/* Therapy Reports Tab */}
             <button
               onClick={() => {
+                if (warnIfEditingIep()) return;
                 if (unsavedTableIndex !== null) {
                   showToast("Save the current table before changing tabs", "warning");
                   return;
@@ -5055,6 +5248,7 @@ const addCellToColumn = (columnKey) => {
             {/* IEP Tab */}
             <button
               onClick={() => {
+                if (warnIfEditingIep()) return;
                 if (unsavedTableIndex !== null) {
                   showToast("Save the current table before changing tabs", "warning");
                   return;
@@ -5073,6 +5267,7 @@ const addCellToColumn = (columnKey) => {
             {/* Special Education Tab */}
             <button
               onClick={() => {
+                if (warnIfEditingIep()) return;
                 if (unsavedTableIndex !== null) {
                   showToast("Save the current table before changing tabs", "warning");
                   return;
@@ -6100,7 +6295,7 @@ const addCellToColumn = (columnKey) => {
                           </div>
                           {aiAnalysis?.truncated && (
                             <div className="mt-3 text-xs text-orange-700 bg-orange-50 p-2 rounded border border-orange-200">
-                              ⚠️ Analysis was truncated due to content length.
+                              ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Analysis was truncated due to content length.
                               Consider filtering by date range for more detailed
                               analysis.
                             </div>
@@ -7095,7 +7290,7 @@ const addCellToColumn = (columnKey) => {
                             </svg>
                             <p className="font-medium text-[#170F49] text-sm">{docType.label}</p>
                           </div>
-                          <p className="text-xs text-[#6F6C90]">PDF only • Max 5MB</p>
+                          <p className="text-xs text-[#6F6C90]">PDF only ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Max 5MB</p>
                         </div>
                                                 
                         <button
@@ -7230,7 +7425,7 @@ const addCellToColumn = (columnKey) => {
                                       {doc.name}
                                     </p>
                                     <p className="text-xs text-[#6F6C90] mt-1">
-                                      {(doc.file_size / 1024).toFixed(2)} KB • {new Date(doc.upload_date).toLocaleDateString()}
+                                      {(doc.file_size / 1024).toFixed(2)} KB ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {new Date(doc.upload_date).toLocaleDateString()}
                                     </p>
                                   </div>
                                 </div>
@@ -7319,18 +7514,7 @@ const addCellToColumn = (columnKey) => {
           ) : activeTab === "iep" ? (
                         
             <div className="max-w-6xl mx-auto p-6">
-              {showIepDeleteConfirm && (
-                <div className="fixed inset-0 z-50 flex justify-center bg-black/40 pt-6">
-                  <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                    <h3 className="text-lg font-bold">Confirm delete</h3>
-                    <p className="mt-2">Are you sure you want to delete the IEP for <strong>{deletePendingIepKey}</strong>? This action cannot be undone.</p>
-                    <div className="mt-4 flex justify-end gap-2">
-                      <button onClick={() => { setShowIepDeleteConfirm(false); setDeletePendingIepKey(null); }} className="px-3 py-1 border rounded">Cancel</button>
-                      <button onClick={performDeleteIepReport} className="px-3 py-1 bg-red-600 text-white rounded">Delete</button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              
               <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8m0-8l-3 3m3-3l3 3M4 6h16" />
@@ -7374,7 +7558,7 @@ const addCellToColumn = (columnKey) => {
                         min="1900"
                         max="2100"
                         value={selectedYear}
-                        onChange={(e) => setSelectedYear(Number(e.target.value) || new Date().getFullYear())}
+                        onChange={(e) => setSelectedYear(e.target.value)}
                         className="px-3 py-1.5 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] font-medium w-28"
                       />
                     </div>
@@ -7384,270 +7568,461 @@ const addCellToColumn = (columnKey) => {
                     <button
                       type="button"
                       onClick={createIepTable}
-                      className="px-6 py-2.5 bg-white text-[#E38B52] border border-[#E38B52] rounded-lg transition-all duration-300 shadow-md hover:shadow-lg hover:bg-[#FFF3E8] whitespace-nowrap"
+                      disabled={!iepData.selectedMonth || !selectedYear || !isValidYear}
+                      className={`px-6 py-2.5 border rounded-lg transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap ${
+                        iepData.selectedMonth && selectedYear && isValidYear
+                          ? "bg-white text-[#E38B52] border-[#E38B52] hover:bg-[#FFF3E8]"
+                          : "bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed"
+                      }`}
                     >
                       + Create Report
                     </button>
+                    {existingIepMonthKey && (
+                      <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+                        <p className="text-sm text-amber-900">
+                          A report already exists for <strong>{existingIepMonthKey}</strong>.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIepFormVisible(false);
+                            setExpandedIepMonth(existingIepMonthKey);
+                            document
+                              .getElementById(`iep-report-${existingIepMonthKey}`)
+                              ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          }}
+                          className="px-4 py-2 rounded-lg bg-[#E38B52] text-white text-sm hover:bg-[#C8742F]"
+                        >
+                          Go to saved report
+                        </button>
+                      </div>
+                    )}
                   </div>
                 <p className="mt-3 text-xs text-[#6F6C90]">Select the month and year to prepare the IEP report.</p>
               
                 
               </div>
-            {iepFormVisible && (
-              <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8">
-                {/* Table controls */}
-                <div className="flex justify-between items-center mb-4">
-                  <button
-                    onClick={addTableRow}
-                    className="px-4 py-2 bg-[#E38B52] text-white rounded-lg hover:bg-[#C8742F] transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Add Row
-                  </button>
-                </div>
+              <tbody>
+              <tr>
+                <td colSpan={3} className="p-4 align-top">
+                  {iepFormVisible ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {[
+                        { key: "adlSkills", title: "ADL Skills", addLabel: "Add ADL Skill" },
+                        { key: "academic", title: "Academic", addLabel: "Add Academic Entry" },
+                        { key: "behaviouralSkills", title: "Behavioural", addLabel: "Add Behavioural Skill" },
+                      ].map(({ key, title, addLabel }) => (
+                        <div key={key} className="bg-white p-3 rounded shadow-sm">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium">{title}</h4>
+                            <button
+                              type="button"
+                              className="text-sm text-[#E38B52] hover:underline"
+                              onClick={() => addIepSectionItem(key)}
+                            >
+                              + {addLabel}
+                            </button>
+                          </div>
             
-                <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
-                  <table className="w-full">
-                    <thead className="bg-gradient-to-r from-[#E38B52] to-[#F5A572]">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-white">ADL SKILLS</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-white">ACADEMIC</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-white">BEHAVIOURAL SKILLS</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                        {iepData.tableRows.map((row, index) => (
-                          <tr key={row.id} className={`relative ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}>
-                            <td className="px-6 py-4">
-                              <textarea
-                                value={row.adlSkills}
-                                onChange={(e) => handleTableRowChange(row.id, "adlSkills", e.target.value)}
-                                placeholder="Enter ADL skills..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent resize-none"
-                                rows={3}
-                              />
-                            </td>
-                        
-                            <td className="px-6 py-4">
-                              <textarea
-                                value={row.academic}
-                                onChange={(e) => handleTableRowChange(row.id, "academic", e.target.value)}
-                                placeholder="Enter academic skills..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent resize-none"
-                                rows={3}
-                              />
-                            </td>
-                        
-                            <td className="px-6 py-4 pr-12"> {/* add right padding for the absolute button */}
-                              <textarea
-                                value={row.behaviouralSkills}
-                                onChange={(e) => handleTableRowChange(row.id, "behaviouralSkills", e.target.value)}
-                                placeholder="Enter behavioural skills..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent resize-none"
-                                rows={3}
-                              />
-                              {/* absolute delete button on the right side of the row */}
-                              {iepData.tableRows.length > 1 && (
+                          <div className="flex flex-col gap-2">
+                            {(iepData.sections[key] || []).map((item) => (
+                              <div key={item.id} className="flex gap-2 items-start">
+                                <textarea
+                                  value={item.text}
+                                  onChange={(e) =>
+                                    handleIepSectionChange(key, item.id, e.target.value)
+                                  }
+                                  placeholder="Enter item"
+                                  className="input-edit h-20 resize-none"
+                                />
                                 <button
-                                  onClick={() => handleRemoveRowWithConfirm(row.id)}
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-600 p-1.5 rounded-md hover:bg-red-50"
-                                  title="Delete row"
-                                  aria-label="Delete row"
+                                  type="button"
+                                  className="text-red-500 ml-1"
+                                  onClick={() => removeIepSectionItem(key, item.id)}
+                                  aria-label="Remove item"
                                 >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6" />
+                                  <svg
+                                    viewBox="0 0 24 24"
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M3 6h18" />
+                                    <path d="M8 6V4h8v2" />
+                                    <path d="M6 6l1 14h10l1-14" />
                                   </svg>
                                 </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-            
-                <div className="space-y-6 mt-6">
-                  <div>
-                    <label className="block text-lg font-semibold text-[#170F49] mb-3">IEP OF THE STUDENT:</label>
-                    <textarea
-                      value={iepData.iepStudent}
-                      onChange={(e) => handleIepInputChange("iepStudent", e.target.value)}
-                      placeholder="Enter the Individual Education Program details for the student..."
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent resize-none shadow-sm"
-                      rows={6}
-                    />
-                  </div>
-            
-                  <div>
-                    <label className="block text-lg font-semibold text-[#170F49] mb-3">Remarks:</label>
-                    <textarea
-                      value={iepData.remarks}
-                      onChange={(e) => handleIepInputChange("remarks", e.target.value)}
-                      placeholder="Enter any additional remarks or observations..."
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent resize-none shadow-sm"
-                      rows={4}
-                    />
-                  </div>
-                </div>
-            
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-[#6F6C90] mb-2">Principal</label>
-                    <input type="text" value={iepData.signatures.principal} onChange={(e) => handleSignatureChange("principal", e.target.value)} placeholder="Principal's signature/name" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent shadow-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[#6F6C90] mb-2">Teacher</label>
-                    <input type="text" value={iepData.signatures.teacher} onChange={(e) => handleSignatureChange("teacher", e.target.value)} placeholder="Teacher's signature/name" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent shadow-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[#6F6C90] mb-2">Parent/Guardian</label>
-                    <input type="text" value={iepData.signatures.parent} onChange={(e) => handleSignatureChange("parent", e.target.value)} placeholder="Parent's signature/name" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent shadow-sm" />
-                  </div>
-                </div>
-            
-                <div className="text-center mt-8">
-                  <button onClick={saveIepData} disabled={savingIep} className="px-8 py-3 bg-gradient-to-r from-[#E38B52] to-[#F5A572] text-white rounded-lg hover:from-[#C8742F] hover:to-[#E38B52] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2 mx-auto">
-                    {savingIep ? <span>Saving…</span> : <span>Save IEP Data</span>}
-                  </button>
-                </div>
-              </div>
-            )}
+                              </div>
+                            ))}
+                            {!(iepData.sections[key] || []).length && (
+                              <div className="text-sm text-gray-400">No items yet</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      {(() => {
+                        const adlItems = Array.isArray(iepData.sections?.adlSkills) ? iepData.sections.adlSkills : [];
+                        const academicItems = Array.isArray(iepData.sections?.academic) ? iepData.sections.academic : [];
+                        const behaviouralItems = Array.isArray(iepData.sections?.behaviouralSkills) ? iepData.sections.behaviouralSkills : [];
+                        const rowCount = Math.max(adlItems.length, academicItems.length, behaviouralItems.length);
+                    
+                        if (rowCount === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={3} className="px-4 py-6 text-center text-gray-500">
+                                No IEP skills added yet.
+                              </td>
+                            </tr>
+                          );
+                        }
+                    
+                        
+                      })()}
+                    </>
+                  )}
+                </td>
+              </tr>
+            </tbody>
 
               {/* Saved IEP Reports List */}
                 <div className="mt-6 mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                   <h3 className="text-lg font-semibold text-[#170F49] mb-4 flex items-center gap-2">Saved Reports</h3>
-                  {Object.keys(savedIepByMonth).length === 0 ? (
-                    <p className="text-sm text-gray-500">No saved reports yet.</p>
-                  ) : (
-                    Object.keys(savedIepByMonth).map((monthYearKey) => (
-                      <div
-                        key={monthYearKey}
-                        className="border border-[#E38B52]/30 rounded-xl bg-white shadow-md overflow-hidden"
-                      >
-                        {/* Collapsed Header */}
-                        <div className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-[#E38B52]/10 to-transparent">
-                          <button
-                            onClick={() => toggleIepExpand(monthYearKey)}
-                            className="text-left flex-1 text-base font-semibold text-[#170F49]"
-                            aria-expanded={expandedIepMonth === monthYearKey}
-                          >
-                            TRIMESTER REPORT FOR {monthYearKey.toUpperCase()}
-                          </button>
-                        
-                          <div className="flex items-center gap-2">
+                  {(() => {
+                    const keys = Object.keys(savedIepByMonth || {});
+                    const sortedKeys = keys.sort((a, b) => parseMonthYearKey(b) - parseMonthYearKey(a)); // newest first
+                    return sortedKeys.map((monthYearKey) => {
+                      const isExpanded = expandedIepMonth === monthYearKey;
+                      const isEditing = editingIepMonth === monthYearKey;
+                      return (
+                        <div
+                          key={monthYearKey}
+                          id={`iep-report-${monthYearKey}`}
+                          className="border border-[#E38B52]/30 rounded-xl bg-white shadow-md overflow-hidden"
+                        >
+                          <div className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-[#E38B52]/10 to-transparent">
                             <button
-                              onClick={(e) => { e.stopPropagation(); toggleIepExpand(monthYearKey); }}
-                              title={expandedIepMonth === monthYearKey ? "Collapse" : "Expand"}
-                              className="p-2 rounded-md text-[#E38B52] hover:bg-[#FFF3E8]"
-                              aria-label="Toggle"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform ${expandedIepMonth === monthYearKey ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedIepMonth(monthYearKey);
-                                setEditingIepMonth(monthYearKey);
-                                setIepData(savedIepByMonth[monthYearKey]);
+                              onClick={() => {
+                                if (warnIfEditingIep() && !isExpanded) return;
+                                toggleIepExpand(monthYearKey);
                               }}
-                              className="px-3 py-1.5 rounded-md bg-[#E38B52] text-white text-sm hover:bg-[#C8742F]"
+                              className="text-left flex-1 text-base font-semibold text-[#170F49]"
+                              aria-expanded={isExpanded}
                             >
-                              Edit
+                              TRIMESTER REPORT FOR {monthYearKey.toUpperCase()}
                             </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); confirmDeleteIepReport(monthYearKey); }}
-                              title="Delete report"
-                              className="p-2 rounded-md text-red-600 hover:bg-red-50"
-                              aria-label="Delete report"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
-                              </svg>
-                            </button>
+                  
+                            <div className="flex items-center gap-2">
+                              
+                  
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); saveIepData(); }}
+                                    className="px-3 py-1.5 rounded-md bg-green-600 text-white text-sm hover:bg-green-700"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const key = `iep_data_student_${id}_by_month`;
+                                      try {
+                                        const mapping = JSON.parse(localStorage.getItem(key) || "{}");
+                                        if (mapping?.[monthYearKey]) {
+                                          setIepData(normalizeIepData(savedIepByMonth[monthYearKey]));
+                                        } else {
+                                          setIepData({
+                                            ...createEmptyIepData(),
+                                            selectedMonth: iepData.selectedMonth,
+                                          });
+                                        }
+                                      } catch (err) {
+                                        console.error("Failed to reload IEP on cancel:", err);
+                                      } finally {
+                                        setEditingIepMonth(null);
+                                      }
+                                    }}
+                                    className="px-3 py-1.5 rounded-md bg-gray-100 text-[#170F49] text-sm hover:bg-gray-200"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (warnIfEditingIep()) return;
+                                    setExpandedIepMonth(monthYearKey);
+                                    setEditingIepMonth(monthYearKey);
+                                    setIepData(normalizeIepData(savedIepByMonth[monthYearKey]));
+                                  }}
+                                  className="px-3 py-1.5 rounded-md bg-[#E38B52] text-white text-sm hover:bg-[#C8742F]"
+                                >
+                                  Edit
+                                </button>
+                              )}
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Download the saved IEP for this month (uses existing helper)
+                                  if (!savedIepByMonth?.[monthYearKey]) {
+                                    showToast("No saved report to download.", "warning");
+                                    return;
+                                  }
+                                  // If downloadIepAsPDF currently uses in-memory iepData, temporarily set it:
+                                  const prev = { ...iepData };
+                                  setIepData(savedIepByMonth[monthYearKey]);
+                                  // small delay to ensure state propagated before generating PDF
+                                  setTimeout(() => {
+                                    downloadIepAsPDF();
+                                    setIepData(prev);
+                                  }, 50);
+                                }}
+                                title="Download report"
+                                className="p-2 rounded-md text-[#E38B52] hover:bg-[#FFF3E8]"
+                                aria-label="Download report"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l4-4m-4 4l-4-4M21 21H3" />
+                                </svg>
+                              </button>
+                  
+                              <button
+                                onClick={(e) => { e.stopPropagation(); confirmDeleteIepReport(monthYearKey); }}
+                                title="Delete report"
+                                className="p-2 rounded-md text-red-600 hover:bg-red-50"
+                                aria-label="Delete report"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      
-                        {/* Expanded Content */}
-                        {expandedIepMonth === monthYearKey && (
+                  
+                          {isExpanded && (
                           <div className="px-6 py-6 border-t border-[#E38B52]/20 space-y-6 bg-white/50">
                             {/* Table Section */}
-                            <div>
-                              <h4 className="text-sm font-semibold text-[#170F49] mb-3">Assessment Table</h4>
+                            {isEditing ? (
                               <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                                <table className="w-full">
+                                <table className="w-full table-fixed border-collapse">
+                                  <colgroup>
+                                    <col style={{ width: "34%" }} />
+                                    <col style={{ width: "33%" }} />
+                                    <col style={{ width: "33%" }} />
+                                  </colgroup>
+                            
                                   <thead className="bg-gradient-to-r from-[#E38B52] to-[#F5A572]">
                                     <tr>
-                                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">ADL SKILLS</th>
-                                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">ACADEMIC</th>
-                                      <th className="px-6 py-4 text-left text-sm font-semibold text-white">BEHAVIOURAL SKILLS</th>
-                                      
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-white border-r border-white/30">
+                                        <div className="flex items-center justify-between gap-3">
+                                          <span>ADL SKILLS</span>
+                                          <button
+                                            type="button"
+                                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white text-[#E38B52] text-xs font-semibold shadow-sm hover:bg-[#FFF3E8] hover:text-[#C8742F] transition-colors whitespace-nowrap"
+                                            onClick={() => addIepSectionItem("adlSkills")}
+                                          >
+                                            <span className="text-base leading-none">+</span>
+                                            <span>Add Row</span>
+                                          </button>
+                                        </div>
+                                      </th>
+                            
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-white border-r border-white/30">
+                                        <div className="flex items-center justify-between gap-3">
+                                          <span>ACADEMIC</span>
+                                          <button
+                                            type="button"
+                                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white text-[#E38B52] text-xs font-semibold shadow-sm hover:bg-[#FFF3E8] hover:text-[#C8742F] transition-colors whitespace-nowrap"
+                                            onClick={() => addIepSectionItem("academic")}
+                                          >
+                                            <span className="text-base leading-none">+</span>
+                                            <span>Add Row</span>
+                                          </button>
+                                        </div>
+                                      </th>
+                            
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-white">
+                                        <div className="flex items-center justify-between gap-3">
+                                          <span>BEHAVIOURAL SKILLS</span>
+                                          <button
+                                            type="button"
+                                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-white text-[#E38B52] text-xs font-semibold shadow-sm hover:bg-[#FFF3E8] hover:text-[#C8742F] transition-colors whitespace-nowrap"
+                                            onClick={() => addIepSectionItem("behaviouralSkills")}
+                                          >
+                                            <span className="text-base leading-none">+</span>
+                                            <span>Add Row</span>
+                                          </button>
+                                        </div>
+                                      </th>
                                     </tr>
                                   </thead>
-                                  <tbody>
-                                      {iepData.tableRows.map((row, index) => (
-                                        <tr key={row.id} className={`relative ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}>
-                                          <td className="px-6 py-4">
-                                            <textarea
-                                              value={row.adlSkills}
-                                              onChange={(e) => handleTableRowChange(row.id, "adlSkills", e.target.value)}
-                                              placeholder="Enter ADL skills..."
-                                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent resize-none"
-                                              rows={3}
-                                              readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
-                                            />
+                            
+                                  <tbody className="bg-white">
+                                    {(() => {
+                                      const adlItems = Array.isArray(iepData.sections?.adlSkills) ? iepData.sections.adlSkills : [];
+                                      const academicItems = Array.isArray(iepData.sections?.academic) ? iepData.sections.academic : [];
+                                      const behaviouralItems = Array.isArray(iepData.sections?.behaviouralSkills) ? iepData.sections.behaviouralSkills : [];
+                                      const rowCount = Math.max(adlItems.length, academicItems.length, behaviouralItems.length);
+                            
+                                      if (rowCount === 0) {
+                                        return (
+                                          <tr>
+                                            <td colSpan={3} className="px-4 py-6 text-center text-gray-500">
+                                              No IEP skills added yet.
+                                            </td>
+                                          </tr>
+                                        );
+                                      }
+                            
+                                      return Array.from({ length: rowCount }).map((_, index) => (
+                                        <tr key={`iep-edit-row-${index}`}>
+                                          <td className="px-4 py-3 align-top text-sm text-gray-700 border-r border-gray-200">
+                                            {adlItems[index] ? (
+                                              <div className="flex items-start gap-2">
+                                                <textarea
+                                                  value={adlItems[index].text}
+                                                  onChange={(e) => handleIepSectionChange("adlSkills", adlItems[index].id, e.target.value)}
+                                                  placeholder="Enter ADL skill"
+                                                  className="input-edit h-20 resize-none flex-1"
+                                                  readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  className="text-red-500 mt-2 shrink-0"
+                                                  onClick={() => removeIepSectionItem("adlSkills", adlItems[index].id)}
+                                                  aria-label="Remove ADL skill"
+                                                >
+                                                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M3 6h18" />
+                                                    <path d="M8 6V4h8v2" />
+                                                    <path d="M6 6l1 14h10l1-14" />
+                                                  </svg>
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              <div className="h-20" />
+                                            )}
                                           </td>
-                                      
-                                          <td className="px-6 py-4">
-                                            <textarea
-                                              value={row.academic}
-                                              onChange={(e) => handleTableRowChange(row.id, "academic", e.target.value)}
-                                              placeholder="Enter academic skills..."
-                                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent resize-none"
-                                              rows={3}
-                                              readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
-                                            />
+                            
+                                          <td className="px-4 py-3 align-top text-sm text-gray-700 border-r border-gray-200">
+                                            {academicItems[index] ? (
+                                              <div className="flex items-start gap-2">
+                                                <textarea
+                                                  value={academicItems[index].text}
+                                                  onChange={(e) => handleIepSectionChange("academic", academicItems[index].id, e.target.value)}
+                                                  placeholder="Enter academic entry"
+                                                  className="input-edit h-20 resize-none flex-1"
+                                                  readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  className="text-red-500 mt-2 shrink-0"
+                                                  onClick={() => removeIepSectionItem("academic", academicItems[index].id)}
+                                                  aria-label="Remove academic entry"
+                                                >
+                                                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M3 6h18" />
+                                                    <path d="M8 6V4h8v2" />
+                                                    <path d="M6 6l1 14h10l1-14" />
+                                                  </svg>
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              <div className="h-20" />
+                                            )}
                                           </td>
-                                      
-                                          <td className="px-6 py-4 pr-12"> {/* add right padding for the absolute button */}
-                                            <textarea
-                                              value={row.behaviouralSkills}
-                                              onChange={(e) => handleTableRowChange(row.id, "behaviouralSkills", e.target.value)}
-                                              placeholder="Enter behavioural skills..."
-                                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] focus:border-transparent resize-none"
-                                              rows={3}
-                                              readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
-                                            />
-                                            {/* absolute delete button on the right side of the row */}
-                                            {iepData.tableRows.length > 1 && (
-                                              <button
-                                                onClick={() => handleRemoveRowWithConfirm(row.id)}
-                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-600 p-1.5 rounded-md hover:bg-red-50"
-                                                title="Delete row"
-                                                aria-label="Delete row"
-                                              >
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6" />
-                                                </svg>
-                                              </button>
+                            
+                                          <td className="px-4 py-3 align-top text-sm text-gray-700">
+                                            {behaviouralItems[index] ? (
+                                              <div className="flex items-start gap-2">
+                                                <textarea
+                                                  value={behaviouralItems[index].text}
+                                                  onChange={(e) => handleIepSectionChange("behaviouralSkills", behaviouralItems[index].id, e.target.value)}
+                                                  placeholder="Enter behavioural skill"
+                                                  className="input-edit h-20 resize-none flex-1"
+                                                  readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  className="text-red-500 mt-2 shrink-0"
+                                                  onClick={() => removeIepSectionItem("behaviouralSkills", behaviouralItems[index].id)}
+                                                  aria-label="Remove behavioural skill"
+                                                >
+                                                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M3 6h18" />
+                                                    <path d="M8 6V4h8v2" />
+                                                    <path d="M6 6l1 14h10l1-14" />
+                                                  </svg>
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              <div className="h-20" />
                                             )}
                                           </td>
                                         </tr>
-                                      ))}
-                                      
+                                      ));
+                                    })()}
                                   </tbody>
                                 </table>
                               </div>
-                              <button
-                                onClick={addTableRow}
-                                className="mt-3 px-4 py-2 bg-[#E38B52] text-white rounded-lg hover:bg-[#C8742F] text-sm"
-                              >
-                                + Add Row
-                              </button>
-                            </div>
+                            ) : (
+                              <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                                <table className="w-full table-fixed border-collapse">
+                                  <colgroup>
+                                    <col style={{ width: "34%" }} />
+                                    <col style={{ width: "33%" }} />
+                                    <col style={{ width: "33%" }} />
+                                  </colgroup>
+                                  <thead className="bg-gradient-to-r from-[#E38B52] to-[#F5A572]">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-white border-r border-white/30">ADL SKILLS</th>
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-white border-r border-white/30">ACADEMIC</th>
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-white">BEHAVIOURAL SKILLS</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white">
+                                    {(() => {
+                                      const adlItems = Array.isArray(iepData.sections?.adlSkills) ? iepData.sections.adlSkills : [];
+                                      const academicItems = Array.isArray(iepData.sections?.academic) ? iepData.sections.academic : [];
+                                      const behaviouralItems = Array.isArray(iepData.sections?.behaviouralSkills) ? iepData.sections.behaviouralSkills : [];
+                                      const rowCount = Math.max(adlItems.length, academicItems.length, behaviouralItems.length);
+                            
+                                      if (rowCount === 0) {
+                                        return (
+                                          <tr>
+                                            <td colSpan={3} className="px-4 py-6 text-center text-gray-500">
+                                              No IEP skills added yet.
+                                            </td>
+                                          </tr>
+                                        );
+                                      }
+                            
+                                      return Array.from({ length: rowCount }).map((_, index) => (
+                                        <tr key={`iep-view-row-${index}`}>
+                                          <td className="px-4 py-3 align-top text-sm text-gray-700 border-r border-gray-200">
+                                            {adlItems[index]?.text || ""}
+                                          </td>
+                                          <td className="px-4 py-3 align-top text-sm text-gray-700 border-r border-gray-200">
+                                            {academicItems[index]?.text || ""}
+                                          </td>
+                                          <td className="px-4 py-3 align-top text-sm text-gray-700">
+                                            {behaviouralItems[index]?.text || ""}
+                                          </td>
+                                        </tr>
+                                      ));
+                                    })()}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
                 
                             {/* Remarks */}
                             <div>
@@ -7711,30 +8086,18 @@ const addCellToColumn = (columnKey) => {
                 
                             {/* Actions */}
                             <div className="flex gap-3 pt-4 border-t">
-                              <button
-                                onClick={saveIepData}
-                                disabled={savingIep}
-                                className="px-6 py-2 bg-gradient-to-r from-[#E38B52] to-[#F5A572] text-white rounded-lg hover:from-[#C8742F] hover:to-[#E38B52] disabled:opacity-50"
-                              >
-                                {savingIep ? "Saving…" : "Save Report"}
-                              </button>
-                              <button
-                                onClick={downloadIepAsPDF}
-                                className="px-6 py-2 bg-white text-[#E38B52] border border-[#E38B52] rounded-lg hover:bg-[#FFF3E8]"
-                              >
-                                Download PDF
-                              </button>
+                              
+                              
                             </div>
                           </div>
                         
                         )}
-                        </div>
-                      
-                    ))
-                  )}
+                      </div>
+                      );
+                    });
+                  })()}
                 </div>
-
-                          </div>
+              </div>
           ) : activeTab === "special-education" ? (
             <div className="max-w-6xl mx-auto p-6">
               <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
@@ -7826,43 +8189,7 @@ const addCellToColumn = (columnKey) => {
                   Select a date and click Create Table to add a new assessment.
                 </p>
               </div>
-              {showDeleteConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                  <div
-                    className="absolute inset-0 bg-black/40"
-                    onClick={() => { setShowDeleteConfirm(false); setDeletePendingIndex(null); }}
-                  />
-                  <div className="relative z-10 w-full max-w-md mx-4 bg-white rounded-lg shadow-lg">
-                    <div className="p-4 border-b">
-                      <h3 className="text-lg font-semibold text-[#170F49]">Confirm Delete</h3>
-                    </div>
-                    <div className="p-4">
-                      <p className="text-sm text-gray-700">Are you sure you want to delete this table? This action cannot be undone.</p>
-                    </div>
-                    <div className="flex gap-3 justify-end p-4 border-t">
-                      <button
-                        className="px-4 py-2 rounded-md bg-gray-100 text-gray-700"
-                        onClick={() => { setShowDeleteConfirm(false); setDeletePendingIndex(null); showToast("Delete cancelled", "info"); }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        className="px-4 py-2 rounded-md bg-[#E38B52] text-white"
-                        onClick={() => {
-                          if (deletePendingIndex !== null) {
-                            handleDeleteTable(deletePendingIndex);
-                            showToast("Table deleted", "success");
-                          }
-                          setShowDeleteConfirm(false);
-                          setDeletePendingIndex(null);
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              
               {/* Results Section */}
               {savedTables.length > 0 ? (
                 <div className="space-y-6">
@@ -8153,7 +8480,7 @@ const addCellToColumn = (columnKey) => {
                                 if (t !== table) return t;
                                 const rows = t.rows || [];
                           
-                                // For non‑quarter phases (e.g. 1st assmt), edit the base value directly
+                                // For nonÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Ëœquarter phases (e.g. 1st assmt), edit the base value directly
                                 if (!isQuarterPhase) {
                                   const newRows = rows.map((row, idx) =>
                                     idx === skillRowIndex ? { ...row, [colName]: newValue } : row
@@ -8161,7 +8488,7 @@ const addCellToColumn = (columnKey) => {
                                   return { ...t, rows: newRows, last_edited_at: nowIso };
                                 }
                           
-                                // For quarter phases (1st–4th Qtr): only original B can be changed
+                                // For quarter phases (1stÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“4th Qtr): only original B can be changed
                                 const row = rows[skillRowIndex] || {};
                                 const rawCurrent = row[colName];
                                 const baseVal =
@@ -8169,7 +8496,7 @@ const addCellToColumn = (columnKey) => {
                                     ? rawCurrent.trim().toUpperCase()
                                     : '';
                           
-                                if (baseVal !== 'B') return t; // ignore non‑B cells in quarter phases
+                                if (baseVal !== 'B') return t; // ignore nonÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ËœB cells in quarter phases
                           
                                 const cellKey = `${skillRowIndex}:${colName}`;
                                 const existingSnapshots = t.quarterSnapshots || {};
@@ -8211,7 +8538,7 @@ const addCellToColumn = (columnKey) => {
                                   Questionnaire (A = Yes, B = No)
                                 </h4>
                                 <div className="flex items-center gap-2">
-                                  {/* Edit/Save/Saved Toggle – now always visible */}
+                                  {/* Edit/Save/Saved Toggle ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ now always visible */}
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -8271,32 +8598,7 @@ const addCellToColumn = (columnKey) => {
                                       <select
                                         value={table.assessment_phase || "1st assmt"}
                                         onMouseDown={(e) => e.stopPropagation()}
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
                                         
-                                          if (table.isEditable) {
-                                            const phaseToSave = table.assessment_phase || "1st assmt";
-                                        
-                                            if (phaseToSave !== "1st assmt") {
-                                              const dateVal = (table.quarterEditDates || {})[phaseToSave];
-                                              if (!dateVal) {
-                                                showToast("Please enter the date before saving this quarter", "warning");
-                                                return;
-                                              }
-                                            }
-                                        
-                                            handleSetTableEditable(table, false);
-                                            setTableSavedStatus((prev) => ({ ...prev, [tableIndex]: true }));
-                                            setTimeout(() => {
-                                              setTableSavedStatus((prev) => ({ ...prev, [tableIndex]: false }));
-                                            }, 1000);
-                                          } else {
-                                            // Prevent entering edit mode on a different table when another is unsaved
-                                            if (warnIfUnsavedOther(tableIndex, "starting to edit this table")) return;
-                                            handleSetTableEditable(table, true);
-                                          }
-                                        }}
                                         onChange={(e) => {
                                           const phase = e.target.value;
                                           const tableKey = savedTables.indexOf(table);
@@ -8698,7 +9000,7 @@ const addCellToColumn = (columnKey) => {
                                         i += 1;
                                         continue;
                                       }
-                                      // Grouped columns (1st Assessment, I Qr, …)
+                                      // Grouped columns (1st Assessment, I Qr, ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦)
                                       const group = col.group;
                                       let span = 0;
                                       while (
@@ -8796,7 +9098,7 @@ const addCellToColumn = (columnKey) => {
                                               cellValue = '-';
                                             }
                                           } else {
-                                            // quadrant not edited yet → show "-"
+                                            // quadrant not edited yet ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ show "-"
                                             cellValue = '-';
                                           }
                                         } else {
@@ -10101,7 +10403,7 @@ const addCellToColumn = (columnKey) => {
                                         title="Delete row"
                                         className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                       >
-                                        <span className="text-base leading-none">×</span>
+                                        <span className="text-base leading-none">ÃƒÆ’Ã¢â‚¬â€</span>
                                       </button>
                                     </td>
                                   </tr>
@@ -10391,11 +10693,11 @@ const addCellToColumn = (columnKey) => {
                                     {/* Display a green check for true, red cross for false */}
                                     {value ? (
                                       <span className="text-green-500 font-bold mr-2 text-xl">
-                                        ✓
+                                        ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“
                                       </span>
                                     ) : (
                                       <span className="text-red-500 font-bold mr-2 text-xl">
-                                        ✗
+                                        ÃƒÂ¢Ã…â€œÃ¢â‚¬â€
                                       </span>
                                     )}
                                     {/* Format the label from snake_case to Title Case */}
@@ -11637,7 +11939,7 @@ const addCellToColumn = (columnKey) => {
                                           title="Delete row"
                                           className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
-                                          <span className="text-base leading-none">×</span>
+                                          <span className="text-base leading-none">ÃƒÆ’Ã¢â‚¬â€</span>
                                         </button>
                                       </td>
                                     </tr>
