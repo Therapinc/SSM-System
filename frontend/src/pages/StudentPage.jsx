@@ -729,11 +729,12 @@ const StudentPage = () => {
   const [pulsatingEditButton, setPulsatingEditButton] = useState({});
   const questionRefs = useRef({});
   // Guard helpers: prevent interacting with other tables while one has unsaved edits
-  const isAnotherTableUnsaved = (tableIndex) =>
-    unsavedTableIndex !== null && unsavedTableIndex !== tableIndex;
+  const isAnotherTableUnsaved = (table) =>
+    unsavedTableIndex !== null &&
+    savedTables[unsavedTableIndex] !== table;
   
   const warnIfUnsavedOther = (tableIndex, actionText = "open or modify another table") => {
-    if (isAnotherTableUnsaved(tableIndex)) {
+    if (isAnotherTableUnsaved(savedTables[tableIndex])) {
       showToast(`Save the current table before ${actionText}`, "warning");
       return true;
     }
@@ -9250,7 +9251,7 @@ const addCellToColumn = (columnKey) => {
                                           // Clicking the skill column selects the skill and opens questions
                                           if (col.isSkill && rowSkillKey) {
                                             onClick = () => {
-                                              if (isAnotherTableUnsaved(tableKey)) {
+                                              if (unsavedTableIndex !== null && unsavedTableIndex !== tableKey) {
                                                 showToast("Save the current table before switching skills", "warning");
                                                 return;
                                               }
@@ -9300,10 +9301,11 @@ const addCellToColumn = (columnKey) => {
                                             const questionIdx =
                                               sessionHeaders.indexOf(fieldName);
                                               onClick = () => {
-                                              if (isAnotherTableUnsaved(tableKey)) {
+                                              if (isAnotherTableUnsaved(table)) {
                                                 showToast("Save the current table before switching skills", "warning");
                                                 return;
                                               }
+                                              
                                               // First, ensure the skill is selected and questions are open
                                               setActiveSkillByTable((prev) => ({
                                                 ...prev,
