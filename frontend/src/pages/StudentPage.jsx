@@ -10852,11 +10852,11 @@ const addCellToColumn = (columnKey) => {
                                     {/* Display a green check for true, red cross for false */}
                                     {value ? (
                                       <span className="text-green-500 font-bold mr-2 text-xl">
-                                        Ã¢Å“â€œ
+                                        ✓
                                       </span>
                                     ) : (
                                       <span className="text-red-500 font-bold mr-2 text-xl">
-                                        Ã¢Å“â€”
+                                        X
                                       </span>
                                     )}
                                     {/* Format the label from snake_case to Title Case */}
