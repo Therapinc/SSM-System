@@ -387,8 +387,11 @@ const TherapistDashboard = () => {
   }, [studentSearch, selectedClass, userName]);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/");
+    try {
+      localStorage.removeItem('token');
+      delete axios.defaults.headers.common['Authorization'];
+    } catch (e) {}
+    navigate('/login');
   };
 
   const handleStudentClick = (studentId) => {

@@ -30,7 +30,8 @@ def read_students(
     db: Session = Depends(get_db),
     pagination: PageParams = Depends(),
     search: Optional[str] = None,
-    class_name: Optional[str] = None
+    class_name: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Retrieve students with optional search, filtering, and pagination.
@@ -141,7 +142,8 @@ def get_my_student_data(
 @router.post("/", response_model=Student)
 def create_student(
     student_in: StudentCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Create a new student.
@@ -160,7 +162,8 @@ def create_student(
 def upsert_case_record(
     student_id: int,
     case_record: Dict[str, Any],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Create/update a student's case record.
@@ -174,7 +177,8 @@ def upsert_case_record(
 @router.get("/{student_id}")
 def read_student(
     student_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Get a specific student by ID, including a photo URL if available.
@@ -208,7 +212,8 @@ def upload_student_photo(
     *,
     student_id: int,
     db: Session = Depends(get_db),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Upload and update a student's photo.
@@ -244,7 +249,8 @@ def upload_student_photo(
 def update_student(
     student_id: int,
     student_update: StudentUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Update a student's information.
@@ -281,7 +287,8 @@ def update_student(
 @router.delete("/{student_id}")
 def delete_student(
     student_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Delete a student.
@@ -301,7 +308,8 @@ def upload_student_document(
     document_type: Optional[str] = Form(None),
     document_label: Optional[str] = Form(None),
     documentType: Optional[str] = Form(None),
-    documentTypeLabel: Optional[str] = Form(None)
+    documentTypeLabel: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Upload a document/certificate (PDF) for a student. Maximum 5MB.
@@ -386,7 +394,8 @@ def upload_student_document(
 @router.get("/{student_id}/documents")
 def get_student_documents(
     student_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Get all documents for a student.
@@ -420,7 +429,8 @@ def get_student_documents(
 def download_student_document(
     student_id: int,
     document_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Download a specific document by UUID.
@@ -457,7 +467,8 @@ def download_student_document(
 def delete_student_document(
     student_id: int,
     document_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
     Delete a specific document by UUID.

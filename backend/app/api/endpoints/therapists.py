@@ -12,7 +12,8 @@ def read_therapists(
     skip: int = 0,
     limit: int = 100,
     search: Optional[str] = None,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_active_user)
 ):
     """
     Retrieve therapists.
@@ -26,7 +27,8 @@ def read_therapists(
 @router.post("/", response_model=schemas_therapist.Therapist)
 def create_therapist(
     therapist: schemas_therapist.TherapistCreate,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_active_user)
 ):
     """
     Create new therapist.
@@ -36,7 +38,8 @@ def create_therapist(
 @router.get("/{therapist_id}", response_model=schemas_therapist.Therapist)
 def read_therapist(
     therapist_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_active_user)
 ):
     """
     Get therapist by ID.
@@ -50,7 +53,8 @@ def read_therapist(
 def update_therapist(
     therapist_id: int,
     therapist: schemas_therapist.TherapistUpdate,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_active_user)
 ):
     """
     Update a therapist.
@@ -63,7 +67,8 @@ def update_therapist(
 @router.delete("/{therapist_id}")
 def delete_therapist(
     therapist_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_active_user)
 ):
     """
     Delete a therapist.

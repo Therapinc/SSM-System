@@ -167,6 +167,7 @@ def list_reports_for_student(
 def ai_summarize_reports_test(
     payload: TherapyAISummaryRequest = Body(...),
     db: Session = Depends(deps.get_db),
+    current_user: schemas.user.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """TEST ENDPOINT - Generate AI analysis WITHOUT authentication (for testing only).
     

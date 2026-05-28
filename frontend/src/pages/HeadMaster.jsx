@@ -311,7 +311,14 @@ const HeadMaster = () => {
 
   // Add this function to handle logout
   const handleLogout = () => {
-    navigate("/");
+    // Clear auth token and axios header
+    try {
+      localStorage.removeItem('token');
+      delete axios.defaults.headers.common['Authorization'];
+    } catch (e) {
+      // ignore
+    }
+    navigate('/login');
   };
 
   // Add this function to handle navigation to AddStudent

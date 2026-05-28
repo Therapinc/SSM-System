@@ -14,7 +14,7 @@ from app.models.student import Student as StudentModel
 router = APIRouter()
 
 @router.post("/", response_model=Teacher)
-def create_teacher(teacher_in: TeacherCreate, db: Session = Depends(get_db)):
+def create_teacher(teacher_in: TeacherCreate, db: Session = Depends(get_db), current_user=Depends(deps.get_current_active_user)):
     # Check if teacher with same Aadhar exists
     db_teacher = teacher.get_by_aadhar(db, aadhar_number=teacher_in.aadhar_number)
     if db_teacher:
@@ -28,19 +28,19 @@ def create_teacher(teacher_in: TeacherCreate, db: Session = Depends(get_db)):
     return teacher.create(db=db, obj_in=teacher_in)
 
 @router.get("/", response_model=List[Teacher])
-def read_teachers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_teachers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user=Depends(deps.get_current_active_user)):
     teachers = teacher.get_multi(db, skip=skip, limit=limit)
     return teachers
 
 @router.get("/{teacher_id}", response_model=Teacher)
-def read_teacher(teacher_id: int, db: Session = Depends(get_db)):
+def read_teacher(teacher_id: int, db: Session = Depends(get_db), current_user=Depends(deps.get_current_active_user)):
     db_teacher = teacher.get(db, id=teacher_id)
     if db_teacher is None:
         raise HTTPException(status_code=404, detail="Teacher not found")
     return db_teacher
 
 @router.put("/{teacher_id}", response_model=Teacher)
-def update_teacher(teacher_id: int, teacher_in: TeacherUpdate, db: Session = Depends(get_db)):
+def update_teacher(teacher_id: int, teacher_in: TeacherUpdate, db: Session = Depends(get_db), current_user=Depends(deps.get_current_active_user)):
     db_teacher = teacher.get(db, id=teacher_id)
     if db_teacher is None:
         raise HTTPException(status_code=404, detail="Teacher not found")
@@ -48,7 +48,7 @@ def update_teacher(teacher_id: int, teacher_in: TeacherUpdate, db: Session = Dep
     return updated_teacher
 
 @router.delete("/{teacher_id}")
-def delete_teacher(teacher_id: int, db: Session = Depends(get_db)):
+def delete_teacher(teacher_id: int, db: Session = Depends(get_db), current_user=Depends(deps.get_current_active_user)):
     db_teacher = teacher.get(db, id=teacher_id)
     if db_teacher is None:
         raise HTTPException(status_code=404, detail="Teacher not found")

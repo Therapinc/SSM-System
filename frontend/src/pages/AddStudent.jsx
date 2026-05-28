@@ -291,7 +291,10 @@ const AddStudent = () => {
         const baseUrl =
           process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
         try {
-          const response = await fetch(`${baseUrl}/api/v1/students/${id}`);
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${baseUrl}/api/v1/students/${id}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
 
           // If the student was deleted, the API returns 404 — switch to create mode instead of showing an error
           if (response.status === 404) {
@@ -442,9 +445,11 @@ const AddStudent = () => {
     }
 
     const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+    const token = localStorage.getItem('token');
     const response = await fetch(`${baseUrl}/api/v1/students/${studentId}/documents`, {
       method: 'POST',
-      body: formData
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
     });
 
     if (!response.ok) {
@@ -457,7 +462,10 @@ const AddStudent = () => {
 
   const refreshPersistedDocuments = async (studentId) => {
     const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
-    const response = await fetch(`${baseUrl}/api/v1/students/${studentId}`);
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${baseUrl}/api/v1/students/${studentId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     if (!response.ok) {
       throw new Error('Failed to reload saved documents.');
     }
@@ -477,8 +485,10 @@ const AddStudent = () => {
       await buildDocumentPayload(studentId, docType, file);
       if (previousDocument?.id) {
         const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+        const token = localStorage.getItem('token');
         await fetch(`${baseUrl}/api/v1/students/${studentId}/documents/${previousDocument.id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         }).catch(() => null);
       }
     }
@@ -525,7 +535,10 @@ const AddStudent = () => {
       });
 
       const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
-      fetch(`${baseUrl}/api/v1/students/${savedStudent?.id || id}/documents/${persistedDocument.id}`)
+      const token = localStorage.getItem('token');
+      fetch(`${baseUrl}/api/v1/students/${savedStudent?.id || id}/documents/${persistedDocument.id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
         .then((response) => response.json())
         .then((data) => {
           const sourceUrl = data.file_data || '';
@@ -559,8 +572,10 @@ const AddStudent = () => {
       if (!studentId) return;
 
       const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+      const token = localStorage.getItem('token');
       const response = await fetch(`${baseUrl}/api/v1/students/${studentId}/documents/${persistedDocument.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (!response.ok) {
@@ -829,9 +844,10 @@ const AddStudent = () => {
       : `${baseUrl}/api/v1/students/`;
     const method = savedStudent?.id ? "PUT" : "POST";
 
+    const token = localStorage.getItem('token');
     const res = await fetch(endpoint, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: Object.assign({ "Content-Type": "application/json" }, token ? { Authorization: `Bearer ${token}` } : {}),
       body: JSON.stringify(payload),
     });
 
@@ -944,7 +960,11 @@ const AddStudent = () => {
   };
 
   const handleLogout = () => {
-    navigate("/");
+    try {
+      localStorage.removeItem('token');
+      delete axios.defaults.headers.common['Authorization'];
+    } catch (e) {}
+    navigate('/login');
   };
 
   const selectClass =

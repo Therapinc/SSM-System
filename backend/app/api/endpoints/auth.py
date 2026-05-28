@@ -56,3 +56,11 @@ def change_password(
 
     crud.user.update(db, db_obj=current_user, obj_in={"password": password_in.new_password})
     return {"msg": "Password updated successfully"}
+
+
+@router.get("/me", response_model=schemas.User)
+def read_current_user(
+    current_user: schemas.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """Return the current authenticated user"""
+    return current_user

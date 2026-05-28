@@ -35,6 +35,11 @@ const LoginPage = () => {
         axios.defaults.headers.common["Authorization"] =
           `Bearer ${response.data.access_token}`;
 
+        // Notify AuthProvider to verify token without a full reload
+        try {
+          window.dispatchEvent(new Event('authChanged'));
+        } catch (e) {}
+
         // Redirect based on user role (normalize casing and type)
         const rawRole = response.data.role || "hm"; // Default to hm if not provided
         const role = String(rawRole).toLowerCase();
