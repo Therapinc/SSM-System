@@ -157,6 +157,7 @@ class StudentBase(BaseModel):
     toilet_control: bool = False
     sentences: bool = False
     physical_deformity: bool = False
+    development_history_items: Optional[str] = None
     
     photo: Optional[bytes] = None
 

@@ -122,6 +122,7 @@ class Student(Base):
     toilet_control = Column(Boolean, default=False)
     sentences = Column(Boolean, default=False)
     physical_deformity = Column(Boolean, default=False)
+    development_history_items = Column(Text, nullable=True)
 
     # Additional History/Assessments
     school_history = Column(Text, nullable=True)

@@ -1864,6 +1864,7 @@ const addCellToColumn = (columnKey) => {
   const [editMode, setEditMode] = useState(false);
   const [teacherUsers, setTeacherUsers] = useState([]);
   const [editData, setEditData] = useState(null);
+  const [developmentHistoryDraft, setDevelopmentHistoryDraft] = useState("");
   const [householdRows, setHouseholdRows] = useState([
     {
       id: 1,
@@ -2125,6 +2126,52 @@ const addCellToColumn = (columnKey) => {
     "Physical Deformity": "physical_deformity",
   };
 
+  const normalizeDevelopmentHistoryItems = (value) => {
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item).trim()).filter(Boolean);
+    }
+
+    if (typeof value === "string") {
+      return value
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  };
+
+  const addDevelopmentHistoryItem = () => {
+    const nextItem = developmentHistoryDraft.trim();
+    if (!nextItem) return;
+
+    setEditData((prev) => {
+      const currentItems = normalizeDevelopmentHistoryItems(
+        prev?.developmentHistoryItems,
+      );
+
+      if (currentItems.includes(nextItem)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        developmentHistoryItems: [...currentItems, nextItem],
+      };
+    });
+
+    setDevelopmentHistoryDraft("");
+  };
+
+  const removeDevelopmentHistoryItem = (indexToRemove) => {
+    setEditData((prev) => ({
+      ...prev,
+      developmentHistoryItems: normalizeDevelopmentHistoryItems(
+        prev?.developmentHistoryItems,
+      ).filter((_, index) => index !== indexToRemove),
+    }));
+  };
+
   const setNestedEditValue = (target, path, value) => {
     const keys = path.split(".");
     const nextTarget = { ...(target || {}) };
@@ -2216,7 +2263,14 @@ const addCellToColumn = (columnKey) => {
       address, // non-editable
       ...editableFields
     } = student;
-    setEditData(editableFields);
+    setEditData({
+      ...editableFields,
+      developmentHistoryItems: normalizeDevelopmentHistoryItems(
+        student?.development_history_items ||
+          student?.developmentHistoryItems,
+      ),
+    });
+    setDevelopmentHistoryDraft("");
     setHouseholdRows(normalizeHouseholdRows(student.household));
     setDrugRows(normalizeDrugRows(student.drug_history));
     setEditMode(false);
@@ -2311,6 +2365,9 @@ const addCellToColumn = (columnKey) => {
         toilet_control: editData.developmentHistory?.toilet_control,
         sentences: editData.developmentHistory?.sentences,
         physical_deformity: editData.developmentHistory?.physical_deformity,
+        development_history_items: normalizeDevelopmentHistoryItems(
+          editData?.developmentHistoryItems,
+        ).join("\n"),
         // Additional Info
         school_history: editData.additionalInfo?.school_history,
         occupational_history: editData.additionalInfo?.occupational_history,
@@ -3034,6 +3091,7 @@ const addCellToColumn = (columnKey) => {
           sentences: data.sentences,
           physical_deformity: data.physical_deformity,
         },
+        development_history_items: data.development_history_items,
         additionalInfo: {
           // You can map these individually if you prefer
           school_history: data.school_history,
@@ -3110,7 +3168,14 @@ const addCellToColumn = (columnKey) => {
       setStudent(mappedForDisplay);
       const { studentId, photoUrl, address, ...editableFields } =
         mappedForDisplay;
-      setEditData(editableFields);
+        setEditData({
+          ...editableFields,
+          developmentHistoryItems: normalizeDevelopmentHistoryItems(
+            mappedForDisplay.development_history_items ||
+              mappedForDisplay.developmentHistoryItems,
+          ),
+        });
+      setDevelopmentHistoryDraft("");
       setDrugRows(normalizeDrugRows(mappedForDisplay.drug_history));
     } catch (e) {
       setStudent(null);
@@ -6821,56 +6886,52 @@ const addCellToColumn = (columnKey) => {
                 </svg>
                 Student Details
               </h2>
-          
-              {/* Edit Button */}
               
+                {/* Edit Button */}
                 {!editMode ? (
                   <button
+                    type="button"
                     onClick={handleEditStart}
-                    className="px-6 py-2.5 bg-gradient-to-r from-[#E38B52] to-[#F5A572] text-white rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2"
+                    className="p-2 rounded-full transition-all duration-200 bg-[#E38B52] text-white hover:bg-[#C8742F]"
+                    title="Edit"
                   >
                     <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
                       fill="none"
+                      viewBox="0 0 24 24"
                       stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                      strokeWidth={2}
                     >
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                    </svg>
-                    Edit Student
-                  </button>
-                ) : (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleEditSave}
-                      className="px-6 py-2.5 bg-green-500 text-white rounded-lg transition-all duration-300 shadow-md hover:shadow-lg hover:bg-green-600 flex items-center gap-2"
-                    >
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
+                      <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      Save Changes
-                    </button>
-                    <button
-                      onClick={handleEditCancel}
-                      className="px-6 py-2.5 bg-gray-400 text-white rounded-lg transition-all duration-300 shadow-md hover:shadow-lg hover:bg-gray-500"
+                        d="M11 5h6M5 19l4-1 10-10a1.414 1.414 0 00-2-2L7 16l-2 4z"
+                      />
+                    </svg>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleEditSave}
+                    className="p-2 rounded-full transition-all duration-200 bg-green-600 text-white hover:bg-green-700"
+                    title="Save changes"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
                     >
-                      Cancel
-                    </button>
-                  </div>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </button>
                 )}
               </div>
           
@@ -9561,31 +9622,43 @@ const addCellToColumn = (columnKey) => {
                     </h3>
                     <div className="flex gap-2">
                       <div className="relative group flex-1">
-                        <button
-                          onClick={handleEditStart}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white text-[#E38B52] rounded-xl hover:bg-gray-50 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 transform border border-[#E38B52]/20"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </button>
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-white text-[#E38B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50 border border-[#E38B52]/20">
-                          Edit
-                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                            <div className="border-4 border-transparent border-t-white"></div>
-                          </div>
-                        </div>
+                        {!editMode ? (
+                          <>
+                            <button
+                              onClick={handleEditStart}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white text-[#E38B52] rounded-xl hover:bg-gray-50 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 transform border border-[#E38B52]/20"
+                              title="Edit"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-white text-[#E38B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50 border border-[#E38B52]/20">
+                              Edit
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                <div className="border-4 border-transparent border-t-white"></div>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={handleEditSave}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg transform"
+                              title="Save changes"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </button>
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-white text-green-600 text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50 border border-green-100">
+                              Save
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                <div className="border-4 border-transparent border-t-white"></div>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                       <div className="relative group flex-1">
                         <button
@@ -10562,7 +10635,47 @@ const addCellToColumn = (columnKey) => {
                                         title="Delete row"
                                         className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                       >
-                                        <span className="text-base leading-none">Ãƒâ€”</span>
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          viewBox="0 0 24 24"
+                                          className="h-5 w-5"
+                                          fill="none"
+                                          stroke="currentColor"
+                                        >
+                                          {/* lid */}
+                                          <path
+                                            d="M9 5h6l1 2H8l1-2z"
+                                            strokeWidth="1.8"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                          />
+                                          {/* body */}
+                                          <rect
+                                            x="8"
+                                            y="7"
+                                            width="8"
+                                            height="11"
+                                            rx="1.5"
+                                            strokeWidth="1.8"
+                                          />
+                                          {/* inner lines */}
+                                          <line
+                                            x1="11"
+                                            y1="10"
+                                            x2="11"
+                                            y2="15"
+                                            strokeWidth="1.8"
+                                            strokeLinecap="round"
+                                          />
+                                          <line
+                                            x1="13"
+                                            y1="10"
+                                            x2="13"
+                                            y2="15"
+                                            strokeWidth="1.8"
+                                            strokeLinecap="round"
+                                          />
+                                        </svg>
                                       </button>
                                     </td>
                                   </tr>
@@ -10815,58 +10928,72 @@ const addCellToColumn = (columnKey) => {
                         Developmental History
                       </h3>
                       {editMode ? (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-6 rounded-xl shadow-lg">
-                          {Object.entries(developmentHistoryMap).map(
-                            ([label, field]) => (
-                              <label
-                                key={field}
-                                className="flex items-center space-x-2"
+                        <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
+                          <div className="flex flex-col md:flex-row gap-3">
+                            <input
+                              type="text"
+                              value={developmentHistoryDraft}
+                              onChange={(e) =>
+                                setDevelopmentHistoryDraft(e.target.value)
+                              }
+                              placeholder="Type a development history item"
+                              className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                            />
+                            <button
+                              type="button"
+                              onClick={addDevelopmentHistoryItem}
+                              className="px-5 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#C8742F] transition-all duration-200 shadow-lg"
+                            >
+                              Add
+                            </button>
+                          </div>
+
+                          <div className="flex flex-wrap gap-3">
+                            {normalizeDevelopmentHistoryItems(
+                              editData?.developmentHistoryItems,
+                            ).map((item, index) => (
+                              <div
+                                key={`${item}-${index}`}
+                                className="flex items-center gap-2 px-3 py-2 rounded-full bg-[#F7F3EE] border border-[#E38B52]/20"
                               >
-                                <input
-                                  type="checkbox"
-                                  className="w-4 h-4 rounded border-gray-300 text-[#E38B52] focus:ring-[#E38B52]"
-                                  name={`developmentHistory.${field}`}
-                                  checked={
-                                    !!editData?.developmentHistory?.[field]
-                                  }
-                                  onChange={handleEditChange}
-                                />
                                 <span className="text-sm text-[#170F49]">
-                                  {label}
+                                  {item}
                                 </span>
-                              </label>
-                            ),
-                          )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeDevelopmentHistoryItem(index)
+                                  }
+                                  className="text-red-500 font-bold"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 p-4 bg-white/70 rounded-xl">
-                          {/* Check if developmentHistory exists and has entries */}
-                          {student?.developmentHistory &&
-                          Object.keys(student.developmentHistory).length > 0 ? (
-                            Object.entries(developmentHistoryMap).map(
-                              ([label, field]) => {
-                                const value = student.developmentHistory[field];
-
-                                return (
-                                  <div key={field} className="flex items-center">
-                                    {/* Display a green check for true, red cross for false */}
-                                    {value ? (
-                                      <span className="text-green-500 font-bold mr-2 text-xl">
-                                        ✓
-                                      </span>
-                                    ) : (
-                                      <span className="text-red-500 font-bold mr-2 text-xl">
-                                        X
-                                      </span>
-                                    )}
-                                    {/* Format the label from snake_case to Title Case */}
-                                    <p className="text-[#170F49] font-medium capitalize">
-                                      {label}
-                                    </p>
-                                  </div>
-                                );
-                              },
-                            )
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-white/70 rounded-xl">
+                          {normalizeDevelopmentHistoryItems(
+                            student?.developmentHistoryItems ||
+                              student?.development_history_items,
+                          ).length > 0 ? (
+                            normalizeDevelopmentHistoryItems(
+                              student?.developmentHistoryItems ||
+                                student?.development_history_items,
+                            ).map((item, index) => (
+                              <div
+                                key={`${item}-${index}`}
+                                className="flex items-start gap-2 rounded-xl border border-green-100 bg-white px-4 py-3 shadow-sm"
+                              >
+                                <span className="text-green-500 font-bold text-lg leading-none mt-0.5">
+                                  ✓
+                                </span>
+                                <p className="text-[#170F49] font-medium break-words">
+                                  {item}
+                                </p>
+                              </div>
+                            ))
                           ) : (
                             <p className="col-span-full text-center text-[#6F6C90]">
                               No development history recorded.
@@ -12098,7 +12225,47 @@ const addCellToColumn = (columnKey) => {
                                           title="Delete row"
                                           className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
-                                          <span className="text-base leading-none">Ãƒâ€”</span>
+                                          <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            viewBox="0 0 24 24"
+                                            className="h-5 w-5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                          >
+                                            {/* lid */}
+                                            <path
+                                              d="M9 5h6l1 2H8l1-2z"
+                                              strokeWidth="1.8"
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                            />
+                                            {/* body */}
+                                            <rect
+                                              x="8"
+                                              y="7"
+                                              width="8"
+                                              height="11"
+                                              rx="1.5"
+                                              strokeWidth="1.8"
+                                            />
+                                            {/* inner lines */}
+                                            <line
+                                              x1="11"
+                                              y1="10"
+                                              x2="11"
+                                              y2="15"
+                                              strokeWidth="1.8"
+                                              strokeLinecap="round"
+                                            />
+                                            <line
+                                              x1="13"
+                                              y1="10"
+                                              x2="13"
+                                              y2="15"
+                                              strokeWidth="1.8"
+                                              strokeLinecap="round"
+                                            />
+                                          </svg>
                                         </button>
                                       </td>
                                     </tr>
