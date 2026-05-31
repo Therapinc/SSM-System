@@ -13,6 +13,8 @@ from app.models.student import Student  # Import the Student model explicitly
 from app.models.teacher import Teacher  # Import the Teacher model explicitly
 from app.models.user import User  # Import the User model explicitly
 from app.models.notification import Notification  # Import the Notification model explicitly
+from app.models.therapist import Therapist
+from app.models.therapist_assignment import therapist_student_assignments
 from app.db.session import Base
 from app.core.config import settings
 

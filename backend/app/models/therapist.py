@@ -1,5 +1,8 @@
 from sqlalchemy import Column, Integer, String, Date, JSON
+from sqlalchemy.orm import relationship
+
 from app.db.session import Base
+from app.models.therapist_assignment import therapist_student_assignments
 
 class Therapist(Base):
     __tablename__ = "therapists"
@@ -20,3 +23,8 @@ class Therapist(Base):
     category = Column(String, nullable=True)
     email = Column(String, nullable=True)
     specialization = Column(String, nullable=True)  # e.g., Speech Therapy, Occupational Therapy, etc.
+    assigned_students = relationship(
+        "Student",
+        secondary=therapist_student_assignments,
+        lazy="selectin",
+    )

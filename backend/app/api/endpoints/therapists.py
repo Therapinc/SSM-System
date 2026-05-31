@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.crud import therapist as crud_therapist
+from app.crud import therapist_assignment as crud_therapist_assignment
+from app.schemas import student as schemas_student
 from app.schemas import therapist as schemas_therapist
 
 router = APIRouter()
@@ -77,3 +79,36 @@ def delete_therapist(
     if not success:
         raise HTTPException(status_code=404, detail="Therapist not found")
     return {"message": "Therapist deleted successfully"}
+
+
+@router.get("/{therapist_id}/students", response_model=List[schemas_student.Student])
+def read_therapist_students(
+    therapist_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_admin_user),
+):
+    therapist = crud_therapist.get_therapist(db, therapist_id=therapist_id)
+    if therapist is None:
+        raise HTTPException(status_code=404, detail="Therapist not found")
+    return crud_therapist_assignment.get_assigned_students(db, therapist_id)
+
+
+@router.put("/{therapist_id}/students", response_model=List[schemas_student.Student])
+def update_therapist_students(
+    therapist_id: int,
+    payload: schemas_therapist.TherapistStudentAssignmentsUpdate,
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_admin_user),
+):
+    therapist = crud_therapist.get_therapist(db, therapist_id=therapist_id)
+    if therapist is None:
+        raise HTTPException(status_code=404, detail="Therapist not found")
+
+    try:
+        return crud_therapist_assignment.set_assigned_students(
+            db,
+            therapist_id=therapist_id,
+            student_ids=payload.student_ids,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error

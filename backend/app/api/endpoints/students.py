@@ -1,10 +1,12 @@
 import base64
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from sqlalchemy import false
 from sqlalchemy.orm import Session
 from typing import List, Optional, Any, Dict
 
 # Renamed import to avoid variable name conflicts
 from app.crud.student import student as crud_student
+from app.crud import therapist_assignment as crud_therapist_assignment
 from app.schemas.student import Student, StudentCreate, StudentUpdate
 from pydantic import BaseModel
 
@@ -18,7 +20,9 @@ class StudentsPage(BaseModel):
 from app.db.session import get_db
 from app.utils.pagination import PageParams, Page
 from app.api.deps import get_current_active_user
+from app.models.therapist import Therapist
 from app.models.user import User
+from app.models.user import UserRole
 
 router = APIRouter()
 
@@ -36,13 +40,36 @@ def read_students(
     """
     Retrieve students with optional search, filtering, and pagination.
     """
-    students_from_db = crud_student.get_filtered(
-        db,
-        skip=pagination.skip,
-        limit=pagination.limit,
-        search=search,
-        class_name=class_name
-    )
+    current_role = str(getattr(current_user, "role", "") or "").lower()
+    query = db.query(crud_student.model)
+
+    if current_user.is_superuser or current_role in {UserRole.ADMIN.value, "hm", "headmaster"}:
+        pass
+    elif current_role == UserRole.THERAPIST.value:
+        therapist = db.query(Therapist).filter(Therapist.email == current_user.email).first()
+        assigned_ids = (
+            crud_therapist_assignment.get_assigned_student_ids(db, therapist.id)
+            if therapist
+            else []
+        )
+        query = query.filter(crud_student.model.id.in_(assigned_ids)) if assigned_ids else query.filter(false())
+    else:
+        query = query.filter(false())
+
+    if search:
+        from sqlalchemy import or_
+        search_filter = or_(
+            crud_student.model.name.ilike(f"%{search}%"),
+            crud_student.model.admission_number.ilike(f"%{search}%"),
+            crud_student.model.student_id.ilike(f"%{search}%")
+        )
+        query = query.filter(search_filter)
+
+    if class_name:
+        query = query.filter(crud_student.model.class_name == class_name)
+
+    total = query.count()
+    students_from_db = query.offset(pagination.skip).limit(pagination.limit).all()
 
     # Serialize students safely (drop raw binary `photo`, add `photo_url`)
     students_with_photos = []
@@ -67,22 +94,6 @@ def read_students(
                 for doc in student_data['documents']
             ]
         students_with_photos.append(student_data)
-
-    # Get the total count for pagination
-    query = db.query(crud_student.model)
-    if search:
-        from sqlalchemy import or_
-        search_filter = or_(
-            crud_student.model.name.ilike(f"%{search}%"),
-            crud_student.model.admission_number.ilike(f"%{search}%"),
-            crud_student.model.student_id.ilike(f"%{search}%")
-        )
-        query = query.filter(search_filter)
-
-    if class_name:
-        query = query.filter(crud_student.model.class_name == class_name)
-
-    total = query.count()
 
     # Build a Page. Some deployment environments have trouble validating
     # Pydantic generics (Page[T]). Return a plain dict reliably by using

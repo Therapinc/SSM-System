@@ -298,6 +298,36 @@ const TherapistDashboard = () => {
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
+  const visibleStudents = students.filter((student) => {
+    const studentClassLabel = (
+      student.class_name ||
+      student.className ||
+      ""
+    ).toString();
+    const matchesSearch =
+      (student.name || "")
+        .toLowerCase()
+        .includes(studentSearch.toLowerCase()) ||
+      studentClassLabel
+        .toLowerCase()
+        .includes(studentSearch.toLowerCase());
+
+    const matchesClass =
+      selectedClass === "all" ||
+      studentClassLabel
+        .toLowerCase()
+        .includes(selectedClass.toLowerCase());
+
+    return matchesSearch && matchesClass;
+  });
+
+  const hasStudentFilters =
+    Boolean(studentSearch.trim()) || selectedClass !== "all";
+
+  const emptyStudentMessage = hasStudentFilters
+    ? "No students match your current filters."
+    : "No students assigned.";
+
   // Update goals when therapy type changes
   useEffect(() => {
     setGoalsAchieved(getTherapySections(therapyType));
@@ -664,56 +694,12 @@ const TherapistDashboard = () => {
               <div className="text-center text-[#6F6C8F]">
                 Loading students...
               </div>
-            ) : students.filter((student) => {
-                const studentClassLabel = (
-                  student.class_name ||
-                  student.className ||
-                  ""
-                ).toString();
-                const matchesSearch =
-                  (student.name || "")
-                    .toLowerCase()
-                    .includes(studentSearch.toLowerCase()) ||
-                  studentClassLabel
-                    .toLowerCase()
-                    .includes(studentSearch.toLowerCase());
-
-                const matchesClass =
-                  selectedClass === "all" ||
-                  studentClassLabel
-                    .toLowerCase()
-                    .includes(selectedClass.toLowerCase());
-
-                return matchesSearch && matchesClass;
-              }).length === 0 ? (
+            ) : visibleStudents.length === 0 ? (
               <div className="text-center text-[#6F6C8F]">
-                No students found.
+                {emptyStudentMessage}
               </div>
             ) : (
-              students
-                .filter((student) => {
-                  const studentClassLabel = (
-                    student.class_name ||
-                    student.className ||
-                    ""
-                  ).toString();
-                  const matchesSearch =
-                    (student.name || "")
-                      .toLowerCase()
-                      .includes(studentSearch.toLowerCase()) ||
-                    studentClassLabel
-                      .toLowerCase()
-                      .includes(studentSearch.toLowerCase());
-
-                  const matchesClass =
-                    selectedClass === "all" ||
-                    studentClassLabel
-                      .toLowerCase()
-                      .includes(selectedClass.toLowerCase());
-
-                  return matchesSearch && matchesClass;
-                })
-                .map((student) => (
+              visibleStudents.map((student) => (
                   <div
                     key={student.id}
                     onClick={() => handleStudentClick(student.id)}

@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from pydantic import BaseModel, EmailStr, Field
+from typing import List, Optional
 from datetime import date
 
 class TherapistBase(BaseModel):
@@ -45,3 +45,7 @@ class Therapist(TherapistBase):
 
     class Config:
         from_attributes = True
+
+
+class TherapistStudentAssignmentsUpdate(BaseModel):
+    student_ids: List[int] = Field(default_factory=list)
