@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import DeleteConfirmationModal from "../components/DeleteConfirmationModal";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -68,6 +69,10 @@ const HeadMaster = () => {
   const [teachers, setTeachers] = useState([]);
   // eslint-disable-next-line
   const [loading, setLoading] = useState(true);
+  const showDeleteSuccess = (message) => {
+    setNotification({ message, type: "success" });
+    setTimeout(() => setNotification({ message: "", type: "" }), 3000);
+  };
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState(null);
   const [teacherSearch, setTeacherSearch] = useState("");
@@ -383,7 +388,7 @@ const HeadMaster = () => {
         setTeachers(
           teachers.filter((teacher) => teacher.id !== teacherToDelete.id),
         );
-        alert(`${teacherToDelete.name} has been successfully deleted.`);
+        showDeleteSuccess(`${teacherToDelete.name} has been deleted.`);
       }
     } catch (error) {
       console.error("Error deleting teacher:", error);
@@ -438,7 +443,7 @@ const HeadMaster = () => {
             (therapist) => therapist.id !== therapistToDelete.id,
           ),
         );
-        alert(`${therapistToDelete.name} has been successfully deleted.`);
+        showDeleteSuccess(`${therapistToDelete.name} has been deleted.`);
       }
     } catch (error) {
       console.error("Error deleting therapist:", error);
@@ -469,10 +474,7 @@ const HeadMaster = () => {
       );
 
       // Step 3: Show a success message
-      setNotification({
-        message: `${studentToDelete.name} has been deleted.`,
-        type: "error",
-      });
+      showDeleteSuccess(`${studentToDelete.name} has been deleted.`);
     } catch (error) {
       console.error("Error deleting student:", error);
       // Show an error message
@@ -1367,170 +1369,32 @@ const HeadMaster = () => {
         }
       `}</style>
 
-      {/* Custom Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
-            <div className="text-center">
-              {/* Warning Icon */}
-              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
-                <svg
-                  className="h-8 w-8 text-red-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
-              </div>
+      <DeleteConfirmationModal
+        open={showDeleteConfirm}
+        title="Delete Teacher"
+        entityName={teacherToDelete?.name || "this teacher"}
+        entityType="teacher"
+        onCancel={cancelDelete}
+        onConfirm={confirmDelete}
+      />
 
-              {/* Title */}
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                Delete Teacher
-              </h3>
+      <DeleteConfirmationModal
+        open={showStudentDeleteConfirm}
+        title="Delete Student"
+        entityName={studentToDelete?.name || "this student"}
+        entityType="student"
+        onCancel={cancelDeleteStudent}
+        onConfirm={confirmDeleteStudent}
+      />
 
-              {/* Message */}
-              <p className="text-sm text-gray-600 mb-6">
-                Are you sure you want to delete{" "}
-                <span className="font-semibold text-[#170F49]">
-                  {teacherToDelete?.name}
-                </span>
-                ?
-                <br />
-                <span className="text-red-600 font-medium">
-                  This action cannot be undone.
-                </span>
-              </p>
-
-              {/* Buttons */}
-              <div className="flex space-x-3">
-                <button
-                  onClick={cancelDelete}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Custom Delete Confirmation Modal for Students */}
-      {showStudentDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
-                <svg
-                  className="h-8 w-8 text-red-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                Delete Student
-              </h3>
-              <p className="text-sm text-gray-600 mb-6">
-                Are you sure of deleting this profile?
-              </p>
-              <div className="flex space-x-3">
-                <button
-                  onClick={cancelDeleteStudent}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
-                >
-                  No
-                </button>
-                <button
-                  onClick={confirmDeleteStudent}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
-                >
-                  Yes
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Custom Delete Confirmation Modal for Therapists */}
-      {showTherapistDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
-            <div className="text-center">
-              {/* Warning Icon */}
-              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
-                <svg
-                  className="h-8 w-8 text-red-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
-              </div>
-
-              {/* Title */}
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                Delete Therapist
-              </h3>
-
-              {/* Message */}
-              <p className="text-sm text-gray-600 mb-6">
-                Are you sure you want to delete{" "}
-                <span className="font-semibold text-[#170F49]">
-                  {therapistToDelete?.name}
-                </span>
-                ?
-                <br />
-                <span className="text-red-600 font-medium">
-                  This action cannot be undone.
-                </span>
-              </p>
-
-              {/* Buttons */}
-              <div className="flex space-x-3">
-                <button
-                  onClick={cancelDeleteTherapist}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDeleteTherapist}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmationModal
+        open={showTherapistDeleteConfirm}
+        title="Delete Therapist"
+        entityName={therapistToDelete?.name || "this therapist"}
+        entityType="therapist"
+        onCancel={cancelDeleteTherapist}
+        onConfirm={confirmDeleteTherapist}
+      />
 
       {notification.message && (
         <div
