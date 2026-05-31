@@ -910,7 +910,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
       const key = `iep_data_student_${id}_by_month`;
       const mapping = JSON.parse(localStorage.getItem(key) || "{}");
       if (mapping?.[monthYearKey]) {
-        setIepData(normalizeIepData(savedIepByMonth[monthYearKey]));
+        setIepData(normalizeIepData(mapping[monthYearKey]));
       }
     }
   };
@@ -925,7 +925,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
       if (iepData?.selectedMonth) {
         const mKey = `${iepData.selectedMonth} ${selectedYear}`;
         if (mapping?.[mKey]) {
-          setIepData(mapping[mKey]);
+          setIepData(normalizeIepData(mapping[mKey]));
         }
       }
     } catch (e) {
@@ -1237,9 +1237,12 @@ const [iepData, setIepData] = useState(createEmptyIepData());
       const key = `iep_data_student_${id}_by_month`;
       const mapping = JSON.parse(localStorage.getItem(key) || "{}");
       setSavedIepByMonth(mapping || {});
-      // if a month is selected, load that month
-      if (iepData?.selectedMonth && mapping?.[iepData.selectedMonth]) {
-        setIepData(mapping[iepData.selectedMonth]);
+  
+      if (iepData?.selectedMonth) {
+        const monthYearKey = `${iepData.selectedMonth} ${selectedYear}`;
+        if (mapping?.[monthYearKey]) {
+          setIepData(normalizeIepData(mapping[monthYearKey]));
+        }
       }
     } catch (error) {
       console.error("Error loading IEP data:", error);
@@ -1267,19 +1270,17 @@ const addCellToColumn = (columnKey) => {
     }
   
     const doc = new jsPDF({ unit: "pt", format: "a4" });
-    // --- Layout & sizing tweaks: larger table, padding above title, moved components ---
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
-    const margin = 40;
+    const margin = 30;
     
-    // add padding above main heading
-    const titleTopPadding = 20;
+    const titleTopPadding = 18;
     const titleY = margin + titleTopPadding;
     
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text(
-      `TRIMESTER REPORT OF ${String(iepData?.selectedMonth || "").toUpperCase()}`,
+      `TRIMESTER REPORT OF ${String(iepSource?.selectedMonth || "").toUpperCase()}`,
       pageW / 2,
       titleY,
       { align: "center" }
@@ -1289,22 +1290,20 @@ const addCellToColumn = (columnKey) => {
     doc.setFont("helvetica", "normal");
     doc.text(`Name : ${student?.name || ""}`, margin, titleY + 20);
     
-    // table sizing: larger overall table
-    const tableTop = titleY + 44; // increased gap under name/title
+    const tableTop = titleY + 50;
     const tableLeft = margin;
     const tableWidth = pageW - margin * 2;
     const colWidth = Math.floor(tableWidth / 3);
     
-    const cellPadding = 6; // consistent padding
+    const cellPadding = 8;
     const usableColW = colWidth - cellPadding * 2;
-    const lineHeight = 12;
-    const headerH = 26;
-    const minRowH = 28; // slightly taller rows for readability
-    
-    // build row data from the three columns (safe string conversion)
-    const adl = iepData?.sections?.adlSkills || [];
-    const academic = iepData?.sections?.academic || [];
-    const behavioural = iepData?.sections?.behaviouralSkills || [];
+    const lineHeight = 14;
+    const headerH = 32;
+    const minRowH = 36;
+  
+    const adl = iepSource?.sections?.adlSkills || [];
+    const academic = iepSource?.sections?.academic || [];
+    const behavioural = iepSource?.sections?.behaviouralSkills || [];
     const rowsCount = Math.max(adl.length, academic.length, behavioural.length, 3); // ensure some rows
     
     const rowHeights = [];
@@ -1355,7 +1354,7 @@ const addCellToColumn = (columnKey) => {
     doc.line(tableLeft, tableTop + headerH, tableLeft + tableWidth, tableTop + headerH);
     
     // render rows
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
     let y = tableTop + headerH;
     for (let r = 0; r < rowsCount; r++) {
@@ -1364,8 +1363,7 @@ const addCellToColumn = (columnKey) => {
     
       for (let c = 0; c < 3; c++) {
         const x = tableLeft + c * colWidth + cellPadding;
-        // top-aligned inside row with a small top offset
-        doc.text(lines[c], x, y + cellPadding + 6);
+        doc.text(lines[c], x, y + cellPadding + 7);
       }
       y += rh;
     }
@@ -1377,15 +1375,28 @@ const addCellToColumn = (columnKey) => {
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("IEP OF THE STUDENT :", margin, y);
-    y += 80;
     
+    // render IEP textbox content (from saved source)
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const iepText = String(iepSource?.iepStudent || "");
+    if (iepText.trim()) {
+      const iepLines = doc.splitTextToSize(iepText, tableWidth - cellPadding * 2);
+      doc.text(iepLines, margin + cellPadding, y + 14);
+      y += Math.max(iepLines.length * lineHeight + 20, 28);
+    } else {
+      y += 28;
+    }
+    
+    y += 28;
+
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text("REMARKS :", margin, y);
-    y += 10;
+    y += 14;
     
     // increased remarks box height
-    const remarksBoxHeight = 140; // adjust as needed
+    const remarksBoxHeight = 100; // adjust as needed
     const remarksBoxWidth = tableWidth;
     doc.rect(margin, y, remarksBoxWidth, remarksBoxHeight);
     
@@ -1399,11 +1410,12 @@ const addCellToColumn = (columnKey) => {
     y += remarksBoxHeight + 26; // move cursor below box
     
     // signatures (computed after remarks box so they sit beneath it)
+    const sigBottomMargin = 55;
+    const sigLineY = pageH - sigBottomMargin;
     const sigW = Math.floor(tableWidth / 3);
     const sigX0 = margin;
     const sigX1 = margin + sigW;
     const sigX2 = margin + sigW * 2;
-    const sigLineY = y + 18;
     const sigLineLength = sigW - 40;
     
     doc.setLineWidth(0.7);
@@ -3571,20 +3583,7 @@ const addCellToColumn = (columnKey) => {
             <textarea value={iepData.remarks} onChange={(e) => handleIepInputChange("remarks", e.target.value)} placeholder="Enter additional remarks..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] resize-none" rows={4} />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[#6F6C90] mb-2">Principal</label>
-              <input type="text" value={iepData.signatures.principal} onChange={(e) => handleSignatureChange("principal", e.target.value)} placeholder="Principal's signature/name" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52]" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[#6F6C90] mb-2">Teacher</label>
-              <input type="text" value={iepData.signatures.teacher} onChange={(e) => handleSignatureChange("teacher", e.target.value)} placeholder="Teacher's signature/name" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52]" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[#6F6C90] mb-2">Parent/Guardian</label>
-              <input type="text" value={iepData.signatures.parent} onChange={(e) => handleSignatureChange("parent", e.target.value)} placeholder="Parent's signature/name" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52]" />
-            </div>
-          </div>
+          
         </div>
       </div>
     );
@@ -8268,46 +8267,9 @@ const addCellToColumn = (columnKey) => {
                               />
                             </div>
                 
-                            {/* Signatures */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-[#6F6C90] mb-2">Principal</label>
-                                <input
-                                  type="text"
-                                  value={iepData.signatures.principal}
-                                  onChange={(e) => handleSignatureChange("principal", e.target.value)}
-                                  placeholder="Principal's signature/name"
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52]"
-                                  readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-[#6F6C90] mb-2">Teacher</label>
-                                <input
-                                  type="text"
-                                  value={iepData.signatures.teacher}
-                                  onChange={(e) => handleSignatureChange("teacher", e.target.value)}
-                                  placeholder="Teacher's signature/name"
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52]"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm font-medium text-[#6F6C90] mb-2">Parent/Guardian</label>
-                                <input
-                                  type="text"
-                                  value={iepData.signatures.parent}
-                                  onChange={(e) => handleSignatureChange("parent", e.target.value)}
-                                  placeholder="Parent's signature/name"
-                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52]"
-                                />
-                              </div>
-                            </div>
+                            
                 
-                            {/* Actions */}
-                            <div className="flex gap-3 pt-4 border-t">
-                              
-                              
-                            </div>
+                            
                           </div>
                         
                         )}
