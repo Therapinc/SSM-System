@@ -20,8 +20,9 @@ import InaugurationCurtain, {
 } from './components/InaugurationCurtain.jsx';
 
 function App() {
-  const [isCurtainVisible, setIsCurtainVisible] = useState(true);
-  const [isContentVisible, setIsContentVisible] = useState(false);
+  const wasInaugurated = localStorage.getItem(STORAGE_KEY) === 'true';
+  const [isCurtainVisible, setIsCurtainVisible] = useState(!wasInaugurated);
+  const [isContentVisible, setIsContentVisible] = useState(wasInaugurated);
 
   return (
     <AuthProvider>
