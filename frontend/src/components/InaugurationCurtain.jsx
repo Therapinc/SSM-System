@@ -82,10 +82,6 @@ function InaugurationCurtain({ active, onInaugurate, onFinished }) {
           St. Martha&apos;s Special School Website Inauguration
         </h1>
 
-        <p className="mt-2 text-sm tracking-[0.25em] uppercase text-[#ffd7bf]">
-          Powered by TherapInc
-        </p>
-
         <p className="mt-4 max-w-2xl text-sm text-[#f8d9d9] sm:text-base">
           Welcome to the official launch.
         </p>
