@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React from 'react';
 import { Routes, Route, BrowserRouter } from 'react-router-dom';
 import LoginPage from './pages/LoginPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
@@ -15,46 +15,31 @@ import TherapistDashboard from './pages/TherapistDashboard.jsx';
 import AddUser from './pages/AddUser.jsx';
 import AuthProvider from './auth/AuthProvider.jsx';
 import ProtectedRoute from './auth/ProtectedRoute.jsx';
-import InaugurationCurtain, {
-  STORAGE_KEY,
-} from './components/InaugurationCurtain.jsx';
 
 function App() {
-  const wasInaugurated = localStorage.getItem(STORAGE_KEY) === 'true';
-  const [isCurtainVisible, setIsCurtainVisible] = useState(!wasInaugurated);
-  const [isContentVisible, setIsContentVisible] = useState(wasInaugurated);
-
   return (
     <AuthProvider>
-      <div className="App relative min-h-screen">
-        <div
-          className={`transition-opacity duration-700 ${isContentVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-        >
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/headmaster" element={<ProtectedRoute><HeadMaster /></ProtectedRoute>} />
-              <Route path="/teacher" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
-              <Route path="/therapist" element={<ProtectedRoute><TherapistDashboard /></ProtectedRoute>} />
-              <Route path="/add-teacher" element={<ProtectedRoute><AddTeacher /></ProtectedRoute>} />
-              <Route path="/add-therapist" element={<ProtectedRoute><AddTherapist /></ProtectedRoute>} />
-              <Route path="/add-student" element={<ProtectedRoute><AddStudent /></ProtectedRoute>} />
-              <Route path="/add-user" element={<ProtectedRoute><AddUser /></ProtectedRoute>} />
-              <Route path="/student/:id" element={<ProtectedRoute><StudentPage /></ProtectedRoute>} />
-              <Route path="/student-view" element={<ProtectedRoute><StudentViewPage /></ProtectedRoute>} />
-              <Route path="/teacher/:id" element={<ProtectedRoute><TeacherPage /></ProtectedRoute>} />
-              <Route path="/therapist/:id" element={<ProtectedRoute><TherapistPage /></ProtectedRoute>} />
-            </Routes>
-          </BrowserRouter>
-        </div>
+      <BrowserRouter>
+        <div className="App">
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
 
-        <InaugurationCurtain
-          active={isCurtainVisible}
-          onInaugurate={() => setIsContentVisible(true)}
-          onFinished={() => setIsCurtainVisible(false)}
-        />
-      </div>
+            {/* Protected routes */}
+            <Route path="/headmaster" element={<ProtectedRoute><HeadMaster /></ProtectedRoute>} />
+            <Route path="/teacher" element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
+            <Route path="/therapist" element={<ProtectedRoute><TherapistDashboard /></ProtectedRoute>} />
+            <Route path="/add-teacher" element={<ProtectedRoute><AddTeacher /></ProtectedRoute>} />
+            <Route path="/add-therapist" element={<ProtectedRoute><AddTherapist /></ProtectedRoute>} />
+            <Route path="/add-student" element={<ProtectedRoute><AddStudent /></ProtectedRoute>} />
+            <Route path="/add-user" element={<ProtectedRoute><AddUser /></ProtectedRoute>} />
+            <Route path="/student/:id" element={<ProtectedRoute><StudentPage /></ProtectedRoute>} />
+            <Route path="/student-view" element={<ProtectedRoute><StudentViewPage /></ProtectedRoute>} />
+            <Route path="/teacher/:id" element={<ProtectedRoute><TeacherPage /></ProtectedRoute>} />
+            <Route path="/therapist/:id" element={<ProtectedRoute><TherapistPage /></ProtectedRoute>} />
+          </Routes>
+        </div>
+      </BrowserRouter>
     </AuthProvider>
   );
 }
