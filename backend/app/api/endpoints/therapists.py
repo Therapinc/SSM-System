@@ -30,7 +30,7 @@ def read_therapists(
 def create_therapist(
     therapist: schemas_therapist.TherapistCreate,
     db: Session = Depends(deps.get_db),
-    current_user=Depends(deps.get_current_active_user)
+    current_user=Depends(deps.get_current_admin_user)
 ):
     """
     Create new therapist.
@@ -41,7 +41,7 @@ def create_therapist(
 def read_therapist(
     therapist_id: int,
     db: Session = Depends(deps.get_db),
-    current_user=Depends(deps.get_current_active_user)
+    current_user=Depends(deps.get_current_admin_user)
 ):
     """
     Get therapist by ID.
@@ -56,7 +56,7 @@ def update_therapist(
     therapist_id: int,
     therapist: schemas_therapist.TherapistUpdate,
     db: Session = Depends(deps.get_db),
-    current_user=Depends(deps.get_current_active_user)
+    current_user=Depends(deps.get_current_admin_user)
 ):
     """
     Update a therapist.
@@ -70,7 +70,7 @@ def update_therapist(
 def delete_therapist(
     therapist_id: int,
     db: Session = Depends(deps.get_db),
-    current_user=Depends(deps.get_current_active_user)
+    current_user=Depends(deps.get_current_admin_user)
 ):
     """
     Delete a therapist.
@@ -85,7 +85,7 @@ def delete_therapist(
 def read_therapist_students(
     therapist_id: int,
     db: Session = Depends(deps.get_db),
-    current_user=Depends(deps.get_current_admin_user),
+    current_user=Depends(deps.get_current_admin_or_teacher_user),
 ):
     therapist = crud_therapist.get_therapist(db, therapist_id=therapist_id)
     if therapist is None:
@@ -98,7 +98,7 @@ def update_therapist_students(
     therapist_id: int,
     payload: schemas_therapist.TherapistStudentAssignmentsUpdate,
     db: Session = Depends(deps.get_db),
-    current_user=Depends(deps.get_current_admin_user),
+    current_user=Depends(deps.get_current_admin_or_teacher_user),
 ):
     therapist = crud_therapist.get_therapist(db, therapist_id=therapist_id)
     if therapist is None:

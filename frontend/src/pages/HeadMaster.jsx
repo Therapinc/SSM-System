@@ -8,6 +8,18 @@ import { AuthContext } from "../auth/AuthProvider.jsx";
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
 
+const CLASS_OPTIONS = [
+  "PrePrimary",
+  "Primary 1",
+  "Primary 2",
+  "Secondary",
+  "Pre vocational 1",
+  "Pre vocational 2",
+  "Care group below 18 years",
+  "Care group Above 18 years",
+  "Vocational 18-35 years",
+];
+
 // ++ PASTE THIS ENTIRE COMPONENT BLOCK HERE ++
 const ScrollToTopButton = () => {
   const [visible, setVisible] = useState(false);
@@ -220,6 +232,7 @@ const HeadMaster = () => {
   // derive list of classes from fetched students for dropdown and handle outside clicks
   useEffect(() => {
     const classSet = new Set();
+    CLASS_OPTIONS.forEach((className) => classSet.add(className));
     students.forEach((s) => {
       if (s.class_name) classSet.add(s.class_name);
     });

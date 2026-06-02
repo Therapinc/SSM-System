@@ -1,9 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import TherapistStudentAssignmentModal from "../components/TherapistStudentAssignmentModal.jsx";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+
+const CLASS_OPTIONS = [
+  "PrePrimary",
+  "Primary 1",
+  "Primary 2",
+  "Secondary",
+  "Pre vocational 1",
+  "Pre vocational 2",
+  "Care group below 18 years",
+  "Care group Above 18 years",
+  "Vocational 18-35 years",
+];
 
 // Helper function to get therapy-specific sections
 const getTherapySections = (therapyType) => {
@@ -284,6 +297,7 @@ const TherapistDashboard = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [activeTab, setActiveTab] = useState("students");
   const [filterOption, setFilterOption] = useState("all");
   const [selectedClass, setSelectedClass] = useState("all");
   const [isSearchFloating, setIsSearchFloating] = useState(false);
@@ -291,6 +305,10 @@ const TherapistDashboard = () => {
   const [studentSearch, setStudentSearch] = useState("");
   const [students, setStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [therapists, setTherapists] = useState([]);
+  const [therapistsLoading, setTherapistsLoading] = useState(false);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [assignmentTherapist, setAssignmentTherapist] = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -387,6 +405,41 @@ const TherapistDashboard = () => {
 
     fetchStudents();
   }, [studentSearch, selectedClass, userName]);
+
+  useEffect(() => {
+    const fetchTherapists = async () => {
+      setTherapistsLoading(true);
+      try {
+        const { data } = await axios.get(`${API_BASE_URL}/api/v1/therapists/`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        const items = Array.isArray(data) ? data : [];
+        const sorted = items
+          .slice()
+          .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        setTherapists(sorted);
+      } catch (err) {
+        console.error("Error fetching therapists:", err);
+        setTherapists([]);
+      } finally {
+        setTherapistsLoading(false);
+      }
+    };
+
+    fetchTherapists();
+  }, []);
+
+  const handleAssignStudents = (therapist) => {
+    setAssignmentTherapist(therapist);
+    setShowAssignmentModal(true);
+  };
+
+  const closeAssignmentModal = () => {
+    setShowAssignmentModal(false);
+    setAssignmentTherapist(null);
+  };
 
   const handleLogout = () => {
     try {
@@ -494,7 +547,9 @@ const TherapistDashboard = () => {
         <h1 className="text-4xl font-bold text-[#170F49] font-baskervville">
           Hi {userName}
         </h1>
-        <p className="text-[#6F6C8F] mt-2">View and Manage Students</p>
+        <p className="text-[#6F6C8F] mt-2">
+          {activeTab === "students" ? "View and Manage Students" : "View Therapists and Assign Students"}
+        </p>
         <p className="text-[#6F6C8F] text-sm mt-1">
           {new Date().toLocaleDateString("en-US", {
             weekday: "long",
@@ -508,7 +563,7 @@ const TherapistDashboard = () => {
       {/* Floating Search Bar */}
       <div
         className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${
-          isSearchFloating ? "translate-y-0" : "-translate-y-full"
+          activeTab === "students" && isSearchFloating ? "translate-y-0" : "-translate-y-full"
         }`}
       >
         <div className="backdrop-blur-xl p-4">
@@ -547,6 +602,45 @@ const TherapistDashboard = () => {
       <div className="w-[90%] max-w-[1200px] mx-4 z-10">
         {/* Main container */}
         <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+          <div className="flex justify-center mb-8">
+            <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative">
+              <div
+                className="absolute h-[calc(100%-8px)] top-[4px] transition-all duration-300 ease-in-out rounded-xl bg-[#E38B52] shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
+                style={{
+                  left: activeTab === "students" ? "4px" : "calc(50% + 0px)",
+                  width: "calc(50% - 6px)",
+                  background: "linear-gradient(135deg, #E38B52 0%, #E38B52 100%)",
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("students")}
+                className={`px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 ${
+                  activeTab === "students"
+                    ? "text-white scale-105"
+                    : "text-[#170F49] hover:text-[#E38B52]"
+                }`}
+              >
+                Students List
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("therapists")}
+                className={`px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 ${
+                  activeTab === "therapists"
+                    ? "text-white scale-105"
+                    : "text-[#170F49] hover:text-[#E38B52]"
+                }`}
+              >
+                Therapists List
+              </button>
+            </div>
+          </div>
+
+          {activeTab === "students" && (
+            <>
           {/* Filter and Search Section */}
           <div className="flex justify-between items-center mb-8 px-4">
             {/* Search Bar */}
@@ -798,8 +892,58 @@ const TherapistDashboard = () => {
                 ))
             )}
           </div>
+            </>
+          )}
+
+          {activeTab === "therapists" && (
+            <div className="px-4">
+            <div className="mb-4">
+              <h2 className="text-2xl font-semibold text-[#170F49]">Therapist List</h2>
+              <p className="text-sm text-[#6F6C8F] mt-1">Assign students to therapists. Details, add, and delete are admin-only.</p>
+            </div>
+            {therapistsLoading ? (
+              <div className="text-center text-[#6F6C8F]">Loading therapists...</div>
+            ) : therapists.length === 0 ? (
+              <div className="text-center text-[#6F6C8F]">No therapists found.</div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {therapists.map((therapist) => (
+                  <div
+                    key={therapist.id}
+                    className="bg-white rounded-2xl p-6 shadow-md transition-all duration-300"
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-[#170F49]">{therapist.name || "-"}</h3>
+                        <p className="text-sm text-[#6F6C8F]">Specialization: {therapist.specialization || "-"}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAssignStudents(therapist)}
+                        className="px-4 py-2 bg-[#E38B52] text-white rounded-lg shadow-md hover:bg-[#E38B52]/90 transition-transform hover:scale-105"
+                      >
+                        Assign Students
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            </div>
+          )}
         </div>
       </div>
+
+      <TherapistStudentAssignmentModal
+        open={showAssignmentModal}
+        therapist={assignmentTherapist}
+        classOptions={CLASS_OPTIONS}
+        teacherScope={true}
+        onClose={closeAssignmentModal}
+        onSaved={() => {
+          closeAssignmentModal();
+        }}
+      />
 
       {/* Global styles for animations */}
       <style jsx global>{`

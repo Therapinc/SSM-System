@@ -131,7 +131,7 @@ const AddTherapist = () => {
           });
         } catch (userError) {
           console.warn('User creation warning:', userError);
-          // Continue anyway - therapist was created
+          throw new Error(userError?.response?.data?.detail || 'Therapist profile was created, but the login account could not be created.');
         }
       }
 

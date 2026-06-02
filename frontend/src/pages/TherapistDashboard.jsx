@@ -776,6 +776,7 @@ const TherapistDashboard = () => {
                 ))
             )}
           </div>
+
         </div>
       </div>
 

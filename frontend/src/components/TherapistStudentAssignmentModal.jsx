@@ -8,6 +8,7 @@ const TherapistStudentAssignmentModal = ({
   open,
   therapist,
   classOptions = [],
+  teacherScope = false,
   onClose,
   onSaved,
 }) => {
@@ -78,29 +79,54 @@ const TherapistStudentAssignmentModal = ({
       setError("");
 
       try {
-        const params = new URLSearchParams();
-        params.set("page", "1");
-        params.set("page_size", "5000");
-        if (searchTerm.trim()) {
-          params.set("search", searchTerm.trim());
-        }
-        if (selectedClass !== "all") {
-          params.set("class_name", selectedClass);
-        }
+        let items = [];
 
-        const response = await axios.get(
-          `${API_BASE_URL}/api/v1/students/?${params.toString()}`,
-        );
+        if (teacherScope) {
+          const response = await axios.get(`${API_BASE_URL}/api/v1/teachers/me/students`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          });
+          const teacherStudents = Array.isArray(response.data) ? response.data : [];
+          const query = searchTerm.trim().toLowerCase();
+
+          items = query
+            ? teacherStudents.filter((student) => {
+                const name = (student.name || "").toLowerCase();
+                const studentId = (student.student_id || "").toLowerCase();
+                const admission = (student.admission_number || "").toLowerCase();
+                return (
+                  name.includes(query) ||
+                  studentId.includes(query) ||
+                  admission.includes(query)
+                );
+              })
+            : teacherStudents;
+        } else {
+          const params = new URLSearchParams();
+          params.set("page", "1");
+          params.set("page_size", "5000");
+          if (searchTerm.trim()) {
+            params.set("search", searchTerm.trim());
+          }
+          if (selectedClass !== "all") {
+            params.set("class_name", selectedClass);
+          }
+
+          const response = await axios.get(
+            `${API_BASE_URL}/api/v1/students/?${params.toString()}`,
+          );
+
+          items = Array.isArray(response.data?.items)
+            ? response.data.items
+            : Array.isArray(response.data)
+              ? response.data
+              : [];
+        }
 
         if (cancelled) {
           return;
         }
-
-        const items = Array.isArray(response.data?.items)
-          ? response.data.items
-          : Array.isArray(response.data)
-            ? response.data
-            : [];
 
         setStudents(
           items
@@ -125,7 +151,7 @@ const TherapistStudentAssignmentModal = ({
     return () => {
       cancelled = true;
     };
-  }, [open, therapist?.id, searchTerm, selectedClass]);
+  }, [open, therapist?.id, searchTerm, selectedClass, teacherScope]);
 
   useEffect(() => {
     if (!open) {
@@ -281,41 +307,45 @@ const TherapistStudentAssignmentModal = ({
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-[#170F49]">
-                Filter by class
-              </label>
-              <select
-                value={selectedClass}
-                onChange={(event) => setSelectedClass(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#170F49] outline-none transition focus:border-[#E38B52] focus:ring-4 focus:ring-[#E38B52]/15"
-              >
-                <option value="all">All classes</option>
-                {classOptions.map((className) => (
-                  <option key={className} value={className}>
-                    {className}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {!teacherScope && (
+              <>
+                <div>
+                  <label className="block text-sm font-semibold text-[#170F49]">
+                    Filter by class
+                  </label>
+                  <select
+                    value={selectedClass}
+                    onChange={(event) => setSelectedClass(event.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#170F49] outline-none transition focus:border-[#E38B52] focus:ring-4 focus:ring-[#E38B52]/15"
+                  >
+                    <option value="all">All classes</option>
+                    {classOptions.map((className) => (
+                      <option key={className} value={className}>
+                        {className}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-[#170F49]">
-                Filter by division
-              </label>
-              <select
-                value={selectedDivision}
-                onChange={(event) => setSelectedDivision(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#170F49] outline-none transition focus:border-[#E38B52] focus:ring-4 focus:ring-[#E38B52]/15"
-              >
-                <option value="all">All divisions</option>
-                {divisionOptions.map((division) => (
-                  <option key={division} value={division}>
-                    {division}
-                  </option>
-                ))}
-              </select>
-            </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#170F49]">
+                    Filter by division
+                  </label>
+                  <select
+                    value={selectedDivision}
+                    onChange={(event) => setSelectedDivision(event.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#170F49] outline-none transition focus:border-[#E38B52] focus:ring-4 focus:ring-[#E38B52]/15"
+                  >
+                    <option value="all">All divisions</option>
+                    {divisionOptions.map((division) => (
+                      <option key={division} value={division}>
+                        {division}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
 
             <div className="rounded-2xl bg-white px-4 py-3 text-sm text-[#6F6C8F] shadow-sm">
               <div>
