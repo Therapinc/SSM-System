@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import TherapistStudentAssignmentModal from "../components/TherapistStudentAssignmentModal.jsx";
@@ -303,8 +303,37 @@ const TherapistDashboard = () => {
   const [isSearchFloating, setIsSearchFloating] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
-  const [students, setStudents] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
+
+  const visibleStudents = useMemo(() => {
+    let visible = allStudents;
+    if (studentSearch && studentSearch.trim()) {
+      const q = studentSearch.trim().toLowerCase();
+      visible = visible.filter((s) => {
+        const name = (s.name || "").toLowerCase();
+        const classLabel = (
+          s.class_name ||
+          s.className ||
+          ""
+        )
+          .toString()
+          .toLowerCase();
+        return name.includes(q) || classLabel.includes(q);
+      });
+    }
+    if (selectedClass && selectedClass !== "all") {
+      visible = visible.filter((s) => {
+        const classLabel = (
+          s.class_name ||
+          s.className ||
+          ""
+        ).toString();
+        return classLabel.toLowerCase().includes(selectedClass.toLowerCase());
+      });
+    }
+    return visible;
+  }, [allStudents, studentSearch, selectedClass]);
   const [therapists, setTherapists] = useState([]);
   const [therapistsLoading, setTherapistsLoading] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
@@ -357,14 +386,12 @@ const TherapistDashboard = () => {
     fetchUser();
   }, []);
 
-  // Fetch students that this therapist is assigned to
+  // Fetch assigned students once; search/class filters are client-side only.
   useEffect(() => {
     const fetchStudents = async () => {
       if (!userName) return;
       setStudentsLoading(true);
       try {
-        // Use server-side teacher-scoped endpoint to retrieve only students
-        // matching this teacher's class+division assignments.
         const { data } = await axios.get(
           `${API_BASE_URL}/api/v1/teachers/me/students`,
           {
@@ -383,39 +410,33 @@ const TherapistDashboard = () => {
         const sortedStudents = [...normalized].sort((a, b) =>
           (a.name || "").localeCompare(b.name || ""),
         );
-
-        // Apply client-side search/class filter on already scoped students
-        let visible = sortedStudents;
-        if (studentSearch && studentSearch.trim()) {
-          const q = studentSearch.trim().toLowerCase();
-          visible = visible.filter((s) =>
-            (s.name || "").toLowerCase().includes(q),
-          );
-        }
-        if (selectedClass && selectedClass !== "all") {
-          visible = visible.filter((s) => s.class_name === selectedClass);
-        }
-        setStudents(visible);
+        setAllStudents(sortedStudents);
       } catch (err) {
         console.error("Error fetching students:", err);
+        setAllStudents([]);
       } finally {
         setStudentsLoading(false);
       }
     };
 
     fetchStudents();
-  }, [studentSearch, selectedClass, userName]);
+  }, [userName]);
 
   useEffect(() => {
     const fetchTherapists = async () => {
       setTherapistsLoading(true);
       try {
         const { data } = await axios.get(`${API_BASE_URL}/api/v1/therapists/`, {
+          params: { page: 1, limit: 50 },
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        const items = Array.isArray(data) ? data : [];
+        const items = Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data)
+            ? data
+            : [];
         const sorted = items
           .slice()
           .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -760,56 +781,12 @@ const TherapistDashboard = () => {
               <div className="text-center text-[#6F6C8F]">
                 Loading students...
               </div>
-            ) : students.filter((student) => {
-                const studentClassLabel = (
-                  student.class_name ||
-                  student.className ||
-                  ""
-                ).toString();
-                const matchesSearch =
-                  (student.name || "")
-                    .toLowerCase()
-                    .includes(studentSearch.toLowerCase()) ||
-                  studentClassLabel
-                    .toLowerCase()
-                    .includes(studentSearch.toLowerCase());
-
-                const matchesClass =
-                  selectedClass === "all" ||
-                  studentClassLabel
-                    .toLowerCase()
-                    .includes(selectedClass.toLowerCase());
-
-                return matchesSearch && matchesClass;
-              }).length === 0 ? (
+            ) : visibleStudents.length === 0 ? (
               <div className="text-center text-[#6F6C8F]">
                 No students found.
               </div>
             ) : (
-              students
-                .filter((student) => {
-                  const studentClassLabel = (
-                    student.class_name ||
-                    student.className ||
-                    ""
-                  ).toString();
-                  const matchesSearch =
-                    (student.name || "")
-                      .toLowerCase()
-                      .includes(studentSearch.toLowerCase()) ||
-                    studentClassLabel
-                      .toLowerCase()
-                      .includes(studentSearch.toLowerCase());
-
-                  const matchesClass =
-                    selectedClass === "all" ||
-                    studentClassLabel
-                      .toLowerCase()
-                      .includes(selectedClass.toLowerCase());
-
-                  return matchesSearch && matchesClass;
-                })
-                .map((student) => (
+              visibleStudents.map((student) => (
                   <div
                     key={student.id}
                     onClick={() => handleStudentClick(student.id)}

@@ -173,6 +173,28 @@ class StudentCreate(StudentBase):
 class StudentUpdate(StudentBase):
     pass
 
+# Lightweight schema for list / dashboard endpoints (no photo bytes, no wide fields).
+class StudentListItem(BaseModel):
+    id: int
+    student_id: str
+    name: Optional[str] = None
+    age: Optional[int] = None
+    class_name: Optional[str] = None
+    division: Optional[str] = None
+    roll_no: Optional[str] = None
+    admission_number: Optional[str] = None
+    gender: Optional[str] = None
+    academic_year: Optional[str] = None
+    disability_type: Optional[str] = None
+    phone_number: Optional[str] = None
+    email: Optional[str] = None
+    created_at: Optional[date] = None
+    updated_at: Optional[date] = None
+    photo_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 # 4. Schema for API RESPONSES
 class Student(StudentBase):
     id: int

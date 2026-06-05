@@ -1874,7 +1874,6 @@ const addCellToColumn = (columnKey) => {
   };
 
   const [editMode, setEditMode] = useState(false);
-  const [teacherUsers, setTeacherUsers] = useState([]);
   const [editData, setEditData] = useState(null);
   const [developmentHistoryDraft, setDevelopmentHistoryDraft] = useState("");
   const [householdRows, setHouseholdRows] = useState([
@@ -3239,54 +3238,6 @@ const addCellToColumn = (columnKey) => {
       </div>
     );
   };
-
-  useEffect(() => {
-  const fetchTeacherUsernames = async () => {
-    try {
-
-      const baseUrl =
-        process.env.REACT_APP_API_BASE_URL ||
-        "http://localhost:8000";
-
-      const token = localStorage.getItem("token");
-
-      const res = await axios.get(
-        `${baseUrl}/api/v1/teachers/`,
-        {
-          headers: token
-            ? { Authorization: `Bearer ${token}` }
-            : {},
-        }
-      );
-
-      // Convert emails to usernames
-      const usernames = (res.data || [])
-        .map((t) =>
-          (t.email || "")
-            .split("@")[0]
-            .trim()
-            .toLowerCase()
-        )
-        .filter((u) => u);
-
-      // Remove duplicates + sort
-      const unique = Array.from(new Set(usernames)).sort();
-
-      setTeacherUsers(unique);
-
-    } catch (err) {
-
-      console.error(err);
-
-      setTeacherUsers([]);
-    }
-  };
-
-  if (activeTab === "student-details") {
-    fetchTeacherUsernames();
-  }
-
-}, [activeTab]);
 
   useEffect(() => {
     if (id) {

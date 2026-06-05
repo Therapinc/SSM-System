@@ -7,12 +7,14 @@ from typing import List, Optional, Any, Dict
 # Renamed import to avoid variable name conflicts
 from app.crud.student import student as crud_student
 from app.crud import therapist_assignment as crud_therapist_assignment
-from app.schemas.student import Student, StudentCreate, StudentUpdate
+from app.schemas.student import Student, StudentCreate, StudentUpdate, StudentListItem
+from app.utils.student_serializers import STUDENT_LIST_LOAD_COLUMNS, serialize_student_list_item
 from pydantic import BaseModel
+from sqlalchemy.orm import load_only
 
 
 class StudentsPage(BaseModel):
-    items: List[Student]
+    items: List[StudentListItem]
     total: int
     page: int
     limit: int
@@ -69,36 +71,16 @@ def read_students(
         query = query.filter(crud_student.model.class_name == class_name)
 
     total = query.count()
-    students_from_db = query.offset(pagination.skip).limit(pagination.limit).all()
+    students_from_db = (
+        query.options(load_only(*STUDENT_LIST_LOAD_COLUMNS))
+        .offset(pagination.skip)
+        .limit(pagination.limit)
+        .all()
+    )
 
-    # Serialize students safely (drop raw binary `photo`, add `photo_url`)
-    students_with_photos = []
-    for student_obj in students_from_db:
-        # Only include table columns to avoid _sa_instance_state and binary data issues
-        student_data = {c.name: getattr(student_obj, c.name) for c in student_obj.__table__.columns}
-        # Convert photo bytes to base64 URL if present
-        if student_data.get('photo'):
-            try:
-                b64_photo = base64.b64encode(student_data['photo']).decode('utf-8')
-                student_data['photo_url'] = f"data:image/jpeg;base64,{b64_photo}"
-            except Exception:
-                student_data['photo_url'] = None
-        else:
-            student_data['photo_url'] = None
-        # Remove raw photo bytes to keep payload JSON-serializable
-        student_data.pop('photo', None)
-        # Strip file_data from documents to keep payload small and avoid encoding issues
-        if student_data.get('documents'):
-            student_data['documents'] = [
-                {k: v for k, v in doc.items() if k != 'file_data'}
-                for doc in student_data['documents']
-            ]
-        students_with_photos.append(student_data)
+    list_items = [serialize_student_list_item(student_obj) for student_obj in students_from_db]
 
-    # Build a Page. Some deployment environments have trouble validating
-    # Pydantic generics (Page[T]). Return a plain dict reliably by using
-    # `.dict()` when available, otherwise return the dict directly.
-    page = Page.create(items=students_with_photos, total=total, params=pagination)
+    page = Page.create(items=list_items, total=total, params=pagination)
     if hasattr(page, "dict"):
         return page.dict()
     return page

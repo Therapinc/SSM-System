@@ -1,16 +1,18 @@
 from typing import List
 
 from sqlalchemy import delete
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.crud.therapist import get_therapist
 from app.models.student import Student
 from app.models.therapist_assignment import therapist_student_assignments
+from app.utils.student_serializers import STUDENT_LIST_LOAD_COLUMNS
 
 
 def get_assigned_students(db: Session, therapist_id: int) -> List[Student]:
     return (
         db.query(Student)
+        .options(load_only(*STUDENT_LIST_LOAD_COLUMNS))
         .join(
             therapist_student_assignments,
             Student.id == therapist_student_assignments.c.student_id,

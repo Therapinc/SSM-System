@@ -35,13 +35,31 @@ def delete_therapist(db: Session, therapist_id: int) -> bool:
     return False
 
 def search_therapists(db: Session, search: str, skip: int = 0, limit: int = 100) -> List[Therapist]:
-    query = db.query(Therapist)
-    if search:
-        search_filter = f"%{search}%"
-        query = query.filter(
-            (Therapist.name.ilike(search_filter)) |
-            (Therapist.mobile_number.ilike(search_filter)) |
-            (Therapist.qualifications_details.ilike(search_filter)) |
-            (Therapist.specialization.ilike(search_filter))
-        )
+    query = _therapists_query(db, search)
     return query.offset(skip).limit(limit).all()
+
+
+def _therapists_query(db: Session, search: Optional[str] = None):
+    query = db.query(Therapist)
+    if search and search.strip():
+        search_filter = f"%{search.strip()}%"
+        query = query.filter(
+            (Therapist.name.ilike(search_filter))
+            | (Therapist.mobile_number.ilike(search_filter))
+            | (Therapist.qualifications_details.ilike(search_filter))
+            | (Therapist.specialization.ilike(search_filter))
+        )
+    return query
+
+
+def list_therapists_paginated(
+    db: Session,
+    *,
+    skip: int = 0,
+    limit: int = 50,
+    search: Optional[str] = None,
+) -> tuple[List[Therapist], int]:
+    query = _therapists_query(db, search)
+    total = query.count()
+    items = query.order_by(Therapist.name.asc()).offset(skip).limit(limit).all()
+    return items, total

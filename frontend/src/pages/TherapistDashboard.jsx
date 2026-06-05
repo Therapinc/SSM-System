@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -298,28 +298,30 @@ const TherapistDashboard = () => {
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  const visibleStudents = students.filter((student) => {
-    const studentClassLabel = (
-      student.class_name ||
-      student.className ||
-      ""
-    ).toString();
-    const matchesSearch =
-      (student.name || "")
-        .toLowerCase()
-        .includes(studentSearch.toLowerCase()) ||
-      studentClassLabel
-        .toLowerCase()
-        .includes(studentSearch.toLowerCase());
+  const visibleStudents = useMemo(() => {
+    return students.filter((student) => {
+      const studentClassLabel = (
+        student.class_name ||
+        student.className ||
+        ""
+      ).toString();
+      const matchesSearch =
+        (student.name || "")
+          .toLowerCase()
+          .includes(studentSearch.toLowerCase()) ||
+        studentClassLabel
+          .toLowerCase()
+          .includes(studentSearch.toLowerCase());
 
-    const matchesClass =
-      selectedClass === "all" ||
-      studentClassLabel
-        .toLowerCase()
-        .includes(selectedClass.toLowerCase());
+      const matchesClass =
+        selectedClass === "all" ||
+        studentClassLabel
+          .toLowerCase()
+          .includes(selectedClass.toLowerCase());
 
-    return matchesSearch && matchesClass;
-  });
+      return matchesSearch && matchesClass;
+    });
+  }, [students, studentSearch, selectedClass]);
 
   const hasStudentFilters =
     Boolean(studentSearch.trim()) || selectedClass !== "all";
@@ -368,23 +370,14 @@ const TherapistDashboard = () => {
     fetchUser();
   }, []);
 
-  // Fetch students that this therapist is assigned to
+  // Fetch therapist-scoped students once; search/class filters are client-side.
   useEffect(() => {
     const fetchStudents = async () => {
       if (!userName) return;
       setStudentsLoading(true);
       try {
-        const params = {
-          page: 1,
-          page_size: 100,
-        };
-        if (studentSearch && studentSearch.trim())
-          params.search = studentSearch.trim();
-        if (selectedClass && selectedClass !== "all")
-          params.class_name = selectedClass;
-
         const { data } = await axios.get(`${API_BASE_URL}/api/v1/students/`, {
-          params,
+          params: { page: 1, page_size: 100 },
         });
         const items = Array.isArray(data?.items)
           ? data.items
@@ -400,21 +393,17 @@ const TherapistDashboard = () => {
         const sortedStudents = [...normalized].sort((a, b) =>
           (a.name || "").localeCompare(b.name || ""),
         );
-
-        // For therapists, we'll show students where therapy_provider or therapist matches the logged-in username
-        // Or if no specific filter is available, show all students (adjust based on your API)
-        const filteredByTherapist = sortedStudents; // Adjust this filter based on your data model
-
-        setStudents(filteredByTherapist);
+        setStudents(sortedStudents);
       } catch (err) {
         console.error("Error fetching students:", err);
+        setStudents([]);
       } finally {
         setStudentsLoading(false);
       }
     };
 
     fetchStudents();
-  }, [studentSearch, selectedClass, userName]);
+  }, [userName]);
 
   const handleLogout = () => {
     try {

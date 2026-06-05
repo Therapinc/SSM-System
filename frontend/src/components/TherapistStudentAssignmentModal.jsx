@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { useDebouncedValue } from "../utils/useDebouncedValue";
 
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+
+const BROWSE_PAGE_SIZE = 50;
 
 const TherapistStudentAssignmentModal = ({
   open,
@@ -13,14 +16,19 @@ const TherapistStudentAssignmentModal = ({
   onSaved,
 }) => {
   const [students, setStudents] = useState([]);
+  const [teacherScopeStudents, setTeacherScopeStudents] = useState([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 400);
   const [selectedClass, setSelectedClass] = useState("all");
   const [selectedDivision, setSelectedDivision] = useState("all");
   const [viewMode, setViewMode] = useState("all");
+  const [browsePage, setBrowsePage] = useState(1);
+  const [browseTotalPages, setBrowseTotalPages] = useState(1);
+  const [browseTotal, setBrowseTotal] = useState(0);
 
   useEffect(() => {
     if (!open || !therapist?.id) {
@@ -32,6 +40,8 @@ const TherapistStudentAssignmentModal = ({
     setSelectedClass("all");
     setSelectedDivision("all");
     setViewMode("all");
+    setBrowsePage(1);
+    setTeacherScopeStudents([]);
   }, [open, therapist?.id]);
 
   useEffect(() => {
@@ -67,8 +77,62 @@ const TherapistStudentAssignmentModal = ({
     };
   }, [open, therapist?.id]);
 
+  // Teacher scope: load assigned students once per open; filter in UI.
   useEffect(() => {
-    if (!open || !therapist?.id) {
+    if (!open || !therapist?.id || !teacherScope) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchTeacherScopeStudents = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/v1/teachers/me/students`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+        const teacherStudents = Array.isArray(response.data) ? response.data : [];
+
+        if (!cancelled) {
+          setTeacherScopeStudents(
+            teacherStudents
+              .slice()
+              .sort((left, right) => (left.name || "").localeCompare(right.name || "")),
+          );
+        }
+      } catch (requestError) {
+        if (!cancelled) {
+          console.error("Error loading students:", requestError);
+          setError("Unable to load students.");
+          setTeacherScopeStudents([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTeacherScopeStudents();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, therapist?.id, teacherScope]);
+
+  useEffect(() => {
+    if (!teacherScope) {
+      setBrowsePage(1);
+    }
+  }, [debouncedSearchTerm, selectedClass, teacherScope]);
+
+  // Admin scope: paginated browse with debounced server search.
+  useEffect(() => {
+    if (!open || !therapist?.id || teacherScope) {
       return;
     }
 
@@ -79,50 +143,25 @@ const TherapistStudentAssignmentModal = ({
       setError("");
 
       try {
-        let items = [];
-
-        if (teacherScope) {
-          const response = await axios.get(`${API_BASE_URL}/api/v1/teachers/me/students`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          });
-          const teacherStudents = Array.isArray(response.data) ? response.data : [];
-          const query = searchTerm.trim().toLowerCase();
-
-          items = query
-            ? teacherStudents.filter((student) => {
-                const name = (student.name || "").toLowerCase();
-                const studentId = (student.student_id || "").toLowerCase();
-                const admission = (student.admission_number || "").toLowerCase();
-                return (
-                  name.includes(query) ||
-                  studentId.includes(query) ||
-                  admission.includes(query)
-                );
-              })
-            : teacherStudents;
-        } else {
-          const params = new URLSearchParams();
-          params.set("page", "1");
-          params.set("page_size", "5000");
-          if (searchTerm.trim()) {
-            params.set("search", searchTerm.trim());
-          }
-          if (selectedClass !== "all") {
-            params.set("class_name", selectedClass);
-          }
-
-          const response = await axios.get(
-            `${API_BASE_URL}/api/v1/students/?${params.toString()}`,
-          );
-
-          items = Array.isArray(response.data?.items)
-            ? response.data.items
-            : Array.isArray(response.data)
-              ? response.data
-              : [];
+        const params = new URLSearchParams();
+        params.set("page", String(browsePage));
+        params.set("page_size", String(BROWSE_PAGE_SIZE));
+        if (debouncedSearchTerm.trim()) {
+          params.set("search", debouncedSearchTerm.trim());
         }
+        if (selectedClass !== "all") {
+          params.set("class_name", selectedClass);
+        }
+
+        const response = await axios.get(
+          `${API_BASE_URL}/api/v1/students/?${params.toString()}`,
+        );
+
+        const items = Array.isArray(response.data?.items)
+          ? response.data.items
+          : Array.isArray(response.data)
+            ? response.data
+            : [];
 
         if (cancelled) {
           return;
@@ -133,11 +172,18 @@ const TherapistStudentAssignmentModal = ({
             .slice()
             .sort((left, right) => (left.name || "").localeCompare(right.name || "")),
         );
+        setBrowseTotal(response.data?.total ?? items.length);
+        setBrowseTotalPages(
+          response.data?.total_pages ??
+            Math.max(1, Math.ceil((response.data?.total ?? items.length) / BROWSE_PAGE_SIZE)),
+        );
       } catch (requestError) {
         if (!cancelled) {
           console.error("Error loading students:", requestError);
           setError("Unable to load students.");
           setStudents([]);
+          setBrowseTotal(0);
+          setBrowseTotalPages(1);
         }
       } finally {
         if (!cancelled) {
@@ -151,7 +197,7 @@ const TherapistStudentAssignmentModal = ({
     return () => {
       cancelled = true;
     };
-  }, [open, therapist?.id, searchTerm, selectedClass, teacherScope]);
+  }, [open, therapist?.id, teacherScope, debouncedSearchTerm, selectedClass, browsePage]);
 
   useEffect(() => {
     if (!open) {
@@ -168,26 +214,46 @@ const TherapistStudentAssignmentModal = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, onClose]);
 
-  const visibleStudentCount = useMemo(() => students.length, [students]);
+  const browseListStudents = useMemo(() => {
+    if (teacherScope) {
+      const query = searchTerm.trim().toLowerCase();
+      if (!query) {
+        return teacherScopeStudents;
+      }
+      return teacherScopeStudents.filter((student) => {
+        const name = (student.name || "").toLowerCase();
+        const studentId = (student.student_id || "").toLowerCase();
+        const admission = (student.admission_number || "").toLowerCase();
+        return (
+          name.includes(query) ||
+          studentId.includes(query) ||
+          admission.includes(query)
+        );
+      });
+    }
+    return students;
+  }, [teacherScope, teacherScopeStudents, searchTerm, students]);
+
+  const visibleStudentCount = useMemo(() => browseListStudents.length, [browseListStudents]);
   const divisionOptions = useMemo(() => {
     const divisions = new Set();
-    students.forEach((student) => {
+    browseListStudents.forEach((student) => {
       if (student.division) {
         divisions.add(student.division);
       }
     });
     return Array.from(divisions).sort();
-  }, [students]);
+  }, [browseListStudents]);
   const selectedStudents = useMemo(
-    () => students.filter((student) => selectedStudentIds.has(student.id)),
-    [students, selectedStudentIds],
+    () => browseListStudents.filter((student) => selectedStudentIds.has(student.id)),
+    [browseListStudents, selectedStudentIds],
   );
   const unselectedStudents = useMemo(
-    () => students.filter((student) => !selectedStudentIds.has(student.id)),
-    [students, selectedStudentIds],
+    () => browseListStudents.filter((student) => !selectedStudentIds.has(student.id)),
+    [browseListStudents, selectedStudentIds],
   );
   const filteredStudents = useMemo(() => {
-    return students.filter((student) => {
+    return browseListStudents.filter((student) => {
       const matchesViewMode =
         viewMode === "all"
           ? true
@@ -199,7 +265,7 @@ const TherapistStudentAssignmentModal = ({
 
       return matchesViewMode && matchesDivision;
     });
-  }, [students, selectedStudentIds, selectedDivision, viewMode]);
+  }, [browseListStudents, selectedStudentIds, selectedDivision, viewMode]);
 
   const selectAllVisible = () => {
     setSelectedStudentIds((previous) => {
@@ -353,6 +419,9 @@ const TherapistStudentAssignmentModal = ({
               </div>
               <div className="mt-1">
                 Showing <span className="font-semibold text-[#170F49]">{visibleStudentCount}</span> results
+                {!teacherScope && browseTotal > 0 ? (
+                  <span> (page {browsePage} of {browseTotalPages}, {browseTotal} total)</span>
+                ) : null}
               </div>
             </div>
 
@@ -517,6 +586,30 @@ const TherapistStudentAssignmentModal = ({
                 </div>
               )}
             </div>
+
+            {!teacherScope && browseTotalPages > 1 && (
+              <div className="flex items-center justify-center gap-3 border-t border-slate-100 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => setBrowsePage((p) => Math.max(1, p - 1))}
+                  disabled={browsePage <= 1 || loading}
+                  className="rounded-lg border border-[#E38B52] px-3 py-1.5 text-sm font-medium text-[#E38B52] disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-[#6F6C8F]">
+                  Page {browsePage} of {browseTotalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBrowsePage((p) => Math.min(browseTotalPages, p + 1))}
+                  disabled={browsePage >= browseTotalPages || loading}
+                  className="rounded-lg border border-[#E38B52] px-3 py-1.5 text-sm font-medium text-[#E38B52] disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                >
+                  Next
+                </button>
+              </div>
+            )}
 
             {error && (
               <div className="border-t border-red-100 bg-red-50 px-4 py-2.5 text-sm text-red-600 sm:px-5">
