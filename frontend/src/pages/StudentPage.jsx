@@ -806,6 +806,16 @@ const [iepData, setIepData] = useState(createEmptyIepData());
 
   // per-month saved IEPs: { "January 2026": { ...iepData }, ... }
   const [savedIepByMonth, setSavedIepByMonth] = useState({});
+
+  // ===== IEP Tab (Individualized Education Program) state =====
+  // Number of evaluation columns (beyond the "Steps" column) per the IEP document.
+  const IEP_TASK_COLS = 6;
+  const [iepFormRecords, setIepFormRecords] = useState([]); // saved IEP records for this student
+  const [iepFormMode, setIepFormMode] = useState("list"); // "list" | "create" | "edit" | "view"
+  const [iepFormDraft, setIepFormDraft] = useState(null); // current draft being created/edited
+  const [iepFormViewRecord, setIepFormViewRecord] = useState(null); // record opened in read-only view
+  const [iepFormDeleteId, setIepFormDeleteId] = useState(null); // record pending deletion
+
   const MONTHS = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December"
@@ -1431,6 +1441,473 @@ const addCellToColumn = (columnKey) => {
   
     // Save PDF
     doc.save(`${(student?.name || "student").replace(/\s+/g, "_")}-iep.pdf`);
+  };
+
+  // ===================== IEP Tab (Individualized Education Program) =====================
+  const iepFormStorageKey = `iep_program_student_${id}`;
+
+  const createEmptyIepTerm = (rowCount) => ({
+    headers: Array.from({ length: IEP_TASK_COLS }, () => ""),
+    rows: Array.from({ length: rowCount }, (_, i) => ({
+      id: i + 1,
+      step: "",
+      cols: Array.from({ length: IEP_TASK_COLS }, () => ""),
+    })),
+    remarks: "",
+  });
+
+  const createEmptyIepForm = () => ({
+    id: null,
+    academicYear: "",
+    firstTerm: createEmptyIepTerm(8),
+    secondTerm: createEmptyIepTerm(7),
+    signatures: { teacher: "", parent: "" },
+    createdAt: null,
+    updatedAt: null,
+  });
+
+  const normalizeIepTerm = (term, rowCount) => {
+    const base = createEmptyIepTerm(rowCount);
+    if (!term) return base;
+    const headers = base.headers.map((_, i) => term.headers?.[i] ?? "");
+    const rows = (Array.isArray(term.rows) && term.rows.length ? term.rows : base.rows).map(
+      (row, idx) => ({
+        id: row?.id ?? idx + 1,
+        step: row?.step ?? "",
+        cols: base.headers.map((_, i) => row?.cols?.[i] ?? ""),
+      })
+    );
+    return { headers, rows, remarks: term.remarks ?? "" };
+  };
+
+  const normalizeIepRecord = (rec = {}) => ({
+    ...createEmptyIepForm(),
+    ...rec,
+    firstTerm: normalizeIepTerm(rec.firstTerm, 8),
+    secondTerm: normalizeIepTerm(rec.secondTerm, 7),
+    signatures: {
+      teacher: rec.signatures?.teacher ?? "",
+      parent: rec.signatures?.parent ?? "",
+    },
+  });
+
+  const loadIepFormRecords = () => {
+    try {
+      const raw = localStorage.getItem(iepFormStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const list = Array.isArray(parsed) ? parsed.map(normalizeIepRecord) : [];
+      setIepFormRecords(list);
+      return list;
+    } catch (e) {
+      console.error("Failed to load IEP records:", e);
+      setIepFormRecords([]);
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    if (!id) return;
+    loadIepFormRecords();
+    setIepFormMode("list");
+    setIepFormDraft(null);
+    setIepFormViewRecord(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const persistIepFormRecords = (list) => {
+    try {
+      localStorage.setItem(iepFormStorageKey, JSON.stringify(list));
+      setIepFormRecords(list);
+    } catch (e) {
+      console.error("Failed to save IEP records:", e);
+      showToast("Failed to save IEP record", "error");
+    }
+  };
+
+  const startCreateIepForm = () => {
+    setIepFormDraft(createEmptyIepForm());
+    setIepFormViewRecord(null);
+    setIepFormMode("create");
+  };
+
+  const startEditIepForm = (record) => {
+    setIepFormDraft(normalizeIepRecord(record));
+    setIepFormViewRecord(null);
+    setIepFormMode("edit");
+  };
+
+  const openViewIepForm = (record) => {
+    setIepFormViewRecord(normalizeIepRecord(record));
+    setIepFormMode("view");
+  };
+
+  const cancelIepForm = () => {
+    setIepFormDraft(null);
+    setIepFormViewRecord(null);
+    setIepFormMode("list");
+  };
+
+  // Draft mutation helpers (term = "firstTerm" | "secondTerm")
+  const updateIepDraft = (updater) =>
+    setIepFormDraft((prev) => (prev ? updater({ ...prev }) : prev));
+
+  const updateIepTermStep = (term, rowIdx, value) =>
+    updateIepDraft((draft) => {
+      const t = { ...draft[term] };
+      t.rows = t.rows.map((r, i) => (i === rowIdx ? { ...r, step: value } : r));
+      draft[term] = t;
+      return draft;
+    });
+
+  const updateIepTermCell = (term, rowIdx, colIdx, value) =>
+    updateIepDraft((draft) => {
+      const t = { ...draft[term] };
+      t.rows = t.rows.map((r, i) =>
+        i === rowIdx
+          ? { ...r, cols: r.cols.map((c, ci) => (ci === colIdx ? value : c)) }
+          : r
+      );
+      draft[term] = t;
+      return draft;
+    });
+
+  const updateIepTermHeader = (term, colIdx, value) =>
+    updateIepDraft((draft) => {
+      const t = { ...draft[term] };
+      t.headers = t.headers.map((h, i) => (i === colIdx ? value : h));
+      draft[term] = t;
+      return draft;
+    });
+
+  const updateIepTermRemarks = (term, value) =>
+    updateIepDraft((draft) => {
+      draft[term] = { ...draft[term], remarks: value };
+      return draft;
+    });
+
+  const addIepTermRow = (term) =>
+    updateIepDraft((draft) => {
+      const t = { ...draft[term] };
+      const nextId = (t.rows[t.rows.length - 1]?.id || 0) + 1;
+      t.rows = [
+        ...t.rows,
+        { id: nextId, step: "", cols: Array.from({ length: IEP_TASK_COLS }, () => "") },
+      ];
+      draft[term] = t;
+      return draft;
+    });
+
+  const removeIepTermRow = (term, rowIdx) =>
+    updateIepDraft((draft) => {
+      const t = { ...draft[term] };
+      t.rows = t.rows.filter((_, i) => i !== rowIdx);
+      if (t.rows.length === 0) {
+        t.rows = [{ id: 1, step: "", cols: Array.from({ length: IEP_TASK_COLS }, () => "") }];
+      }
+      draft[term] = t;
+      return draft;
+    });
+
+  const updateIepSignature = (which, value) =>
+    updateIepDraft((draft) => {
+      draft.signatures = { ...draft.signatures, [which]: value };
+      return draft;
+    });
+
+  const saveIepForm = () => {
+    if (!iepFormDraft) return;
+    const now = new Date().toISOString();
+    const existing = [...iepFormRecords];
+    if (iepFormDraft.id) {
+      const idx = existing.findIndex((r) => r.id === iepFormDraft.id);
+      const updated = { ...iepFormDraft, updatedAt: now };
+      if (idx >= 0) existing[idx] = updated;
+      else existing.push(updated);
+      persistIepFormRecords(existing);
+      showToast("IEP record updated", "success");
+    } else {
+      const newRecord = { ...iepFormDraft, id: Date.now(), createdAt: now, updatedAt: now };
+      existing.unshift(newRecord);
+      persistIepFormRecords(existing);
+      showToast("IEP record saved", "success");
+    }
+    setIepFormDraft(null);
+    setIepFormMode("list");
+  };
+
+  const deleteIepForm = (recordId) => {
+    const filtered = iepFormRecords.filter((r) => r.id !== recordId);
+    persistIepFormRecords(filtered);
+    setIepFormDeleteId(null);
+    showToast("IEP record deleted", "success");
+  };
+
+  const downloadIepFormPDF = (record) => {
+    const rec = normalizeIepRecord(record);
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 32;
+    const contentW = pageW - margin * 2;
+    let y = margin;
+
+    const ensureSpace = (needed) => {
+      if (y + needed > pageH - margin) {
+        doc.addPage();
+        y = margin;
+      }
+    };
+
+    // Title
+    doc.setFontSize(15);
+    doc.setFont("helvetica", "bold");
+    doc.text("INDIVIDUALIZED EDUCATION PROGRAM (IEP)", pageW / 2, y + 8, { align: "center" });
+    y += 30;
+
+    // Student details
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Name : ${student?.name || ""}`, margin, y);
+    if (rec.academicYear) {
+      doc.text(`Academic Year : ${rec.academicYear}`, pageW - margin, y, { align: "right" });
+    }
+    y += 14;
+    const stamp = rec.updatedAt || rec.createdAt;
+    if (stamp) {
+      doc.setFontSize(9);
+      doc.setTextColor(120);
+      doc.text(`Last updated : ${new Date(stamp).toLocaleString()}`, margin, y);
+      doc.setTextColor(0);
+      y += 12;
+    }
+    y += 6;
+
+    const lineHeight = 11;
+    const cellPad = 4;
+    const stepColW = contentW * 0.46;
+    const otherColW = (contentW - stepColW) / IEP_TASK_COLS;
+
+    const drawTerm = (title, term) => {
+      ensureSpace(60);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(title, margin, y + 4);
+      y += 16;
+      doc.setFontSize(10);
+      doc.text("Task Analysis", margin, y + 2);
+      y += 12;
+
+      // Pre-compute column x positions
+      const colX = [margin];
+      colX.push(margin + stepColW);
+      for (let c = 0; c < IEP_TASK_COLS; c++) colX.push(margin + stepColW + otherColW * (c + 1));
+
+      // Header row
+      doc.setFontSize(9);
+      const headerLabels = ["Steps", ...term.headers.map((h) => h || "")];
+      const drawRow = (cells, isHeader) => {
+        doc.setFont("helvetica", isHeader ? "bold" : "normal");
+        const wrapped = cells.map((txt, i) => {
+          const w = (i === 0 ? stepColW : otherColW) - cellPad * 2;
+          return doc.splitTextToSize(String(txt || ""), w);
+        });
+        const maxLines = Math.max(1, ...wrapped.map((l) => l.length));
+        const rowH = maxLines * lineHeight + cellPad * 2;
+        ensureSpace(rowH);
+        // borders
+        doc.setLineWidth(0.5);
+        doc.rect(margin, y, contentW, rowH, "S");
+        for (let i = 1; i <= IEP_TASK_COLS; i++) {
+          doc.line(colX[i], y, colX[i], y + rowH);
+        }
+        // text
+        wrapped.forEach((lines, i) => {
+          doc.text(lines, colX[i] + cellPad, y + cellPad + 8);
+        });
+        y += rowH;
+      };
+
+      drawRow(headerLabels, true);
+      term.rows.forEach((r) => drawRow([r.step, ...r.cols], false));
+
+      // Remarks
+      y += 8;
+      ensureSpace(40);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Remarks :", margin, y + 2);
+      y += 12;
+      doc.setFont("helvetica", "normal");
+      const remarksLines = doc.splitTextToSize(String(term.remarks || ""), contentW - cellPad * 2);
+      const boxH = Math.max(36, remarksLines.length * lineHeight + cellPad * 2);
+      ensureSpace(boxH);
+      doc.setLineWidth(0.5);
+      doc.rect(margin, y, contentW, boxH, "S");
+      doc.text(remarksLines, margin + cellPad, y + cellPad + 8);
+      y += boxH + 14;
+    };
+
+    drawTerm("FIRST TERM", rec.firstTerm);
+    drawTerm("SECOND TERM", rec.secondTerm);
+
+    // Signatures
+    ensureSpace(60);
+    y += 10;
+    const sigColW = contentW / 2;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Signature Of The Teacher : ${rec.signatures.teacher || ""}`,
+      margin,
+      y
+    );
+    doc.text(
+      `Signature Of The Parent : ${rec.signatures.parent || ""}`,
+      margin + sigColW,
+      y
+    );
+
+    doc.save(`${(student?.name || "student").replace(/\s+/g, "_")}-IEP.pdf`);
+  };
+
+  // Editable Task Analysis grid + remarks for one term in the IEP draft
+  const renderIepTermEditor = (termKey, label) => {
+    const term = iepFormDraft?.[termKey];
+    if (!term) return null;
+    return (
+      <div className="mb-8 p-5 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-md">
+        <h3 className="text-lg font-bold text-[#170F49] mb-4">{label}</h3>
+        <div className="mb-2 text-sm font-semibold text-[#170F49]">Task Analysis</div>
+        <div className="overflow-x-auto rounded-xl border border-[#E38B52]/20">
+          <table className="min-w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-[#E38B52]/10">
+                <th className="border border-[#E38B52]/20 px-3 py-2 text-left text-[#170F49] font-semibold w-[40%]">
+                  Steps
+                </th>
+                {term.headers.map((h, ci) => (
+                  <th key={ci} className="border border-[#E38B52]/20 px-1 py-1">
+                    <input
+                      type="text"
+                      value={h}
+                      onChange={(e) => updateIepTermHeader(termKey, ci, e.target.value)}
+                      placeholder={`Col ${ci + 1}`}
+                      className="w-full min-w-[64px] px-2 py-1 rounded-md border border-[#E38B52]/20 bg-white/90 text-center text-[#170F49] font-medium focus:outline-none focus:border-[#E38B52]"
+                    />
+                  </th>
+                ))}
+                <th className="border border-[#E38B52]/20 px-2 py-2 w-10"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {term.rows.map((row, ri) => (
+                <tr key={row.id}>
+                  <td className="border border-[#E38B52]/20 px-1 py-1 align-top">
+                    <textarea
+                      rows={1}
+                      value={row.step}
+                      onChange={(e) => updateIepTermStep(termKey, ri, e.target.value)}
+                      placeholder={`Step ${ri + 1}`}
+                      className="w-full px-2 py-1 rounded-md border border-[#E38B52]/20 bg-white/90 text-[#170F49] resize-y focus:outline-none focus:border-[#E38B52]"
+                    />
+                  </td>
+                  {row.cols.map((c, ci) => (
+                    <td key={ci} className="border border-[#E38B52]/20 px-1 py-1">
+                      <input
+                        type="text"
+                        value={c}
+                        onChange={(e) => updateIepTermCell(termKey, ri, ci, e.target.value)}
+                        className="w-full min-w-[64px] px-2 py-1 rounded-md border border-[#E38B52]/20 bg-white/90 text-center text-[#170F49] focus:outline-none focus:border-[#E38B52]"
+                      />
+                    </td>
+                  ))}
+                  <td className="border border-[#E38B52]/20 px-1 py-1 text-center">
+                    <button
+                      type="button"
+                      onClick={() => removeIepTermRow(termKey, ri)}
+                      title="Remove row"
+                      className="text-red-500 hover:text-red-700 font-bold px-2"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button
+          type="button"
+          onClick={() => addIepTermRow(termKey)}
+          className="mt-3 px-4 py-1.5 rounded-lg bg-white text-[#E38B52] border border-[#E38B52] hover:bg-[#FFF3E8] text-sm"
+        >
+          + Add Step
+        </button>
+        <div className="mt-4">
+          <label className="block text-sm font-semibold text-[#170F49] mb-1">Remarks</label>
+          <textarea
+            rows={3}
+            value={term.remarks}
+            onChange={(e) => updateIepTermRemarks(termKey, e.target.value)}
+            placeholder="Enter remarks for this term"
+            className="w-full px-3 py-2 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] resize-y focus:outline-none focus:border-[#E38B52]"
+          />
+        </div>
+      </div>
+    );
+  };
+
+  // Read-only Task Analysis grid + remarks for one term
+  const renderIepTermView = (term, label) => {
+    if (!term) return null;
+    return (
+      <div className="mb-8 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm">
+        <h3 className="text-lg font-bold text-[#170F49] mb-4">{label}</h3>
+        <div className="mb-2 text-sm font-semibold text-[#170F49]">Task Analysis</div>
+        <div className="overflow-x-auto rounded-xl border border-[#E38B52]/20">
+          <table className="min-w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-[#E38B52]/10">
+                <th className="border border-[#E38B52]/20 px-3 py-2 text-left text-[#170F49] font-semibold w-[40%]">
+                  Steps
+                </th>
+                {term.headers.map((h, ci) => (
+                  <th
+                    key={ci}
+                    className="border border-[#E38B52]/20 px-3 py-2 text-center text-[#170F49] font-semibold"
+                  >
+                    {h || `Col ${ci + 1}`}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {term.rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="border border-[#E38B52]/20 px-3 py-2 text-[#170F49] whitespace-pre-wrap align-top">
+                    {row.step}
+                  </td>
+                  {row.cols.map((c, ci) => (
+                    <td
+                      key={ci}
+                      className="border border-[#E38B52]/20 px-3 py-2 text-center text-[#170F49]"
+                    >
+                      {c}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4">
+          <div className="text-sm font-semibold text-[#170F49] mb-1">Remarks</div>
+          <div className="px-3 py-2 rounded-xl border border-[#E38B52]/20 bg-white/80 text-[#170F49] whitespace-pre-wrap min-h-[44px]">
+            {term.remarks || <span className="text-gray-400">—</span>}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderSummaryContent = (summaryText, isStreaming = false) => {
@@ -5331,21 +5808,23 @@ const addCellToColumn = (columnKey) => {
 
         {/* Tabs */}
         <div className="flex justify-center mb-8">
-          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative w-[925px]">
+          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative w-[1136px]">
             {/* Active Tab Background */}
             <div
               className="absolute h-[calc(100%-8px)] top-[4px] transition-all duration-300 ease-in-out rounded-xl bg-[#E38B52] shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
               style={{
                 left:
                   activeTab === "student-details"
-                    ? "4px"
+                    ? "8px"
                     : activeTab === "case-record"
-                      ? "188px"
+                      ? "196px"
                       : activeTab === "therapy-reports"
-                        ? "372px"
+                        ? "384px"
                         : activeTab === "iep"
-                          ? "556px"
-                          : "740px",
+                          ? "572px"
+                          : activeTab === "iep-form"
+                            ? "760px"
+                            : "948px",
                 width: "180px",
                 background: "linear-gradient(135deg, #E38B52 0%, #E38B52 100%)",
               }}
@@ -5427,7 +5906,7 @@ const addCellToColumn = (columnKey) => {
             >
               Therapy Reports
             </button>
-            {/* IEP Tab */}
+            {/* Term Report Tab (formerly IEP) */}
             <button
               onClick={() => {
                 if (warnIfEditingIep()) return;
@@ -5439,6 +5918,25 @@ const addCellToColumn = (columnKey) => {
               }}
               className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
                 activeTab === "iep"
+                  ? "text-white"
+                  : "text-[#170F49] hover:text-[#E38B52]"
+              }`}
+            >
+              Term Report
+            </button>
+
+            {/* IEP Tab */}
+            <button
+              onClick={() => {
+                if (warnIfEditingIep()) return;
+                if (unsavedTableIndex !== null) {
+                  showToast("Save the current table before changing tabs", "warning");
+                  return;
+                }
+                setActiveTab("iep-form");
+              }}
+              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
+                activeTab === "iep-form"
                   ? "text-white"
                   : "text-[#170F49] hover:text-[#E38B52]"
               }`}
@@ -8230,6 +8728,273 @@ const addCellToColumn = (columnKey) => {
                   })()}
                 </div>
               </div>
+          ) : activeTab === "iep-form" ? (
+            <div className="max-w-6xl mx-auto p-6">
+              <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                Individualized Education Program (IEP)
+              </h2>
+
+              {/* ===================== LIST MODE ===================== */}
+              {iepFormMode === "list" && (
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-[#170F49]">
+                      IEP Records of: <span className="font-semibold">{student?.name}</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={startCreateIepForm}
+                      className="px-5 py-2.5 rounded-lg bg-[#E38B52] text-white hover:bg-[#C8742F] shadow-md transition-all whitespace-nowrap"
+                    >
+                      + New IEP Record
+                    </button>
+                  </div>
+
+                  {iepFormRecords.length === 0 ? (
+                    <div className="text-center py-16 border-2 border-dashed border-[#E38B52]/30 rounded-2xl bg-white/40">
+                      <p className="text-gray-500">No IEP records saved yet.</p>
+                      <button
+                        type="button"
+                        onClick={startCreateIepForm}
+                        className="mt-4 px-5 py-2.5 rounded-lg bg-white text-[#E38B52] border border-[#E38B52] hover:bg-[#FFF3E8]"
+                      >
+                        Create the first IEP
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4">
+                      {iepFormRecords.map((rec) => (
+                        <div
+                          key={rec.id}
+                          className="p-5 border-2 border-[#E38B52]/25 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-md flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+                        >
+                          <div>
+                            <p className="text-[#170F49] font-semibold">
+                              {rec.academicYear ? `Academic Year: ${rec.academicYear}` : "IEP Record"}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {rec.updatedAt
+                                ? `Last updated: ${new Date(rec.updatedAt).toLocaleString()}`
+                                : ""}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openViewIepForm(rec)}
+                              className="px-4 py-2 rounded-lg bg-white text-[#170F49] border border-[#E38B52]/40 hover:bg-[#FFF3E8] text-sm"
+                            >
+                              View
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => startEditIepForm(rec)}
+                              className="px-4 py-2 rounded-lg bg-white text-[#E38B52] border border-[#E38B52] hover:bg-[#FFF3E8] text-sm"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadIepFormPDF(rec)}
+                              className="px-4 py-2 rounded-lg bg-[#E38B52] text-white hover:bg-[#C8742F] text-sm"
+                            >
+                              Download PDF
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIepFormDeleteId(rec.id)}
+                              className="px-4 py-2 rounded-lg bg-white text-red-600 border border-red-300 hover:bg-red-50 text-sm"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ===================== CREATE / EDIT MODE ===================== */}
+              {(iepFormMode === "create" || iepFormMode === "edit") && iepFormDraft && (
+                <div>
+                  <div className="mb-6 p-5 border-2 border-[#E38B52]/30 rounded-2xl bg-white/60 shadow-md">
+                    <h3 className="text-lg font-bold text-[#170F49] mb-3">
+                      {iepFormMode === "create" ? "New IEP Record" : "Edit IEP Record"} for{" "}
+                      <span>{student?.name}</span>
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      <label className="block text-sm font-semibold text-[#170F49] whitespace-nowrap">
+                        Academic Year
+                      </label>
+                      <input
+                        type="text"
+                        value={iepFormDraft.academicYear}
+                        onChange={(e) =>
+                          updateIepDraft((draft) => {
+                            draft.academicYear = e.target.value;
+                            return draft;
+                          })
+                        }
+                        placeholder="e.g. 2025-2026"
+                        className="px-3 py-1.5 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] font-medium w-48 focus:outline-none focus:border-[#E38B52]"
+                      />
+                    </div>
+                  </div>
+
+                  {renderIepTermEditor("firstTerm", "FIRST TERM")}
+                  {renderIepTermEditor("secondTerm", "SECOND TERM")}
+
+                  <div className="mb-8 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-[#170F49] mb-1">
+                        Signature Of The Teacher
+                      </label>
+                      <input
+                        type="text"
+                        value={iepFormDraft.signatures.teacher}
+                        onChange={(e) => updateIepSignature("teacher", e.target.value)}
+                        placeholder="Teacher name / signature"
+                        className="w-full px-3 py-2 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] focus:outline-none focus:border-[#E38B52]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-[#170F49] mb-1">
+                        Signature Of The Parent
+                      </label>
+                      <input
+                        type="text"
+                        value={iepFormDraft.signatures.parent}
+                        onChange={(e) => updateIepSignature("parent", e.target.value)}
+                        placeholder="Parent name / signature"
+                        className="w-full px-3 py-2 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] focus:outline-none focus:border-[#E38B52]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={saveIepForm}
+                      className="px-6 py-2.5 rounded-lg bg-[#E38B52] text-white hover:bg-[#C8742F] shadow-md"
+                    >
+                      {iepFormMode === "create" ? "Save IEP" : "Update IEP"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelIepForm}
+                      className="px-6 py-2.5 rounded-lg bg-white text-[#170F49] border border-gray-300 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ===================== VIEW MODE (read-only) ===================== */}
+              {iepFormMode === "view" && iepFormViewRecord && (
+                <div>
+                  <div className="mb-6 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                      <p className="text-[#170F49] font-semibold text-lg">{student?.name}</p>
+                      {iepFormViewRecord.academicYear && (
+                        <p className="text-sm text-[#170F49]">
+                          Academic Year: {iepFormViewRecord.academicYear}
+                        </p>
+                      )}
+                      {(iepFormViewRecord.updatedAt || iepFormViewRecord.createdAt) && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Last updated:{" "}
+                          {new Date(
+                            iepFormViewRecord.updatedAt || iepFormViewRecord.createdAt
+                          ).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => downloadIepFormPDF(iepFormViewRecord)}
+                        className="px-4 py-2 rounded-lg bg-[#E38B52] text-white hover:bg-[#C8742F] text-sm"
+                      >
+                        Download PDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => startEditIepForm(iepFormViewRecord)}
+                        className="px-4 py-2 rounded-lg bg-white text-[#E38B52] border border-[#E38B52] hover:bg-[#FFF3E8] text-sm"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelIepForm}
+                        className="px-4 py-2 rounded-lg bg-white text-[#170F49] border border-gray-300 hover:bg-gray-50 text-sm"
+                      >
+                        Back to list
+                      </button>
+                    </div>
+                  </div>
+
+                  {renderIepTermView(iepFormViewRecord.firstTerm, "FIRST TERM")}
+                  {renderIepTermView(iepFormViewRecord.secondTerm, "SECOND TERM")}
+
+                  <div className="mb-4 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm grid md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm font-semibold text-[#170F49] mb-1">
+                        Signature Of The Teacher
+                      </div>
+                      <div className="text-[#170F49]">
+                        {iepFormViewRecord.signatures.teacher || (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-[#170F49] mb-1">
+                        Signature Of The Parent
+                      </div>
+                      <div className="text-[#170F49]">
+                        {iepFormViewRecord.signatures.parent || (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Delete confirmation modal */}
+              {iepFormDeleteId !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                  <div className="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4">
+                    <h4 className="text-lg font-bold text-[#170F49] mb-2">Delete IEP Record</h4>
+                    <p className="text-sm text-gray-600 mb-6">
+                      Are you sure you want to delete this IEP record? This action cannot be undone.
+                    </p>
+                    <div className="flex justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIepFormDeleteId(null)}
+                        className="px-4 py-2 rounded-lg bg-white text-[#170F49] border border-gray-300 hover:bg-gray-50 text-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteIepForm(iepFormDeleteId)}
+                        className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : activeTab === "special-education" ? (
             <div className="max-w-6xl mx-auto p-6">
               <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
