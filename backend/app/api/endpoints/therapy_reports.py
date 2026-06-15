@@ -121,6 +121,12 @@ def create_report(
     current_user: schemas.user.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """Create a therapy report for a student."""
+    role = str(getattr(current_user, "role", "") or "").lower()
+    if role == "teacher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Teachers are not authorized to create or enter therapy reports."
+        )
     try:
         # Optionally set teacher_id from current_user if not provided
         if not report_in.teacher_id:
