@@ -4003,7 +4003,7 @@ const addCellToColumn = (columnKey) => {
 
           <div>
             <label className="block text-sm font-semibold text-[#170F49] mb-2">IEP OF THE STUDENT:</label>
-            <textarea value={iepData.iepStudent} onChange={(e) => handleIepInputChange("iepStudent", e.target.value)} placeholder="Enter the Individual Education Program details..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] resize-none" rows={4} />
+            <textarea value={iepData.iepStudent} onChange={(e) => handleIepInputChange("iepStudent", e.target.value)} placeholder="Enter the IEP details of the student..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] resize-none" rows={4} />
           </div>
 
           <div>
@@ -8197,7 +8197,7 @@ const addCellToColumn = (columnKey) => {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8m0-8l-3 3m3-3l3 3M4 6h16" />
                 </svg>
-                Individual Education Program
+                Term Report
               </h2>
             
               <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
@@ -8205,7 +8205,7 @@ const addCellToColumn = (columnKey) => {
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  IEP Report of: <span className="font-semibold ml-1">{student?.name}</span>
+                  Term Report of: <span className="font-semibold ml-1">{student?.name}</span>
                 </h3>
 
                 
@@ -8697,7 +8697,7 @@ const addCellToColumn = (columnKey) => {
                               <textarea
                                 value={iepData.iepStudent}
                                 onChange={(e) => handleIepInputChange("iepStudent", e.target.value)}
-                                placeholder="Enter the Individual Education Program details..."
+                                placeholder="Enter the IEP details of the student..."
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] resize-none"
                                 rows={4}
                                 readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
