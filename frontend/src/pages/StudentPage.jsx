@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { jsPDF } from "jspdf";
 import { useParams } from "react-router-dom";
 import axios from "axios";
@@ -3023,6 +3023,18 @@ const addCellToColumn = (columnKey) => {
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file size (200 KB limit to prevent database bloat)
+      const maxSize = 200 * 1024;
+      if (file.size > maxSize) {
+        showToast(
+          `Photo size exceeds 200KB limit. File size: ${(file.size / 1024).toFixed(2)}KB`,
+          "error"
+        );
+        if (fileInputRef && fileInputRef.current) {
+          fileInputRef.current.value = null;
+        }
+        return;
+      }
       // Revoke previous preview to avoid leaking object URLs
       if (photoPreview) {
         try {
@@ -3117,6 +3129,46 @@ const addCellToColumn = (columnKey) => {
       showToast(`Failed to upload photo: ${errorMessage}`, "error");
     } finally {
       setPhotoUploading(false);
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    if (photoPreview) {
+      // If it's just a local preview, discard it
+      try {
+        URL.revokeObjectURL(photoPreview);
+      } catch (err) {}
+      setPhotoPreview(null);
+      setPhotoFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = null;
+      return;
+    }
+
+    if (!student?.photoUrl && !student?.photo_url) return;
+
+    if (!window.confirm("Are you sure you want to permanently delete this student's photo?")) {
+      return;
+    }
+
+    try {
+      const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+      const token = localStorage.getItem("token");
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+      await axios.delete(`${baseUrl}/api/v1/students/${id}/photo`, config);
+
+      setStudent((prev) => ({
+        ...(prev || {}),
+        photoUrl: null,
+        photo_url: null,
+      }));
+
+      showToast("Photo deleted successfully!", "success");
+      await fetchStudent();
+    } catch (error) {
+      console.error("Error deleting photo:", error);
+      const errorMessage = error.response?.data?.detail || error.message || "Failed to delete photo.";
+      showToast(`Failed to delete photo: ${errorMessage}`, "error");
     }
   };
 
@@ -7449,16 +7501,9 @@ const addCellToColumn = (columnKey) => {
                         </svg>
                       </button>
           
-                      {(student?.photoUrl || photoPreview) && (
+                      {(student?.photoUrl || student?.photo_url || photoPreview) && (
                         <button
-                          onClick={() => {
-                            if (photoPreview) {
-                              URL.revokeObjectURL(photoPreview);
-                              setPhotoPreview(null);
-                              setPhotoFile(null);
-                              if (fileInputRef.current) fileInputRef.current.value = null;
-                            }
-                          }}
+                          onClick={handlePhotoDelete}
                           className="p-2.5 bg-white rounded-lg border border-red-500/30 hover:bg-red-500 hover:border-red-500 transition-all duration-200 shadow-md group"
                           title="Delete Photo"
                         >

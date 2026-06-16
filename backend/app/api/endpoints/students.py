@@ -216,6 +216,14 @@ def upload_student_photo(
         raise HTTPException(status_code=404, detail="Student not found")
 
     contents = file.file.read()
+    # Validate file size (200 KB limit to prevent database bloat)
+    max_size = 200 * 1024
+    if len(contents) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Photo size exceeds 200KB limit. Uploaded file: {len(contents) / 1024:.2f}KB"
+        )
+
     update_data = {"photo": contents}
     updated_student = crud_student.update(db=db, db_obj=db_student, obj_in=update_data)
 
@@ -237,6 +245,34 @@ def upload_student_photo(
             for doc in student_data['documents']
         ]
     return student_data
+
+@router.delete("/{student_id}/photo")
+def delete_student_photo(
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Dict[str, Any]:
+    """
+    Remove/delete a student's photo.
+    """
+    db_student = crud_student.get(db, id=student_id)
+    if not db_student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    update_data = {"photo": None}
+    updated_student = crud_student.update(db=db, db_obj=db_student, obj_in=update_data)
+
+    student_data = {c.name: getattr(updated_student, c.name) for c in updated_student.__table__.columns}
+    student_data['photo_url'] = None
+    student_data.pop('photo', None)
+    # Strip file_data from documents
+    if student_data.get('documents'):
+        student_data['documents'] = [
+            {k: v for k, v in doc.items() if k != 'file_data'}
+            for doc in student_data['documents']
+        ]
+    return student_data
+
 
 @router.put("/{student_id}")
 def update_student(
