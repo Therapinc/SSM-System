@@ -20,7 +20,7 @@ const CLASS_OPTIONS = [
 
 
 
-const TherapistDashboard = () => {
+const TeacherDashboard = () => {
   const navigate = useNavigate();
   const [userName, setUserName] = useState("        ");
   const [activeTab, setActiveTab] = useState("students");
@@ -31,6 +31,7 @@ const TherapistDashboard = () => {
   const [studentSearch, setStudentSearch] = useState("");
   const [allStudents, setAllStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [profileError, setProfileError] = useState("");
 
   const visibleStudents = useMemo(() => {
     let visible = allStudents;
@@ -114,6 +115,7 @@ const TherapistDashboard = () => {
     const fetchStudents = async () => {
       if (!userName) return;
       setStudentsLoading(true);
+      setProfileError("");
       try {
         const { data } = await axios.get(
           `${API_BASE_URL}/api/v1/teachers/me/students`,
@@ -136,6 +138,13 @@ const TherapistDashboard = () => {
         setAllStudents(sortedStudents);
       } catch (err) {
         console.error("Error fetching students:", err);
+        if (err.response?.status === 404) {
+          setProfileError(
+            "Your teacher profile was not found. Please ask the administrator to verify that your login email matches your teacher profile email."
+          );
+        } else {
+          setProfileError("Failed to fetch assigned students. Please try again later.");
+        }
         setAllStudents([]);
       } finally {
         setStudentsLoading(false);
@@ -500,7 +509,11 @@ const TherapistDashboard = () => {
 
           {/* Student List */}
           <div className="grid grid-cols-1 gap-4 px-4">
-            {studentsLoading ? (
+            {profileError ? (
+              <div className="text-center text-red-600 bg-red-50/80 border border-red-200 rounded-2xl p-6 shadow-sm font-medium">
+                {profileError}
+              </div>
+            ) : studentsLoading ? (
               <div className="text-center text-[#6F6C8F]">
                 Loading students...
               </div>
@@ -736,4 +749,4 @@ const TherapistDashboard = () => {
   );
 };
 
-export default TherapistDashboard;
+export default TeacherDashboard;

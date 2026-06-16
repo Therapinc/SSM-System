@@ -195,3 +195,7 @@ class Student(Base):
     drug_history = Column(JSONB, nullable=True)
     # Household composition as a JSONB array of {name, age, education, occupation, health, income}
     household = Column(JSONB, nullable=True)
+    # Special Education & IEP columns
+    iep_data = Column(JSONB, nullable=True)
+    special_education_tables = Column(JSONB, nullable=True)
+    iep_program_records = Column(JSONB, nullable=True)

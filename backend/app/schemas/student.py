@@ -74,6 +74,9 @@ class StudentBase(BaseModel):
     food_allergy: Optional[str] = None
     drug_history: Optional[Any] = None
     household: Optional[Any] = None
+    iep_data: Optional[Any] = None
+    special_education_tables: Optional[Any] = None
+    iep_program_records: Optional[Any] = None
 
     # Case Record Fields
     informant_name: Optional[str] = None

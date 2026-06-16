@@ -815,6 +815,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
   const [iepFormDraft, setIepFormDraft] = useState(null); // current draft being created/edited
   const [iepFormViewRecord, setIepFormViewRecord] = useState(null); // record opened in read-only view
   const [iepFormDeleteId, setIepFormDeleteId] = useState(null); // record pending deletion
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const MONTHS = [
   "January","February","March","April","May","June",
@@ -927,21 +928,14 @@ const [iepData, setIepData] = useState(createEmptyIepData());
 
   // load per-month mapping on mount / when student id changes
   useEffect(() => {
-    const key = `iep_data_student_${id}_by_month`;
-    try {
-      const mapping = JSON.parse(localStorage.getItem(key) || "{}");
-      setSavedIepByMonth(mapping || {});
-      // if a month is already selected, load it
-      if (iepData?.selectedMonth) {
-        const mKey = `${iepData.selectedMonth} ${selectedYear}`;
-        if (mapping?.[mKey]) {
-          setIepData(normalizeIepData(mapping[mKey]));
-        }
+    if (!initialLoadDone) return;
+    if (iepData?.selectedMonth) {
+      const mKey = `${iepData.selectedMonth} ${selectedYear}`;
+      if (savedIepByMonth?.[mKey]) {
+        setIepData(normalizeIepData(savedIepByMonth[mKey]));
       }
-    } catch (e) {
-      console.error("Failed to load IEPs by month:", e);
     }
-  }, [id]);
+  }, [id, savedIepByMonth, initialLoadDone]);
 
   // Load AI summaries from localStorage on mount
   useEffect(() => {
@@ -956,6 +950,63 @@ const [iepData, setIepData] = useState(createEmptyIepData());
       console.error("Failed to load AI summaries from localStorage:", e);
     }
   }, [id]);
+
+  // Sync IEP month data to database
+  useEffect(() => {
+    if (!initialLoadDone || !id) return;
+    const syncIepData = async () => {
+      try {
+        const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+        const token = localStorage.getItem("token");
+        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+        await axios.put(`${baseUrl}/api/v1/students/${id}`, {
+          iep_data: savedIepByMonth
+        }, config);
+        console.debug("Successfully synced IEP data to database");
+      } catch (err) {
+        console.error("Failed to sync IEP data to DB:", err);
+      }
+    };
+    syncIepData();
+  }, [savedIepByMonth, id, initialLoadDone]);
+
+  // Sync Special Education tables to database
+  useEffect(() => {
+    if (!initialLoadDone || !id) return;
+    const syncSpecTables = async () => {
+      try {
+        const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+        const token = localStorage.getItem("token");
+        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+        await axios.put(`${baseUrl}/api/v1/students/${id}`, {
+          special_education_tables: savedTables
+        }, config);
+        console.debug("Successfully synced Special Education tables to database");
+      } catch (err) {
+        console.error("Failed to sync Special Education tables to DB:", err);
+      }
+    };
+    syncSpecTables();
+  }, [savedTables, id, initialLoadDone]);
+
+  // Sync IEP program records to database
+  useEffect(() => {
+    if (!initialLoadDone || !id) return;
+    const syncIepProgramRecords = async () => {
+      try {
+        const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+        const token = localStorage.getItem("token");
+        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+        await axios.put(`${baseUrl}/api/v1/students/${id}`, {
+          iep_program_records: iepFormRecords
+        }, config);
+        console.debug("Successfully synced IEP program records to database");
+      } catch (err) {
+        console.error("Failed to sync IEP program records to DB:", err);
+      }
+    };
+    syncIepProgramRecords();
+  }, [iepFormRecords, id, initialLoadDone]);
 
   const [iepFormVisible, setIepFormVisible] = useState(false);
   const [showIepDeleteConfirm, setShowIepDeleteConfirm] = useState(false);
@@ -1507,7 +1558,6 @@ const addCellToColumn = (columnKey) => {
 
   useEffect(() => {
     if (!id) return;
-    loadIepFormRecords();
     setIepFormMode("list");
     setIepFormDraft(null);
     setIepFormViewRecord(null);
@@ -3515,6 +3565,7 @@ const addCellToColumn = (columnKey) => {
 
   const fetchStudent = async () => {
     try {
+      setInitialLoadDone(false);
       setLoading(true);
       const baseUrl =
         process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -3717,6 +3768,64 @@ const addCellToColumn = (columnKey) => {
         });
       setDevelopmentHistoryDraft("");
       setDrugRows(normalizeDrugRows(mappedForDisplay.drug_history));
+
+      // 1. IEP Data
+      let dbIepData = data.iep_data;
+      const iepKey = `iep_data_student_${id}_by_month`;
+      const localIepRaw = localStorage.getItem(iepKey);
+      let finalIepData = dbIepData;
+      if (!finalIepData && localIepRaw) {
+        try {
+          finalIepData = JSON.parse(localIepRaw);
+        } catch (e) {
+          console.error("Failed to parse local IEP data", e);
+        }
+      }
+      setSavedIepByMonth(finalIepData || {});
+
+      // 2. Special Education Tables
+      let dbSpecTables = data.special_education_tables;
+      const specKey = `special-education-tables:${id}`;
+      const localSpecRaw = localStorage.getItem(specKey);
+      let finalSpecTables = dbSpecTables;
+      if (!finalSpecTables && localSpecRaw) {
+        try {
+          finalSpecTables = JSON.parse(localSpecRaw);
+        } catch (e) {
+          console.error("Failed to parse local SpecEd tables", e);
+        }
+      }
+      if (Array.isArray(finalSpecTables)) {
+        const normalized = finalSpecTables.map((t) => ({
+          ...t,
+          isEditable: t.isEditable === true,
+          assessment_phase: t.assessment_phase || getHighestFilledPhase(t),
+          last_edited_at: t.last_edited_at || null,
+          table_year: t.table_year || (t.report_date ? new Date(t.report_date).getFullYear() : null),
+          quarterEditDates: t.quarterEditDates || {},
+          savedPhases: t.savedPhases || {},
+        }));
+        setSavedTables(normalized);
+      } else {
+        setSavedTables([]);
+      }
+
+      // 3. IEP Program Records
+      let dbIepProgram = data.iep_program_records;
+      const iepProgramKey = `iep_program_student_${id}`;
+      const localIepProgramRaw = localStorage.getItem(iepProgramKey);
+      let finalIepProgram = dbIepProgram;
+      if (!finalIepProgram && localIepProgramRaw) {
+        try {
+          finalIepProgram = JSON.parse(localIepProgramRaw);
+        } catch (e) {
+          console.error("Failed to parse local IEP Program records", e);
+        }
+      }
+      const programList = Array.isArray(finalIepProgram) ? finalIepProgram.map(normalizeIepRecord) : [];
+      setIepFormRecords(programList);
+
+      setInitialLoadDone(true);
     } catch (e) {
       setStudent(null);
       console.error("Failed to fetch student data:", e);
@@ -3776,30 +3885,7 @@ const addCellToColumn = (columnKey) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  useEffect(() => {
-    if (!id) return;
-    try {
-      if (typeof window === "undefined") return;
-      const key = `special-education-tables:${id}`;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        const normalized = parsed.map((t) => ({
-          ...t,
-          isEditable: t.isEditable === true,
-          assessment_phase: t.assessment_phase || getHighestFilledPhase(t),
-          last_edited_at: t.last_edited_at || null,
-          table_year: t.table_year || (t.report_date ? new Date(t.report_date).getFullYear() : null),
-          quarterEditDates: t.quarterEditDates || {},
-          savedPhases: t.savedPhases || {},
-        }));
-        setSavedTables(normalized);
-      }
-    } catch (err) {
-      console.warn("Failed to load saved Special Education tables", err);
-    }
-  }, [id]);
+  // Loaded from DB/localStorage in fetchStudent()
 
   // Load IEP data when component mounts or student ID changes
   useEffect(() => {
