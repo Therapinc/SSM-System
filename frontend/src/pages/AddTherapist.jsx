@@ -497,7 +497,7 @@ const AddTherapist = () => {
                   <option value="">Select Specialization</option>
                   <option value="Speech Therapy">Speech Therapy</option>
                   <option value="Occupational Therapy">Occupational Therapy</option>
-                  <option value="Physical Therapy">Physical Therapy</option>
+                  <option value="Physiotherapy">Physiotherapy</option>
                   <option value="Behavioral Therapy">Behavioral Therapy</option>
                   <option value="Special Education">Special Education</option>
                   <option value="Other">Other</option>

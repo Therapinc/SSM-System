@@ -162,6 +162,7 @@ const TherapistDashboard = () => {
     new Date().toISOString().slice(0, 10),
   );
   const [therapyType, setTherapyType] = useState("Occupational Therapy");
+  const [specialization, setSpecialization] = useState("");
 
   // Define goals for each therapy type
   const getGoalsForTherapyType = (therapy) => {
@@ -362,6 +363,14 @@ const TherapistDashboard = () => {
         });
         if (data?.username) setUserName(data.username);
         else if (data?.email) setUserName(data.email.split("@")[0]);
+        if (data?.specialization) {
+          const spec = data.specialization;
+          if (spec === "Physical Therapy") {
+            setSpecialization("Physiotherapy");
+          } else {
+            setSpecialization(spec);
+          }
+        }
       } catch (err) {
         // silently fail and keep fallback
       }
@@ -784,7 +793,8 @@ const TherapistDashboard = () => {
                           setSelectedStudent(student);
                           setShowReportDialog(true);
                           setReportDate(new Date().toISOString().slice(0, 10));
-                          setTherapyType("Speech Therapy");
+                          const initialType = specialization || "Speech Therapy";
+                          setTherapyType(initialType);
                           setProgressLevel("Excellent");
                         }}
                       >
@@ -922,7 +932,31 @@ const TherapistDashboard = () => {
 
       {showReportDialog && selectedStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowReportDialog(false);
+                setSubmitError(null);
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition"
+              aria-label="Close dialog"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
             <h2 className="text-2xl font-bold text-[#170F49] mb-4 text-center">
               Therapy Report for {selectedStudent.name}
             </h2>
@@ -966,7 +1000,7 @@ const TherapistDashboard = () => {
                   );
 
                   setReportDate(new Date().toISOString().slice(0, 10));
-                  const defaultType = "Speech Therapy";
+                  const defaultType = specialization || "Speech Therapy";
                   setTherapyType(defaultType);
                   setGoalsAchieved(getTherapySections(defaultType));
                   setProgressLevel("Excellent");
@@ -1007,8 +1041,9 @@ const TherapistDashboard = () => {
                   Therapy Type
                 </label>
                 <select
-                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52]"
+                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] disabled:bg-gray-100 disabled:opacity-75"
                   value={therapyType}
+                  disabled={Boolean(specialization)}
                   onChange={(e) => {
                     const newType = e.target.value;
                     setTherapyType(newType);
@@ -1106,23 +1141,23 @@ const TherapistDashboard = () => {
                         </label>
                       </div>
                       <textarea
-                        placeholder="Describe progress (2-3 sentences)"
+                        placeholder="Describe progress"
                         value={goalData.notes}
                         onChange={(e) =>
                           setGoalsAchieved({
                             ...goalsAchieved,
                             [goalKey]: {
                               ...goalsAchieved[goalKey],
-                              notes: e.target.value.substring(0, 250),
+                              notes: e.target.value.substring(0, 1000),
                             },
                           })
                         }
                         className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                        rows="2"
-                        maxLength="250"
+                        rows="3"
+                        maxLength="1000"
                       />
                       <div className="text-xs text-gray-500 mt-1">
-                        {goalData.notes.length}/250
+                        {goalData.notes.length}/1000
                       </div>
                     </div>
                   ))}

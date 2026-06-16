@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext, useMemo } from "react";
 import { jsPDF } from "jspdf";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { formatAadhaar } from "../utils/validation";
-import schoolLogo from "../images/logo.png"
+import schoolLogo from "../images/logo.png";
+import { AuthContext } from "../auth/AuthProvider.jsx";
 
 // Add styles for input-edit class
 const inputEditStyles = `
@@ -694,15 +695,46 @@ const StudentPage = () => {
   const [activeEducationSubsection, setActiveEducationSubsection] =
     useState("self-help");
   const { id } = useParams();
+  const { user } = useContext(AuthContext);
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState([]);
+  const [rawReports, setRawReports] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(false);
+
+  const reports = useMemo(() => {
+    if (!user || user.role !== "therapist") {
+      return rawReports;
+    }
+    const spec = (user.specialization || "").trim().toLowerCase();
+    if (!spec) {
+      return [];
+    }
+    const normalize = (type) => {
+      let t = type.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (t === "physicaltherapy" || t === "physio") return "physiotherapy";
+      return t;
+    };
+    const specNorm = normalize(spec);
+    return rawReports.filter((r) => {
+      const rType = (r.therapy_type || "").trim();
+      return normalize(rType) === specNorm;
+    });
+  }, [rawReports, user]);
   const [visibleCount, setVisibleCount] = useState(5); // show latest 5 by default
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [showSummary, setShowSummary] = useState(false);
   const [selectedTherapyType, setSelectedTherapyType] = useState("");
+  useEffect(() => {
+    if (user && user.role === "therapist" && user.specialization) {
+      const spec = user.specialization;
+      if (spec.toLowerCase() === "physical therapy" || spec.toLowerCase() === "physio") {
+        setSelectedTherapyType("Physiotherapy");
+      } else {
+        setSelectedTherapyType(spec);
+      }
+    }
+  }, [user]);
   const [generatingReport, setGeneratingReport] = useState(false);
   // AI summary related state
   const [aiSummary, setAiSummary] = useState("");
@@ -1339,7 +1371,7 @@ const addCellToColumn = (columnKey) => {
     const titleY = margin + titleTopPadding;
     
     doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold");
     doc.text(
       `TRIMESTER REPORT OF ${String(iepSource?.selectedMonth || "").toUpperCase()}`,
       pageW / 2,
@@ -1348,7 +1380,7 @@ const addCellToColumn = (columnKey) => {
     );
     
     doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     doc.text(`Name : ${student?.name || ""}`, margin, titleY + 20);
     
     const tableTop = titleY + 50;
@@ -1402,7 +1434,7 @@ const addCellToColumn = (columnKey) => {
     
     // header
     doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold");
     const headerTitles = ["ADL SKILLS", "ACADEMIC SKILLS", "BEHAVIOURAL SKILLS"];
     for (let i = 0; i < 3; i++) {
       const hx = tableLeft + i * colWidth + cellPadding;
@@ -1416,7 +1448,7 @@ const addCellToColumn = (columnKey) => {
     
     // render rows
     doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     let y = tableTop + headerH;
     for (let r = 0; r < rowsCount; r++) {
       const rh = rowHeights[r];
@@ -1434,12 +1466,12 @@ const addCellToColumn = (columnKey) => {
     
     // IEP label + REMARKS (moved accordingly)
     doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold");
     doc.text("IEP OF THE STUDENT :", margin, y);
     
     // render IEP textbox content (from saved source)
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     const iepText = String(iepSource?.iepStudent || "");
     if (iepText.trim()) {
       const iepLines = doc.splitTextToSize(iepText, tableWidth - cellPadding * 2);
@@ -1452,7 +1484,7 @@ const addCellToColumn = (columnKey) => {
     y += 28;
 
     doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold");
     doc.text("REMARKS :", margin, y);
     y += 14;
     
@@ -1463,7 +1495,7 @@ const addCellToColumn = (columnKey) => {
     
     // write remarks text inside box with small left padding
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     const remarksText = String(iepSource?.remarks || "");
     const remarksLines = doc.splitTextToSize(remarksText, remarksBoxWidth - cellPadding * 2);
     doc.text(remarksLines, margin + cellPadding, y + 12);
@@ -1485,7 +1517,7 @@ const addCellToColumn = (columnKey) => {
     doc.line(sigX2 + 20, sigLineY, sigX2 + 20 + sigLineLength, sigLineY);
     
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     doc.text("Principal", sigX0 + 20, sigLineY + 14);
     doc.text("Class Teacher", sigX1 + 20, sigLineY + 14);
     doc.text("Parent / Guardian", sigX2 + 20, sigLineY + 14);
@@ -1719,13 +1751,13 @@ const addCellToColumn = (columnKey) => {
 
     // Title
     doc.setFontSize(15);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold");
     doc.text("INDIVIDUALIZED EDUCATION PROGRAM (IEP)", pageW / 2, y + 8, { align: "center" });
     y += 30;
 
     // Student details
     doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     doc.text(`Name : ${student?.name || ""}`, margin, y);
     if (rec.academicYear) {
       doc.text(`Academic Year : ${rec.academicYear}`, pageW - margin, y, { align: "right" });
@@ -1744,10 +1776,10 @@ const addCellToColumn = (columnKey) => {
     if (rec.annualGoal) {
       ensureSpace(40);
       doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
+      doc.setFont("times", "bold");
       doc.text("Annual Goal :", margin, y + 2);
       y += 12;
-      doc.setFont("helvetica", "normal");
+      doc.setFont("times", "normal");
       const annualGoalLines = doc.splitTextToSize(String(rec.annualGoal), contentW);
       doc.text(annualGoalLines, margin, y);
       y += annualGoalLines.length * 12 + 10;
@@ -1761,17 +1793,17 @@ const addCellToColumn = (columnKey) => {
     const drawTerm = (title, term) => {
       ensureSpace(60);
       doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
+      doc.setFont("times", "bold");
       doc.text(title, margin, y + 4);
       y += 16;
 
       if (term.shortTermGoal) {
         ensureSpace(35);
         doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
+        doc.setFont("times", "bold");
         doc.text("Short Term Goal :", margin, y + 2);
         y += 12;
-        doc.setFont("helvetica", "normal");
+        doc.setFont("times", "normal");
         const goalLines = doc.splitTextToSize(String(term.shortTermGoal), contentW);
         doc.text(goalLines, margin, y);
         y += goalLines.length * 12 + 10;
@@ -1779,7 +1811,7 @@ const addCellToColumn = (columnKey) => {
 
       ensureSpace(30);
       doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
+      doc.setFont("times", "bold");
       doc.text("Task Analysis", margin, y + 2);
       y += 12;
 
@@ -1792,7 +1824,7 @@ const addCellToColumn = (columnKey) => {
       doc.setFontSize(9);
       const headerLabels = ["Steps", ...term.headers.map((h) => h || "")];
       const drawRow = (cells, isHeader) => {
-        doc.setFont("helvetica", isHeader ? "bold" : "normal");
+        doc.setFont("times", isHeader ? "bold" : "normal");
         const wrapped = cells.map((txt, i) => {
           const w = (i === 0 ? stepColW : otherColW) - cellPad * 2;
           return doc.splitTextToSize(String(txt || ""), w);
@@ -1820,10 +1852,10 @@ const addCellToColumn = (columnKey) => {
       y += 8;
       ensureSpace(40);
       doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
+      doc.setFont("times", "bold");
       doc.text("Remarks :", margin, y + 2);
       y += 12;
-      doc.setFont("helvetica", "normal");
+      doc.setFont("times", "normal");
       const remarksLines = doc.splitTextToSize(String(term.remarks || ""), contentW - cellPad * 2);
       const boxH = Math.max(36, remarksLines.length * lineHeight + cellPad * 2);
       ensureSpace(boxH);
@@ -1841,7 +1873,7 @@ const addCellToColumn = (columnKey) => {
     y += 10;
     const sigColW = contentW / 2;
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     doc.text(
       `Signature Of The Teacher : ${rec.signatures.teacher || ""}`,
       margin,
@@ -2383,13 +2415,13 @@ const addCellToColumn = (columnKey) => {
 
     // Header
     pdf.setFontSize(18);
-    pdf.setFont(undefined, "bold");
+    pdf.setFont("times", "bold");
     pdf.text("AI Therapy Analysis Report", marginLeft, yPosition);
     yPosition += 10;
 
     // Student Information
     pdf.setFontSize(12);
-    pdf.setFont(undefined, "normal");
+    pdf.setFont("times", "normal");
     pdf.text(`Student: ${student.name || "N/A"}`, marginLeft, yPosition);
     yPosition += 7;
     pdf.text(
@@ -2420,11 +2452,11 @@ const addCellToColumn = (columnKey) => {
     // PROGRESS SUMMARY - Main consolidated report
     if (aiAnalysis.summary) {
       pdf.setFontSize(16);
-      pdf.setFont(undefined, "bold");
+      pdf.setFont("times", "bold");
       pdf.text("PROGRESS SUMMARY", marginLeft, yPosition);
       yPosition += 10;
       pdf.setFontSize(10);
-      pdf.setFont(undefined, "normal");
+      pdf.setFont("times", "normal");
 
       // Split the summary text and handle page breaks
       const summaryLines = pdf.splitTextToSize(
@@ -3912,10 +3944,10 @@ const addCellToColumn = (columnKey) => {
           a.report_date || a.created_at || "",
         ),
       );
-      setReports(list);
+      setRawReports(list);
     } catch (err) {
       console.error("Failed to fetch reports:", err);
-      setReports([]);
+      setRawReports([]);
     } finally {
       setReportsLoading(false);
     }
@@ -4560,7 +4592,7 @@ const addCellToColumn = (columnKey) => {
         }
       
         // center title, shifted down to align with logo
-        doc.setFont("helvetica", "bold");
+        doc.setFont("times", "bold");
         doc.setFontSize(12);
         doc.text(
           "ST. MARTHA'S SPECIAL SCHOOL FOR THE MENTALLY CHALLENGED",
@@ -4569,7 +4601,7 @@ const addCellToColumn = (columnKey) => {
           { align: "center" }
         );
       
-        doc.setFont("helvetica", "normal");
+        doc.setFont("times", "normal");
         doc.setFontSize(8.5);
         doc.text(
           "Reg.No: SJD/4315/2024/RPWD2, Kalpana Road, Chittattumukku P.O. Menamkulam, Trivandrum - 695 301",
@@ -4677,7 +4709,7 @@ const addCellToColumn = (columnKey) => {
         const legendLineGap = 4.3;
         const iconX = legendX + 34;
       
-        doc.setFont("helvetica", "normal");
+        doc.setFont("times", "normal");
         doc.setFontSize(7.2);
       
         doc.text(`Student: ${studentName}`, marginLeft, y, { align: "left" });
@@ -4728,7 +4760,7 @@ const addCellToColumn = (columnKey) => {
         doc.rect(x, yPos, width, height, "FD");
   
         doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-        doc.setFont("helvetica", bold ? "bold" : "normal");
+        doc.setFont("times", bold ? "bold" : "normal");
         doc.setFontSize(fontSize);
   
         const split = doc.splitTextToSize(String(text ?? ""), Math.max(1, width - 1.2));
@@ -4761,7 +4793,7 @@ const addCellToColumn = (columnKey) => {
             doc.setDrawColor(120);
             doc.rect(x, y, w, topRowHeight + secondRowHeight, "FD");
   
-            doc.setFont("helvetica", "bold");
+            doc.setFont("times", "bold");
             doc.setFontSize(6.4);
             doc.setTextColor(55, 55, 55);
             doc.text(String(col.header), x + w / 2, y + 5.2, { align: "center" });
@@ -4788,7 +4820,7 @@ const addCellToColumn = (columnKey) => {
           doc.setDrawColor(120);
           doc.rect(x, y, groupWidth, topRowHeight, "FD");
   
-          doc.setFont("helvetica", "bold");
+          doc.setFont("times", "bold");
           doc.setFontSize(6.4);
           doc.setTextColor(55, 55, 55);
           doc.text(String(col.group), x + groupWidth / 2, y + 3.6, { align: "center" });
@@ -4802,7 +4834,7 @@ const addCellToColumn = (columnKey) => {
             doc.setDrawColor(120);
             doc.rect(innerX, y + topRowHeight, w, secondRowHeight, "FD");
   
-            doc.setFont("helvetica", "bold");
+            doc.setFont("times", "bold");
             doc.setFontSize(6.0);
             doc.text(String(current.subLabel || current.header), innerX + w / 2, y + topRowHeight + 2.8, {
               align: "center",
@@ -5086,24 +5118,24 @@ const addCellToColumn = (columnKey) => {
       }
     }
     doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold");
     doc.text("ST. MARTHA'S SPECIAL SCHOOL", pageWidth / 2, y + 5, {
       align: "center",
     });
     doc.setFontSize(12);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("times", "normal");
     doc.text("FOR THE MENTALLY CHALLENGED", pageWidth / 2, y + 12, {
       align: "center",
     });
     doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold");
     doc.text("STUDENT RECORD FORM", pageWidth / 2, y + 25, { align: "center" });
     y = Math.max(y + 25, imgY + imgHeight) + 5; // --- End Header ---
     const drawField = (label, value) => {
       // Multiline-aware field renderer. Calculates needed box height based on
       // wrapped text and prevents page overflow.
       doc.setFontSize(12);
-      doc.setFont("helvetica", "normal");
+      doc.setFont("times", "normal");
 
       const text = String(value || "");
       const maxTextWidth = boxWidth - 4; // padding inside box
@@ -5137,7 +5169,7 @@ const addCellToColumn = (columnKey) => {
       checkPageBreak();
       y += 5;
       doc.setFontSize(13);
-      doc.setFont("helvetica", "bold");
+      doc.setFont("times", "bold");
       doc.text(title, leftCol, y);
       y += 8;
     };
@@ -5231,20 +5263,20 @@ const addCellToColumn = (columnKey) => {
       checkPageBreak(20); // Check if header fits
       y += sectionGap;
       doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
+      doc.setFont("times", "bold");
       doc.text(title, leftMargin, y);
       y += sectionGap;
-      doc.setFont("helvetica", "normal");
+      doc.setFont("times", "normal");
     };
 
     const drawSubHeader = (title) => {
       checkPageBreak(15);
       y += 4;
       doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
+      doc.setFont("times", "bold");
       doc.text(title, leftMargin, y);
       y += 7;
-      doc.setFont("helvetica", "normal");
+      doc.setFont("times", "normal");
     };
 
     const drawField = (label, value) => {
@@ -5289,7 +5321,7 @@ const addCellToColumn = (columnKey) => {
 
     // Header
     doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold");
     doc.text("CASE RECORD", doc.internal.pageSize.getWidth() / 2, y, {
       align: "center",
     });
@@ -5559,7 +5591,7 @@ const addCellToColumn = (columnKey) => {
       const addText = (text, fontSize = 10, isBold = false) => {
         checkPageBreak(lineHeight + 2);
         doc.setFontSize(fontSize);
-        doc.setFont("helvetica", isBold ? "bold" : "normal");
+        doc.setFont("times", isBold ? "bold" : "normal");
         const lines = doc.splitTextToSize(text, contentWidth);
         lines.forEach((line) => {
           checkPageBreak(lineHeight);
@@ -5589,7 +5621,7 @@ const addCellToColumn = (columnKey) => {
 
       // Header
       doc.setFontSize(18);
-      doc.setFont("helvetica", "bold");
+      doc.setFont("times", "bold");
       doc.text(
         "THERAPY SUMMARY REPORT",
         pageWidth / 2,
@@ -5648,7 +5680,7 @@ const addCellToColumn = (columnKey) => {
               !Array.isArray(report.goals_achieved)
             ) {
               // If it's an object with sections
-              addText("Goals Achieved:", 10, true);
+              addText("Goals Addressed:", 10, true);
               Object.entries(report.goals_achieved).forEach(
                 ([sectionKey, sectionData]) => {
                   // Format section title (e.g., "receptive_language" -> "Receptive Language")
@@ -5666,7 +5698,7 @@ const addCellToColumn = (columnKey) => {
               );
             } else {
               // If it's a simple string
-              addText(`Goals Achieved: ${report.goals_achieved}`, 10);
+              addText(`Goals Addressed: ${report.goals_achieved}`, 10);
             }
           }
           y += 5;
@@ -6305,11 +6337,12 @@ const addCellToColumn = (columnKey) => {
                         <div className="relative flex items-center h-10 w-full">
                           <select
                             value={selectedTherapyType}
+                            disabled={user?.role === "therapist"}
                             onChange={(e) => {
                               setSelectedTherapyType(e.target.value);
                               setVisibleCount(5);
                             }}
-                            className="appearance-none w-full min-w-[110px] h-10 bg-white border border-gray-300 rounded-full focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] text-base text-gray-700 pl-9 pr-6 py-2 shadow-sm transition-all duration-200 cursor-pointer hover:bg-orange-50"
+                            className="appearance-none w-full min-w-[110px] h-10 bg-white border border-gray-300 rounded-full focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] text-base text-gray-700 pl-9 pr-6 py-2 shadow-sm transition-all duration-200 cursor-pointer hover:bg-orange-50 disabled:bg-gray-100 disabled:opacity-75"
                             title="Filter by therapy type"
                             aria-label="Therapy type"
                           >
@@ -6320,7 +6353,7 @@ const addCellToColumn = (columnKey) => {
                             <option value="Occupational Therapy">
                               Occupational
                             </option>
-                            <option value="Physical Therapy">Physical</option>
+                            <option value="Physiotherapy">Physiotherapy</option>
                             <option value="Speech Therapy">Speech</option>
                           </select>
                           <svg
@@ -6562,7 +6595,7 @@ const addCellToColumn = (columnKey) => {
 
                             // Title
                             pdf.setFontSize(18);
-                            pdf.setFont(undefined, "bold");
+                            pdf.setFont("times", "bold");
                             pdf.text(
                               `Therapy Reports - ${student?.name || "Student"}`,
                               marginLeft,
@@ -6572,7 +6605,7 @@ const addCellToColumn = (columnKey) => {
 
                             // Date range
                             pdf.setFontSize(10);
-                            pdf.setFont(undefined, "normal");
+                            pdf.setFont("times", "normal");
                             const dateRangeText =
                               fromDate || toDate
                                 ? `Date Range: ${fromDate || "Start"} to ${toDate || "End"}`
@@ -6604,7 +6637,7 @@ const addCellToColumn = (columnKey) => {
                               }
 
                               pdf.setFontSize(14);
-                              pdf.setFont(undefined, "bold");
+                              pdf.setFont("times", "bold");
                               pdf.text(
                                 `Report ${index + 1}`,
                                 marginLeft,
@@ -6613,7 +6646,7 @@ const addCellToColumn = (columnKey) => {
                               yPosition += 8;
 
                               pdf.setFontSize(10);
-                              pdf.setFont(undefined, "normal");
+                              pdf.setFont("times", "normal");
 
                               pdf.text(
                                 `Date: ${new Date(report.report_date).toLocaleDateString()}`,
@@ -6664,10 +6697,10 @@ const addCellToColumn = (columnKey) => {
                                   pdf.addPage();
                                   yPosition = 20;
                                 }
-                                pdf.setFont(undefined, "bold");
+                                pdf.setFont("times", "bold");
                                 pdf.text(`${label}:`, marginLeft, yPosition);
                                 yPosition += 5;
-                                pdf.setFont(undefined, "normal");
+                                pdf.setFont("times", "normal");
                                 const lines = pdf.splitTextToSize(
                                   String(value),
                                   pageWidth - marginLeft - marginRight,
@@ -6689,14 +6722,14 @@ const addCellToColumn = (columnKey) => {
                                   pdf.addPage();
                                   yPosition = 20;
                                 }
-                                pdf.setFont(undefined, "bold");
+                                pdf.setFont("times", "bold");
                                 pdf.text(
                                   "Progress Notes:",
                                   marginLeft,
                                   yPosition,
                                 );
                                 yPosition += 5;
-                                pdf.setFont(undefined, "normal");
+                                pdf.setFont("times", "normal");
                                 const progressLines = pdf.splitTextToSize(
                                   report.progress_notes,
                                   pageWidth - marginLeft - marginRight,
@@ -6718,67 +6751,54 @@ const addCellToColumn = (columnKey) => {
                                   pdf.addPage();
                                   yPosition = 20;
                                 }
-                                pdf.setFont(undefined, "bold");
+                                pdf.setFont("times", "bold");
                                 pdf.text(
-                                  "Goals Achieved:",
+                                  "Goals Addressed:",
                                   marginLeft,
                                   yPosition,
                                 );
                                 yPosition += 5;
-                                pdf.setFont(undefined, "normal");
+                                pdf.setFont("times", "normal");
 
                                 if (
                                   typeof report.goals_achieved === "object" &&
                                   !Array.isArray(report.goals_achieved)
                                 ) {
-                                  // Iterate through each section (e.g., receptive_language, expressive_language, etc.)
-                                  Object.entries(report.goals_achieved).forEach(
-                                    ([sectionKey, sectionData]) => {
-                                      if (yPosition > pageHeight - 20) {
-                                        pdf.addPage();
-                                        yPosition = 20;
-                                      }
+                                  const activeSections = Object.entries(report.goals_achieved).filter(
+                                    ([_, data]) => data && (data.checked || (data.notes && data.notes.trim()))
+                                  );
 
-                                      // Format section title (e.g., "receptive_language" -> "Receptive Language")
-                                      const sectionTitle = sectionKey
-                                        .split("_")
-                                        .map(
-                                          (word) =>
-                                            word.charAt(0).toUpperCase() +
-                                            word.slice(1),
-                                        )
-                                        .join(" ");
-
-                                      pdf.setFont(undefined, "bold");
-                                      pdf.text(
-                                        ` ${sectionTitle}:`,
-                                        marginLeft + 5,
-                                        yPosition,
-                                      );
-                                      yPosition += 5;
-                                      pdf.setFont(undefined, "normal");
-
-                                      // Handle different data structures
-                                      if (
-                                        typeof sectionData === "object" &&
-                                        sectionData !== null
-                                      ) {
-                                        // If it has a 'checked' property, show status
-                                        if ("checked" in sectionData) {
-                                          if (!sectionData.checked) {
-                                            pdf.text(
-                                              "No data entered",
-                                              marginLeft + 10,
-                                              yPosition,
-                                            );
-                                            yPosition += 5;
-                                          }
+                                  if (activeSections.length > 0) {
+                                    activeSections.forEach(
+                                      ([sectionKey, sectionData]) => {
+                                        if (yPosition > pageHeight - 20) {
+                                          pdf.addPage();
+                                          yPosition = 20;
                                         }
+
+                                        // Format section title (e.g., "receptive_language" -> "Receptive Language")
+                                        const sectionTitle = sectionKey
+                                          .split("_")
+                                          .map(
+                                            (word) =>
+                                              word.charAt(0).toUpperCase() +
+                                              word.slice(1),
+                                          )
+                                          .join(" ");
+
+                                        pdf.setFont("times", "bold");
+                                        pdf.text(
+                                          ` ${sectionTitle}:`,
+                                          marginLeft + 5,
+                                          yPosition,
+                                        );
+                                        yPosition += 5;
+                                        pdf.setFont("times", "normal");
 
                                         // If it has notes, display them
                                         if (sectionData.notes) {
                                           const noteLines = pdf.splitTextToSize(
-                                            `Notes: ${sectionData.notes}`,
+                                            sectionData.notes,
                                             pageWidth -
                                               marginLeft -
                                               marginRight -
@@ -6796,37 +6816,30 @@ const addCellToColumn = (columnKey) => {
                                             );
                                             yPosition += 5;
                                           });
-                                        }
-                                      } else if (
-                                        typeof sectionData === "string"
-                                      ) {
-                                        // Simple string value
-                                        const dataLines = pdf.splitTextToSize(
-                                          sectionData,
-                                          pageWidth -
-                                            marginLeft -
-                                            marginRight -
-                                            15,
-                                        );
-                                        dataLines.forEach((line) => {
-                                          if (yPosition > pageHeight - 20) {
-                                            pdf.addPage();
-                                            yPosition = 20;
-                                          }
+                                        } else {
+                                          // Checked but no notes
                                           pdf.text(
-                                            line,
+                                            "Addressed",
                                             marginLeft + 10,
                                             yPosition,
                                           );
                                           yPosition += 5;
-                                        });
-                                      }
+                                        }
 
-                                      yPosition += 2;
-                                    },
-                                  );
+                                        yPosition += 2;
+                                      },
+                                    );
+                                  } else {
+                                    pdf.text(
+                                      "No goals addressed",
+                                      marginLeft + 5,
+                                      yPosition,
+                                    );
+                                    yPosition += 5;
+                                  }
                                 } else if (
-                                  typeof report.goals_achieved === "string"
+                                  typeof report.goals_achieved === "string" &&
+                                  report.goals_achieved.trim()
                                 ) {
                                   // If goals_achieved is just a string
                                   const goalLines = pdf.splitTextToSize(
@@ -6841,6 +6854,13 @@ const addCellToColumn = (columnKey) => {
                                     pdf.text(line, marginLeft + 5, yPosition);
                                     yPosition += 5;
                                   });
+                                } else {
+                                  pdf.text(
+                                    "No goals addressed",
+                                    marginLeft + 5,
+                                    yPosition,
+                                  );
+                                  yPosition += 5;
                                 }
                                 yPosition += 3;
                               }
@@ -6851,10 +6871,10 @@ const addCellToColumn = (columnKey) => {
                                   pdf.addPage();
                                   yPosition = 20;
                                 }
-                                pdf.setFont(undefined, "bold");
+                                pdf.setFont("times", "bold");
                                 pdf.text("Challenges:", marginLeft, yPosition);
                                 yPosition += 5;
-                                pdf.setFont(undefined, "normal");
+                                pdf.setFont("times", "normal");
                                 const challengeLines = pdf.splitTextToSize(
                                   report.challenges,
                                   pageWidth - marginLeft - marginRight,
@@ -6876,14 +6896,14 @@ const addCellToColumn = (columnKey) => {
                                   pdf.addPage();
                                   yPosition = 20;
                                 }
-                                pdf.setFont(undefined, "bold");
+                                pdf.setFont("times", "bold");
                                 pdf.text(
                                   "Recommendations:",
                                   marginLeft,
                                   yPosition,
                                 );
                                 yPosition += 5;
-                                pdf.setFont(undefined, "normal");
+                                pdf.setFont("times", "normal");
                                 const recLines = pdf.splitTextToSize(
                                   report.recommendations,
                                   pageWidth - marginLeft - marginRight,
@@ -6905,10 +6925,10 @@ const addCellToColumn = (columnKey) => {
                                   pdf.addPage();
                                   yPosition = 20;
                                 }
-                                pdf.setFont(undefined, "bold");
+                                pdf.setFont("times", "bold");
                                 pdf.text("Next Goals:", marginLeft, yPosition);
                                 yPosition += 5;
-                                pdf.setFont(undefined, "normal");
+                                pdf.setFont("times", "normal");
                                 const nextGoalLines = pdf.splitTextToSize(
                                   report.next_goals,
                                   pageWidth - marginLeft - marginRight,
@@ -7392,7 +7412,7 @@ const addCellToColumn = (columnKey) => {
                                 {r.goals_achieved && (
                                   <div>
                                     <div className="text-xs text-[#6F6C90] font-semibold mb-2">
-                                      Goals Achieved
+                                      Goals Addressed
                                     </div>
                                     <div className="space-y-2">
                                       {typeof r.goals_achieved === "object" ? (

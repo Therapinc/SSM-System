@@ -113,6 +113,86 @@ def _get_filtered_reports_for_payload(db: Session, payload: TherapyAISummaryRequ
 
 
 
+def _populate_therapist_names(db: Session, reports: List[Any]):
+    if not reports:
+        return
+    # Get all unique teacher_ids
+    user_ids = {r.teacher_id for r in reports if r.teacher_id}
+    if not user_ids:
+        return
+    
+    # Query users
+    from app.models.user import User
+    from sqlalchemy import func
+    users = db.query(User).filter(User.id.in_(user_ids)).all()
+    user_map = {u.id: u for u in users}
+    
+    # Gather emails by role to lookup names
+    therapist_emails = []
+    teacher_emails = []
+    
+    for u in users:
+        role = (u.role or "").lower()
+        if role == "therapist":
+            therapist_emails.append(u.email.lower())
+        elif role == "teacher":
+            teacher_emails.append(u.email.lower())
+            
+    # Lookup therapist names
+    therapist_names = {}
+    if therapist_emails:
+        from app.models.therapist import Therapist
+        therapists = db.query(Therapist.email, Therapist.name).filter(
+            func.lower(Therapist.email).in_(therapist_emails)
+        ).all()
+        therapist_names = {t.email.lower(): t.name for t in therapists if t.email}
+        
+    # Lookup teacher names
+    teacher_names = {}
+    if teacher_emails:
+        from app.models.teacher import Teacher
+        teachers = db.query(Teacher.email, Teacher.name).filter(
+            func.lower(Teacher.email).in_(teacher_emails)
+        ).all()
+        teacher_names = {t.email.lower(): t.name for t in teachers if t.email}
+        
+    # Assign therapist_name to each report object
+    for r in reports:
+        if not r.teacher_id:
+            r.therapist_name = "N/A"
+            continue
+        u = user_map.get(r.teacher_id)
+        if not u:
+            r.therapist_name = "N/A"
+            continue
+            
+        role = (u.role or "").lower()
+        email_lower = u.email.lower() if u.email else ""
+        
+        if role == "therapist" and email_lower in therapist_names:
+            r.therapist_name = therapist_names[email_lower]
+        elif role == "teacher" and email_lower in teacher_names:
+            r.therapist_name = teacher_names[email_lower]
+        else:
+            r.therapist_name = u.username or u.email or "N/A"
+
+
+def _get_therapist_specialization(db: Session, email: str) -> Optional[str]:
+    from app.models.therapist import Therapist
+    from sqlalchemy import func
+    therapist = db.query(Therapist).filter(func.lower(Therapist.email) == email.lower()).first()
+    return therapist.specialization if therapist else None
+
+
+def _normalize_therapy_type(t_type: Optional[str]) -> str:
+    if not t_type:
+        return ""
+    t = re.sub(r"[^a-z0-9]", "", t_type.lower())
+    if t in ("physicaltherapy", "physio"):
+        return "physiotherapy"
+    return t
+
+
 @router.post("/", response_model=schemas.therapy_report.TherapyReport)
 def create_report(
     *,
@@ -127,6 +207,18 @@ def create_report(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Teachers are not authorized to create or enter therapy reports."
         )
+    if role == "therapist":
+        specialization = _get_therapist_specialization(db, current_user.email)
+        if not specialization:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Therapists must have a specialization assigned to enter reports."
+            )
+        if _normalize_therapy_type(report_in.therapy_type) != _normalize_therapy_type(specialization):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You are only authorized to enter reports under your therapy type: {specialization}."
+            )
     try:
         # Optionally set teacher_id from current_user if not provided
         if not report_in.teacher_id:
@@ -149,7 +241,10 @@ def create_report(
         # Create the report
         report = crud.therapy_report.create(db, obj_in=report_in)
         logging.info(f"Successfully created therapy report for student {report_in.student_id}")
+        _populate_therapist_names(db, [report])
         return report
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error(f"Error creating therapy report: {str(e)}")
         raise HTTPException(
@@ -166,7 +261,18 @@ def list_reports_for_student(
 ) -> Any:
     """List therapy reports for a student."""
     # Authorization can be added (e.g., only teacher or admin)
-    return crud.therapy_report.get_by_student(db, student_id=student_id)
+    reports = crud.therapy_report.get_by_student(db, student_id=student_id)
+    _populate_therapist_names(db, reports)
+    
+    role = str(getattr(current_user, "role", "") or "").lower()
+    if role == "therapist":
+        specialization = _get_therapist_specialization(db, current_user.email)
+        if specialization:
+            spec_norm = _normalize_therapy_type(specialization)
+            reports = [r for r in reports if _normalize_therapy_type(r.therapy_type) == spec_norm]
+        else:
+            reports = []
+    return reports
 
 
 @router.post("/summary/ai/test", response_model=TherapyAISummaryResponse)
@@ -205,6 +311,16 @@ def ai_summarize_reports(
     if not settings.GEMINI_API_KEY:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY environment variable not set on server.")
 
+    role = str(getattr(current_user, "role", "") or "").lower()
+    if role == "therapist":
+        specialization = _get_therapist_specialization(db, current_user.email)
+        if not specialization:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Therapists must have a specialization assigned to generate AI summaries."
+            )
+        payload.therapy_type = specialization
+
     db_student, filtered = _get_filtered_reports_for_payload(db, payload)
     
     # Generate comprehensive analysis based on actual data
@@ -221,6 +337,16 @@ def ai_summarize_reports_stream(
     """Stream main summary progressively, then return full AI analysis as final event."""
     if not settings.GEMINI_API_KEY:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY environment variable not set on server.")
+
+    role = str(getattr(current_user, "role", "") or "").lower()
+    if role == "therapist":
+        specialization = _get_therapist_specialization(db, current_user.email)
+        if not specialization:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Therapists must have a specialization assigned to generate AI summaries."
+            )
+        payload.therapy_type = specialization
 
     db_student, filtered = _get_filtered_reports_for_payload(db, payload)
 
@@ -540,7 +666,7 @@ def _build_structured_summary_fallback(reports, student):
             "Activities of Daily Living (ADL)",
             "Handwriting & Pre-Academic Skills",
         ],
-        "Physical Therapy": [
+        "Physiotherapy": [
             "Gross Motor Skills",
             "Balance & Postural Control",
             "Strength & Endurance",
@@ -1521,7 +1647,7 @@ def _build_main_summary_prompt_with_fewshot(reports, student):
             "Activities of Daily Living (ADL)",
             "Handwriting & Pre-Academic Skills"
         ],
-        "Physical Therapy": [
+        "Physiotherapy": [
             "Gross Motor Skills",
             "Balance & Postural Control",
             "Strength & Endurance",
@@ -1546,7 +1672,7 @@ def _build_main_summary_prompt_with_fewshot(reports, student):
         "Gross Motor Skills": "Gross Motor Skills",  
         "Daily Living Activities": "Activities of Daily Living (ADL)",
         "Sensory Integration": "Sensory Processing & Integration",
-        # Physical Therapy aliases
+        # Physiotherapy aliases
         "Strength & Endurance": "Strength & Endurance",
         "Flexibility & Range of Motion": "Coordination & Motor Planning",
         "Balance & Coordination": "Balance & Postural Control",

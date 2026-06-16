@@ -60,7 +60,14 @@ def change_password(
 
 @router.get("/me", response_model=schemas.User)
 def read_current_user(
+    db: Session = Depends(deps.get_db),
     current_user: schemas.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """Return the current authenticated user"""
+    if current_user and str(current_user.role).lower() == "therapist":
+        from app.models.therapist import Therapist
+        from sqlalchemy import func
+        therapist = db.query(Therapist).filter(func.lower(Therapist.email) == current_user.email.lower()).first()
+        if therapist:
+            current_user.specialization = therapist.specialization
     return current_user

@@ -27,7 +27,7 @@ class UserInDBBase(UserBase):
         from_attributes = True
 
 class User(UserInDBBase):
-    pass
+    specialization: Optional[str] = None
 
 class UserInDB(UserInDBBase):
     hashed_password: str

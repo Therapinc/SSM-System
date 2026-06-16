@@ -64,6 +64,7 @@ class TherapyReport(TherapyReportBase):
     id: int
     student_id: int
     teacher_id: Optional[int] = None
+    therapist_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
