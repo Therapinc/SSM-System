@@ -1505,11 +1505,13 @@ const addCellToColumn = (columnKey) => {
       cols: Array.from({ length: IEP_TASK_COLS }, () => ""),
     })),
     remarks: "",
+    shortTermGoal: "",
   });
 
   const createEmptyIepForm = () => ({
     id: null,
     academicYear: "",
+    annualGoal: "",
     firstTerm: createEmptyIepTerm(8),
     secondTerm: createEmptyIepTerm(7),
     signatures: { teacher: "", parent: "" },
@@ -1528,12 +1530,13 @@ const addCellToColumn = (columnKey) => {
         cols: base.headers.map((_, i) => row?.cols?.[i] ?? ""),
       })
     );
-    return { headers, rows, remarks: term.remarks ?? "" };
+    return { headers, rows, remarks: term.remarks ?? "", shortTermGoal: term.shortTermGoal ?? "" };
   };
 
   const normalizeIepRecord = (rec = {}) => ({
     ...createEmptyIepForm(),
     ...rec,
+    annualGoal: rec.annualGoal ?? "",
     firstTerm: normalizeIepTerm(rec.firstTerm, 8),
     secondTerm: normalizeIepTerm(rec.secondTerm, 7),
     signatures: {
@@ -1635,6 +1638,12 @@ const addCellToColumn = (columnKey) => {
       return draft;
     });
 
+  const updateIepTermShortTermGoal = (term, value) =>
+    updateIepDraft((draft) => {
+      draft[term] = { ...draft[term], shortTermGoal: value };
+      return draft;
+    });
+
   const addIepTermRow = (term) =>
     updateIepDraft((draft) => {
       const t = { ...draft[term] };
@@ -1732,6 +1741,18 @@ const addCellToColumn = (columnKey) => {
     }
     y += 6;
 
+    if (rec.annualGoal) {
+      ensureSpace(40);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Annual Goal :", margin, y + 2);
+      y += 12;
+      doc.setFont("helvetica", "normal");
+      const annualGoalLines = doc.splitTextToSize(String(rec.annualGoal), contentW);
+      doc.text(annualGoalLines, margin, y);
+      y += annualGoalLines.length * 12 + 10;
+    }
+
     const lineHeight = 11;
     const cellPad = 4;
     const stepColW = contentW * 0.46;
@@ -1743,7 +1764,22 @@ const addCellToColumn = (columnKey) => {
       doc.setFont("helvetica", "bold");
       doc.text(title, margin, y + 4);
       y += 16;
+
+      if (term.shortTermGoal) {
+        ensureSpace(35);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("Short Term Goal :", margin, y + 2);
+        y += 12;
+        doc.setFont("helvetica", "normal");
+        const goalLines = doc.splitTextToSize(String(term.shortTermGoal), contentW);
+        doc.text(goalLines, margin, y);
+        y += goalLines.length * 12 + 10;
+      }
+
+      ensureSpace(30);
       doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
       doc.text("Task Analysis", margin, y + 2);
       y += 12;
 
@@ -1827,6 +1863,18 @@ const addCellToColumn = (columnKey) => {
     return (
       <div className="mb-8 p-5 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-md">
         <h3 className="text-lg font-bold text-[#170F49] mb-4">{label}</h3>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-semibold text-[#170F49] mb-1">Short Term Goal</label>
+          <textarea
+            rows={2}
+            value={term.shortTermGoal || ""}
+            onChange={(e) => updateIepTermShortTermGoal(termKey, e.target.value)}
+            placeholder={`Enter short term goal for ${label.toLowerCase()}`}
+            className="w-full px-3 py-2 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] resize-y focus:outline-none focus:border-[#E38B52]"
+          />
+        </div>
+
         <div className="mb-2 text-sm font-semibold text-[#170F49]">Task Analysis</div>
         <div className="overflow-x-auto rounded-xl border border-[#E38B52]/20">
           <table className="min-w-full border-collapse text-sm">
@@ -1913,6 +1961,14 @@ const addCellToColumn = (columnKey) => {
     return (
       <div className="mb-8 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm">
         <h3 className="text-lg font-bold text-[#170F49] mb-4">{label}</h3>
+        
+        {term.shortTermGoal && (
+          <div className="mb-4">
+            <div className="text-sm font-semibold text-[#170F49] mb-1">Short Term Goal</div>
+            <div className="text-[#170F49] whitespace-pre-wrap font-medium">{term.shortTermGoal}</div>
+          </div>
+        )}
+
         <div className="mb-2 text-sm font-semibold text-[#170F49]">Task Analysis</div>
         <div className="overflow-x-auto rounded-xl border border-[#E38B52]/20">
           <table className="min-w-full border-collapse text-sm">
@@ -8974,6 +9030,23 @@ const addCellToColumn = (columnKey) => {
                         className="px-3 py-1.5 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] font-medium w-48 focus:outline-none focus:border-[#E38B52]"
                       />
                     </div>
+                    <div className="flex flex-col gap-2 mt-4">
+                      <label className="block text-sm font-semibold text-[#170F49]">
+                        Annual Goal
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={iepFormDraft.annualGoal || ""}
+                        onChange={(e) =>
+                          updateIepDraft((draft) => {
+                            draft.annualGoal = e.target.value;
+                            return draft;
+                          })
+                        }
+                        placeholder="Enter the annual goal for the student"
+                        className="w-full px-3 py-2 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] resize-y focus:outline-none focus:border-[#E38B52]"
+                      />
+                    </div>
                   </div>
 
                   {renderIepTermEditor("firstTerm", "FIRST TERM")}
@@ -9069,6 +9142,17 @@ const addCellToColumn = (columnKey) => {
                       </button>
                     </div>
                   </div>
+
+                  {iepFormViewRecord.annualGoal && (
+                    <div className="mb-6 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm">
+                      <div className="text-sm font-semibold text-[#170F49] mb-2">
+                        Annual Goal
+                      </div>
+                      <div className="text-[#170F49] whitespace-pre-wrap font-medium">
+                        {iepFormViewRecord.annualGoal}
+                      </div>
+                    </div>
+                  )}
 
                   {renderIepTermView(iepFormViewRecord.firstTerm, "FIRST TERM")}
                   {renderIepTermView(iepFormViewRecord.secondTerm, "SECOND TERM")}

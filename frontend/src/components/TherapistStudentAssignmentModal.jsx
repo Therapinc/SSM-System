@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import axios from "axios";
 import { useDebouncedValue } from "../utils/useDebouncedValue";
 
@@ -18,6 +18,8 @@ const TherapistStudentAssignmentModal = ({
   const [students, setStudents] = useState([]);
   const [teacherScopeStudents, setTeacherScopeStudents] = useState([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
+  const [initialStudentIds, setInitialStudentIds] = useState(new Set());
+  const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -42,6 +44,9 @@ const TherapistStudentAssignmentModal = ({
     setViewMode("all");
     setBrowsePage(1);
     setTeacherScopeStudents([]);
+    setSelectedStudentIds(new Set());
+    setInitialStudentIds(new Set());
+    setShowConfirmClose(false);
   }, [open, therapist?.id]);
 
   useEffect(() => {
@@ -61,7 +66,9 @@ const TherapistStudentAssignmentModal = ({
           return;
         }
 
-        setSelectedStudentIds(new Set((response.data || []).map((student) => student.id)));
+        const ids = new Set((response.data || []).map((student) => student.id));
+        setSelectedStudentIds(ids);
+        setInitialStudentIds(ids);
       } catch (requestError) {
         if (!cancelled) {
           console.error("Error loading therapist assignments:", requestError);
@@ -199,6 +206,22 @@ const TherapistStudentAssignmentModal = ({
     };
   }, [open, therapist?.id, teacherScope, debouncedSearchTerm, selectedClass, browsePage]);
 
+  const hasChanges = useMemo(() => {
+    if (initialStudentIds.size !== selectedStudentIds.size) return true;
+    for (let id of selectedStudentIds) {
+      if (!initialStudentIds.has(id)) return true;
+    }
+    return false;
+  }, [initialStudentIds, selectedStudentIds]);
+
+  const handleCloseAttempt = useCallback(() => {
+    if (hasChanges) {
+      setShowConfirmClose(true);
+    } else {
+      onClose();
+    }
+  }, [hasChanges, onClose]);
+
   useEffect(() => {
     if (!open) {
       return;
@@ -206,13 +229,13 @@ const TherapistStudentAssignmentModal = ({
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
-        onClose();
+        handleCloseAttempt();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+  }, [open, handleCloseAttempt]);
 
   const browseListStudents = useMemo(() => {
     if (teacherScope) {
@@ -327,7 +350,7 @@ const TherapistStudentAssignmentModal = ({
   }
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 px-4 py-6">
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 px-4 py-6 overflow-y-auto">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.28)]">
         <div className="border-b border-slate-100 bg-gradient-to-r from-[#fff6ef] to-[#fffaf6] px-4 py-3 sm:px-5">
           <div className="flex items-start justify-between gap-3">
@@ -349,7 +372,7 @@ const TherapistStudentAssignmentModal = ({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleCloseAttempt}
               className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:text-slate-800"
               aria-label="Close assignment modal"
             >
@@ -358,19 +381,44 @@ const TherapistStudentAssignmentModal = ({
           </div>
         </div>
 
-        <div className="grid flex-1 gap-4 overflow-hidden px-4 py-3 sm:px-5 lg:grid-cols-[280px_1fr] lg:gap-5">
-          <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-3 lg:sticky lg:top-3 lg:self-start">
+        <div className="grid flex-1 min-h-0 gap-4 overflow-y-auto lg:overflow-hidden px-4 py-3 sm:px-5 lg:grid-cols-[280px_1fr] lg:gap-5">
+          <div className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-3 lg:sticky lg:top-3 lg:self-start lg:max-h-full lg:overflow-y-auto">
             <div>
               <label className="block text-sm font-semibold text-[#170F49]">
                 Search students
               </label>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search by name, admission no, or student ID"
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#170F49] outline-none transition focus:border-[#E38B52] focus:ring-4 focus:ring-[#E38B52]/15"
-              />
+              <div className="relative mt-2 w-full">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search by name, admission no, or student ID"
+                  className="w-full rounded-2xl border border-slate-200 bg-white pl-3 pr-10 py-2.5 text-sm text-[#170F49] outline-none transition focus:border-[#E38B52] focus:ring-4 focus:ring-[#E38B52]/15"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400 hover:text-slate-600 transition"
+                    aria-label="Clear search"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
 
             {!teacherScope && (
@@ -474,7 +522,7 @@ const TherapistStudentAssignmentModal = ({
             </p>
           </div>
 
-          <div className="flex min-h-[460px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white">
+          <div className="flex h-full min-h-0 lg:min-h-[460px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white">
             <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
               <p className="text-sm text-[#6F6C8F]">
                 Use the checklist to assign or unassign multiple students at once.
@@ -621,7 +669,7 @@ const TherapistStudentAssignmentModal = ({
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleCloseAttempt}
                   className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-[#170F49] transition hover:bg-slate-50"
                 >
                   Cancel
@@ -643,6 +691,35 @@ const TherapistStudentAssignmentModal = ({
           </div>
         </div>
       </div>
+      {showConfirmClose && (
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-3xl p-6 shadow-[0_20px_60px_rgba(15,23,42,0.3)] max-w-md w-full border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <h4 className="text-lg font-bold text-[#170F49] mb-2">Unsaved Changes</h4>
+            <p className="text-sm text-[#6F6C8F] mb-6 leading-relaxed">
+              You have unsaved student assignment changes. Are you sure you want to close and discard these changes?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowConfirmClose(false)}
+                className="px-5 py-2.5 rounded-2xl bg-white text-[#170F49] border border-slate-200 hover:bg-slate-50 text-sm font-semibold transition"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmClose(false);
+                  onClose();
+                }}
+                className="px-5 py-2.5 rounded-2xl bg-[#E38B52] text-white hover:bg-[#C8742F] text-sm font-semibold shadow-sm transition"
+              >
+                Discard Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
