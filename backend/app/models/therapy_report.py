@@ -22,11 +22,11 @@ class TherapyReport(Base):
     
     # Store individual goals with checkboxes and notes
     goals_achieved = Column(JSON, nullable=True, default={
-        "receptive_language": {"checked": False, "notes": ""},
-        "expressive_language": {"checked": False, "notes": ""},
-        "oral_motor_opt": {"checked": False, "notes": ""},
-        "pragmatic_language": {"checked": False, "notes": ""},
-        "narrative_skills": {"checked": False, "notes": ""}
+        "receptive_language": {"checked": False, "notes": "", "response": ""},
+        "expressive_language": {"checked": False, "notes": "", "response": ""},
+        "oral_motor_opt": {"checked": False, "notes": "", "response": ""},
+        "pragmatic_language": {"checked": False, "notes": "", "response": ""},
+        "narrative_skills": {"checked": False, "notes": "", "response": ""}
     })
     
     progress_level = Column(String, nullable=True)

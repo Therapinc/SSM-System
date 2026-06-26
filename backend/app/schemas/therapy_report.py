@@ -8,6 +8,7 @@ class GoalItem(BaseModel):
     """Individual goal with checkbox and notes"""
     checked: bool = False
     notes: str = ""
+    response: str = ""
 
 
 class TherapyReportBase(BaseModel):

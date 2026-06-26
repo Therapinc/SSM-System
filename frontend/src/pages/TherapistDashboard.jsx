@@ -12,26 +12,31 @@ const getTherapySections = (therapyType) => {
       receptive_language: {
         checked: false,
         notes: "",
+        response: "",
         label: "Receptive Language Skills (Comprehension)",
       },
       expressive_language: {
         checked: false,
         notes: "",
+        response: "",
         label: "Expressive Language Skills",
       },
       oral_motor_opt: {
         checked: false,
         notes: "",
+        response: "",
         label: "Oral Motor & Oral Placement Therapy (OPT) Goals",
       },
       pragmatic_language: {
         checked: false,
         notes: "",
+        response: "",
         label: "Pragmatic Language Skills (Social Communication)",
       },
       narrative_skills: {
         checked: false,
         notes: "",
+        response: "",
         label: "Narrative Skills",
       },
     },
@@ -39,26 +44,31 @@ const getTherapySections = (therapyType) => {
       behavior_regulation: {
         checked: false,
         notes: "",
+        response: "",
         label: "Behavior Regulation & Self-Control",
       },
       attention_compliance: {
         checked: false,
         notes: "",
+        response: "",
         label: "Attention, Compliance & Task Engagement",
       },
       emotional_regulation: {
         checked: false,
         notes: "",
+        response: "",
         label: "Emotional Regulation Skills",
       },
       social_behavior: {
         checked: false,
         notes: "",
+        response: "",
         label: "Social Behavior & Interaction Skills",
       },
       adaptive_behavior: {
         checked: false,
         notes: "",
+        response: "",
         label: "Adaptive Behavior & Functional Skills",
       },
     },
@@ -66,86 +76,102 @@ const getTherapySections = (therapyType) => {
       attention_concentration: {
         checked: false,
         notes: "",
+        response: "",
         label: "Attention & Concentration Skills",
       },
       memory_recall: {
         checked: false,
         notes: "",
+        response: "",
         label: "Memory & Recall Skills",
       },
       problem_solving: {
         checked: false,
         notes: "",
+        response: "",
         label: "Problem Solving & Reasoning Skills",
       },
       executive_functioning: {
         checked: false,
         notes: "",
+        response: "",
         label: "Executive Functioning Skills",
       },
       cognitive_flexibility: {
         checked: false,
         notes: "",
+        response: "",
         label: "Cognitive Flexibility & Processing Skills",
       },
     },
     "Occupational Therapy": {
-  daily_living_adl: {
-    checked: false,
-    notes: "",
-    label: "Activities of Daily Living (ADL)",
-  },
-  sensory_integration_modulation: {
-    checked: false,
-    notes: "",
-    label: "Sensory Integration and Modulation",
-  },
-  neuro_cognitive_rehabilitation: {
-    checked: false,
-    notes: "",
-    label: "Neuro-Cognitive Rehabilitation",
-  },
-  fine_motor_hand_function: {
-    checked: false,
-    notes: "",
-    label: "Fine Motor and Hand Function",
-  },
-  gross_motor_coordination_balance: {
-    checked: false,
-    notes: "",
-    label: "Gross Motor Coordination and Balance",
-  },
-  psychosocial_behavioral_regulation: {
-    checked: false,
-    notes: "",
-    label: "Psychosocial and Behavioral Regulation",
-  },
-  handwriting_pre_academics: {
-    checked: false,
-    notes: "",
-    label: "Handwriting and Pre-Academics",
-  },
-},
+      daily_living_adl: {
+        checked: false,
+        notes: "",
+        response: "",
+        label: "Activities of Daily Living (ADL)",
+      },
+      sensory_integration_modulation: {
+        checked: false,
+        notes: "",
+        response: "",
+        label: "Sensory Integration and Modulation",
+      },
+      neuro_cognitive_rehabilitation: {
+        checked: false,
+        notes: "",
+        response: "",
+        label: "Neuro-Cognitive Rehabilitation",
+      },
+      fine_motor_hand_function: {
+        checked: false,
+        notes: "",
+        response: "",
+        label: "Fine Motor and Hand Function",
+      },
+      gross_motor_coordination_balance: {
+        checked: false,
+        notes: "",
+        response: "",
+        label: "Gross Motor Coordination and Balance",
+      },
+      psychosocial_behavioral_regulation: {
+        checked: false,
+        notes: "",
+        response: "",
+        label: "Psychosocial and Behavioral Regulation",
+      },
+      handwriting_pre_academics: {
+        checked: false,
+        notes: "",
+        response: "",
+        label: "Handwriting and Pre-Academics",
+      },
+    },
     "Physiotherapy": {
-      gross_motor: { checked: false, notes: "", label: "Gross Motor Skills" },
+      gross_motor: { checked: false, notes: "", response: "", label: "Gross Motor Skills" },
       balance_postural: {
         checked: false,
         notes: "",
+        response: "",
         label: "Balance & Postural Control",
       },
       strength_endurance: {
         checked: false,
         notes: "",
+        response: "",
         label: "Strength & Endurance",
       },
       coordination_planning: {
         checked: false,
         notes: "",
+        response: "",
         label: "Coordination & Motor Planning",
       },
       functional_mobility: {
         checked: false,
         notes: "",
+        response: "",
         label: "Functional Mobility Skills",
       },
     },
@@ -171,99 +197,117 @@ const TherapistDashboard = () => {
         behavioral_management: {
           checked: false,
           notes: "",
+          response: "",
           label: "Behavioral Management",
         },
         emotional_regulation: {
           checked: false,
           notes: "",
+          response: "",
           label: "Emotional Regulation",
         },
-        social_skills: { checked: false, notes: "", label: "Social Skills" },
+        social_skills: { checked: false, notes: "", response: "", label: "Social Skills" },
         coping_strategies: {
           checked: false,
           notes: "",
+          response: "",
           label: "Coping Strategies",
         },
       },
       "Occupational Therapy": {
-  daily_living_adl: {
-    checked: false,
-    notes: "",
-    label: "Activities of Daily Living (ADL)",
-  },
-  sensory_integration_modulation: {
-    checked: false,
-    notes: "",
-    label: "Sensory Integration and Modulation",
-  },
-  neuro_cognitive_rehabilitation: {
-    checked: false,
-    notes: "",
-    label: "Neuro-Cognitive Rehabilitation",
-  },
-  fine_motor_hand_function: {
-    checked: false,
-    notes: "",
-    label: "Fine Motor and Hand Function",
-  },
-  gross_motor_coordination_balance: {
-    checked: false,
-    notes: "",
-    label: "Gross Motor Coordination and Balance",
-  },
-  psychosocial_behavioral_regulation: {
-    checked: false,
-    notes: "",
-    label: "Psychosocial and Behavioral Regulation",
-  },
-  handwriting_pre_academics: {
-    checked: false,
-    notes: "",
-    label: "Handwriting and Pre-Academics",
-  },
-},
+        daily_living_adl: {
+          checked: false,
+          notes: "",
+          response: "",
+          label: "Activities of Daily Living (ADL)",
+        },
+        sensory_integration_modulation: {
+          checked: false,
+          notes: "",
+          response: "",
+          label: "Sensory Integration and Modulation",
+        },
+        neuro_cognitive_rehabilitation: {
+          checked: false,
+          notes: "",
+          response: "",
+          label: "Neuro-Cognitive Rehabilitation",
+        },
+        fine_motor_hand_function: {
+          checked: false,
+          notes: "",
+          response: "",
+          label: "Fine Motor and Hand Function",
+        },
+        gross_motor_coordination_balance: {
+          checked: false,
+          notes: "",
+          response: "",
+          label: "Gross Motor Coordination and Balance",
+        },
+        psychosocial_behavioral_regulation: {
+          checked: false,
+          notes: "",
+          response: "",
+          label: "Psychosocial and Behavioral Regulation",
+        },
+        handwriting_pre_academics: {
+          checked: false,
+          notes: "",
+          response: "",
+          label: "Handwriting and Pre-Academics",
+        },
+      },
       "Physiotherapy": {
         strength_endurance: {
           checked: false,
           notes: "",
+          response: "",
           label: "Strength & Endurance",
         },
         flexibility_range: {
           checked: false,
           notes: "",
+          response: "",
           label: "Flexibility & Range of Motion",
         },
         balance_coordination: {
           checked: false,
           notes: "",
+          response: "",
           label: "Balance & Coordination",
         },
-        mobility_gait: { checked: false, notes: "", label: "Mobility & Gait" },
+        mobility_gait: { checked: false, notes: "", response: "", label: "Mobility & Gait" },
       },
       "Speech Therapy": {
         receptive_language: {
           checked: false,
           notes: "",
+          response: "",
           label: "Receptive Language Skills (Comprehension)",
         },
         expressive_language: {
           checked: false,
           notes: "",
+          response: "",
           label: "Expressive Language Skills",
         },
         oral_motor_opt: {
           checked: false,
           notes: "",
+          response: "",
           label: "Oral Motor & Oral Placement Therapy (OPT) Goals",
         },
         pragmatic_language: {
           checked: false,
           notes: "",
+          response: "",
           label: "Pragmatic Language Skills (Social Communication)",
         },
         narrative_skills: {
           checked: false,
           notes: "",
+          response: "",
           label: "Narrative Skills",
         },
       },
@@ -298,6 +342,43 @@ const TherapistDashboard = () => {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const loadPreviousGoals = async (studentId, type) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const { data } = await axios.get(`${API_BASE_URL}/api/v1/therapy-reports/student/${studentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Find the most recent report matching the therapy type
+      const normalizedType = (type || "").trim().toLowerCase();
+      const match = data.find(
+        (r) => (r.therapy_type || "").trim().toLowerCase() === normalizedType
+      );
+      
+      const defaultSections = getTherapySections(type);
+      if (match && match.goals_achieved && typeof match.goals_achieved === "object") {
+        // Pre-populate with previous goals (notes), but set response to ""
+        const updatedGoals = { ...defaultSections };
+        Object.entries(match.goals_achieved).forEach(([key, val]) => {
+          if (updatedGoals[key]) {
+            updatedGoals[key] = {
+              ...updatedGoals[key],
+              checked: val.checked || false,
+              notes: val.notes || "",
+              response: "", // Keep response empty for the new report
+            };
+          }
+        });
+        setGoalsAchieved(updatedGoals);
+      } else {
+        setGoalsAchieved(defaultSections);
+      }
+    } catch (err) {
+      console.error("Failed to load previous goals:", err);
+      setGoalsAchieved(getTherapySections(type));
+    }
+  };
 
   const visibleStudents = useMemo(() => {
     return students.filter((student) => {
@@ -796,6 +877,7 @@ const TherapistDashboard = () => {
                           const initialType = specialization || "Speech Therapy";
                           setTherapyType(initialType);
                           setProgressLevel("Excellent");
+                          loadPreviousGoals(student.id, initialType);
                         }}
                       >
                         Enter Report
@@ -1047,7 +1129,7 @@ const TherapistDashboard = () => {
                   onChange={(e) => {
                     const newType = e.target.value;
                     setTherapyType(newType);
-                    setGoalsAchieved(getTherapySections(newType));
+                    loadPreviousGoals(selectedStudent.id, newType);
                   }}
                 >
                   <option value="Speech Therapy">Speech Therapy</option>
@@ -1140,24 +1222,55 @@ const TherapistDashboard = () => {
                           {goalData.label}
                         </label>
                       </div>
-                      <textarea
-                        placeholder="Describe progress"
-                        value={goalData.notes}
-                        onChange={(e) =>
-                          setGoalsAchieved({
-                            ...goalsAchieved,
-                            [goalKey]: {
-                              ...goalsAchieved[goalKey],
-                              notes: e.target.value.substring(0, 1000),
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                        rows="3"
-                        maxLength="1000"
-                      />
-                      <div className="text-xs text-gray-500 mt-1">
-                        {goalData.notes.length}/1000
+                      <div className="mt-2 space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-[#170F49] mb-1">
+                            Goal
+                          </label>
+                          <textarea
+                            placeholder="Enter goal details"
+                            value={goalData.notes || ""}
+                            onChange={(e) =>
+                              setGoalsAchieved({
+                                ...goalsAchieved,
+                                [goalKey]: {
+                                  ...goalsAchieved[goalKey],
+                                  notes: e.target.value.substring(0, 1000),
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
+                            rows="2"
+                            maxLength="1000"
+                          />
+                          <div className="text-[10px] text-gray-500 mt-0.5 text-right">
+                            {(goalData.notes || "").length}/1000
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#170F49] mb-1">
+                            Responses
+                          </label>
+                          <textarea
+                            placeholder="Enter response or progress"
+                            value={goalData.response || ""}
+                            onChange={(e) =>
+                              setGoalsAchieved({
+                                ...goalsAchieved,
+                                [goalKey]: {
+                                  ...goalsAchieved[goalKey],
+                                  response: e.target.value.substring(0, 1000),
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
+                            rows="2"
+                            maxLength="1000"
+                          />
+                          <div className="text-[10px] text-gray-500 mt-0.5 text-right">
+                            {(goalData.response || "").length}/1000
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}

@@ -180,6 +180,47 @@ def test_therapist_auth_and_restrictions():
         
         print("✅ Therapist names are successfully populated on reports instead of 'N/A'!")
         
+        # --- TEST 4: Update/Edit Restriction ---
+        print("\n--- Running Test 4: Update/Edit Restrictions ---")
+        
+        # Speech therapist tries to update Physiotherapy report -> Should fail (403)
+        current_test_user = u_speech
+        update_payload = {
+            "student_id": student.id,
+            "therapy_type": "Physiotherapy",
+            "report_date": "2026-06-16",
+            "goals_achieved": {
+                "Speech goal": {"checked": True, "notes": "some note", "response": "some response"}
+            },
+            "progress_level": "Good"
+        }
+        response = client.put(f"/api/v1/therapy-reports/{physio_report_id}", json=update_payload)
+        print(f"Speech Therapist updating Physiotherapy report: Status {response.status_code}")
+        assert response.status_code == 403, "Should fail with 403 Forbidden"
+        print("✅ Correctly rejected report update under invalid specialization!")
+        
+        # Speech therapist tries to update Speech Therapy report -> Should succeed (200)
+        update_payload["therapy_type"] = "Speech Therapy"
+        update_payload["goals_achieved"] = {
+            "Speech goal": {"checked": True, "notes": "original speech goal", "response": "speech response"}
+        }
+        response = client.put(f"/api/v1/therapy-reports/{speech_report_id}", json=update_payload)
+        print(f"Speech Therapist updating Speech Therapy report: Status {response.status_code}")
+        assert response.status_code == 200, "Should succeed with 200"
+        updated_data = response.json()
+        assert updated_data["goals_achieved"]["Speech goal"]["response"] == "speech response"
+        print("✅ Correctly allowed report update under specialization and stored response!")
+        
+        # Admin tries to update Speech Therapy report -> Should succeed (200)
+        current_test_user = u_admin
+        update_payload["goals_achieved"]["Speech goal"]["response"] = "admin modified speech response"
+        response = client.put(f"/api/v1/therapy-reports/{speech_report_id}", json=update_payload)
+        print(f"Admin updating Speech Therapy report: Status {response.status_code}")
+        assert response.status_code == 200, "Should succeed with 200"
+        updated_data = response.json()
+        assert updated_data["goals_achieved"]["Speech goal"]["response"] == "admin modified speech response"
+        print("✅ Correctly allowed Admin to update the report and stored response!")
+        
         # Clean up created reports to keep database clean
         db.execute(text(f"DELETE FROM therapy_reports WHERE id IN ({speech_report_id}, {physio_report_id})"))
         db.commit()

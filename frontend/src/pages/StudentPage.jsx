@@ -745,6 +745,19 @@ const StudentPage = () => {
   const aiSummaryAbortControllerRef = useRef(null);
   const [collapsedSummarySections, setCollapsedSummarySections] = useState({});
 
+  // Therapy report editing state
+  const [editingTherapyReport, setEditingTherapyReport] = useState(null);
+  const [editTherapyGoals, setEditTherapyGoals] = useState({});
+  const [editTherapyPresentComplaints, setEditTherapyPresentComplaints] = useState("");
+  const [editTherapyCurrentObservation, setEditTherapyCurrentObservation] = useState("");
+  const [editTherapyAssessmentDone, setEditTherapyAssessmentDone] = useState("");
+  const [editTherapyProvisionalDiagnosis, setEditTherapyProvisionalDiagnosis] = useState("");
+  const [editTherapyProgressLevel, setEditTherapyProgressLevel] = useState("Excellent");
+  const [editTherapyReportDate, setEditTherapyReportDate] = useState("");
+  const [editTherapySubmitting, setEditTherapySubmitting] = useState(false);
+  const [editTherapyError, setEditTherapyError] = useState(null);
+
+
   // Special Ed
   const fileInputRef = useRef(null);
   const [phaseSavedStatus, setPhaseSavedStatus] = useState({}); // Track which phases are saved per table
@@ -3158,6 +3171,64 @@ const addCellToColumn = (columnKey) => {
       alert("Could not save changes. Please try again.");
     }
   };
+
+  const handleEditTherapyReportSave = async (e) => {
+    e.preventDefault();
+    if (!editingTherapyReport) return;
+    setEditTherapySubmitting(true);
+    setEditTherapyError(null);
+    try {
+      const token = localStorage.getItem("token");
+      const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+      if (!token) {
+        setEditTherapyError("Authentication token not found. Please log in again.");
+        setEditTherapySubmitting(false);
+        return;
+      }
+      const payload = {
+        student_id: student.id,
+        report_date: editTherapyReportDate,
+        therapy_type: editingTherapyReport.therapy_type,
+        present_complaints: editTherapyPresentComplaints?.trim() || null,
+        current_observation: editTherapyCurrentObservation?.trim() || null,
+        assessment_done: editTherapyAssessmentDone?.trim() || null,
+        provisional_diagnosis: editTherapyProvisionalDiagnosis?.trim() || null,
+        goals_achieved: editTherapyGoals,
+        progress_level: editTherapyProgressLevel,
+      };
+
+      const res = await axios.put(
+        `${baseUrl}/api/v1/therapy-reports/${editingTherapyReport.id}`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      
+      const updatedReport = res.data;
+      // Update reports state
+      setRawReports((prev) =>
+        prev.map((r) => (r.id === updatedReport.id ? updatedReport : r))
+      );
+      
+      setEditingTherapyReport(null);
+      showToast("Therapy report updated successfully!", "success");
+    } catch (err) {
+      console.error("Failed to update report:", err);
+      const msg =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to update report.";
+      setEditTherapyError(msg);
+    } finally {
+      setEditTherapySubmitting(false);
+    }
+  };
+
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -5684,13 +5755,21 @@ const addCellToColumn = (columnKey) => {
               Object.entries(report.goals_achieved).forEach(
                 ([sectionKey, sectionData]) => {
                   // Format section title (e.g., "receptive_language" -> "Receptive Language")
-                  const sectionTitle = sectionKey
+                  const sectionTitle = (sectionData && sectionData.label) || sectionKey
                     .split("_")
                     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
                     .join(" ");
 
-                  if (typeof sectionData === "object" && sectionData.notes) {
-                    addText(`  ${sectionTitle}: ${sectionData.notes}`, 9);
+                  if (sectionData && typeof sectionData === "object") {
+                    if (sectionData.notes || sectionData.response) {
+                      addText(`  ${sectionTitle}:`, 9, true);
+                      if (sectionData.notes) {
+                        addText(`    Goal: ${sectionData.notes}`, 9);
+                      }
+                      if (sectionData.response) {
+                        addText(`    Response: ${sectionData.response}`, 9);
+                      }
+                    }
                   } else if (typeof sectionData === "string") {
                     addText(`  ${sectionTitle}: ${sectionData}`, 9);
                   }
@@ -6765,7 +6844,7 @@ const addCellToColumn = (columnKey) => {
                                   !Array.isArray(report.goals_achieved)
                                 ) {
                                   const activeSections = Object.entries(report.goals_achieved).filter(
-                                    ([_, data]) => data && (data.checked || (data.notes && data.notes.trim()))
+                                    ([_, data]) => data && (data.checked || (data.notes && data.notes.trim()) || (data.response && data.response.trim()))
                                   );
 
                                   if (activeSections.length > 0) {
@@ -6777,7 +6856,7 @@ const addCellToColumn = (columnKey) => {
                                         }
 
                                         // Format section title (e.g., "receptive_language" -> "Receptive Language")
-                                        const sectionTitle = sectionKey
+                                        const sectionTitle = (sectionData && sectionData.label) || sectionKey
                                           .split("_")
                                           .map(
                                             (word) =>
@@ -6795,29 +6874,46 @@ const addCellToColumn = (columnKey) => {
                                         yPosition += 5;
                                         pdf.setFont("times", "normal");
 
-                                        // If it has notes, display them
-                                        if (sectionData.notes) {
-                                          const noteLines = pdf.splitTextToSize(
-                                            sectionData.notes,
-                                            pageWidth -
-                                              marginLeft -
-                                              marginRight -
-                                              15,
-                                          );
-                                          noteLines.forEach((line) => {
-                                            if (yPosition > pageHeight - 20) {
-                                              pdf.addPage();
-                                              yPosition = 20;
-                                            }
-                                            pdf.text(
-                                              line,
-                                              marginLeft + 10,
-                                              yPosition,
+                                        // If it has notes or response, display them
+                                        if (sectionData && (sectionData.notes || sectionData.response)) {
+                                          if (sectionData.notes) {
+                                            const noteLines = pdf.splitTextToSize(
+                                              `Goal: ${sectionData.notes}`,
+                                              pageWidth - marginLeft - marginRight - 15,
                                             );
-                                            yPosition += 5;
-                                          });
+                                            noteLines.forEach((line) => {
+                                              if (yPosition > pageHeight - 20) {
+                                                pdf.addPage();
+                                                yPosition = 20;
+                                              }
+                                              pdf.text(
+                                                line,
+                                                marginLeft + 10,
+                                                yPosition,
+                                              );
+                                              yPosition += 5;
+                                            });
+                                          }
+                                          if (sectionData.response) {
+                                            const respLines = pdf.splitTextToSize(
+                                              `Response: ${sectionData.response}`,
+                                              pageWidth - marginLeft - marginRight - 15,
+                                            );
+                                            respLines.forEach((line) => {
+                                              if (yPosition > pageHeight - 20) {
+                                                pdf.addPage();
+                                                yPosition = 20;
+                                              }
+                                              pdf.text(
+                                                line,
+                                                marginLeft + 10,
+                                                yPosition,
+                                              );
+                                              yPosition += 5;
+                                            });
+                                          }
                                         } else {
-                                          // Checked but no notes
+                                          // Checked but no notes or response
                                           pdf.text(
                                             "Addressed",
                                             marginLeft + 10,
@@ -7433,7 +7529,7 @@ const addCellToColumn = (columnKey) => {
                                                 />
                                                 <div className="flex-1">
                                                   <div className="font-medium text-sm text-[#170F49]">
-                                                    {key
+                                                    {goal.label || key
                                                       .split("_")
                                                       .map(
                                                         (word) =>
@@ -7445,8 +7541,15 @@ const addCellToColumn = (columnKey) => {
                                                       .join(" ")}
                                                   </div>
                                                   {goal.notes && (
-                                                    <div className="text-xs text-[#6F6C90] mt-1 italic">
+                                                    <div className="text-xs text-[#6F6C90] mt-1">
+                                                      <span className="font-semibold text-gray-700">Goal: </span>
                                                       {goal.notes}
+                                                    </div>
+                                                  )}
+                                                  {goal.response && (
+                                                    <div className="text-xs text-[#E38B52] mt-1">
+                                                      <span className="font-semibold">Response: </span>
+                                                      {goal.response}
                                                     </div>
                                                   )}
                                                 </div>
@@ -7465,9 +7568,42 @@ const addCellToColumn = (columnKey) => {
                                 <div className="text-xs text-[#6F6C90]">
                                   Recorded
                                 </div>
-                                <div className="text-sm">
+                                <div className="text-sm mb-4">
                                   {new Date(r.created_at).toLocaleString()}
                                 </div>
+                                {(() => {
+                                  const normalize = (type) => {
+                                    if (!type) return "";
+                                    let t = type.toLowerCase().replace(/[^a-z0-9]/g, "");
+                                    if (t === "physicaltherapy" || t === "physio") return "physiotherapy";
+                                    return t;
+                                  };
+                                  const canEdit = user && (
+                                    user.role === "admin" ||
+                                    (user.role === "therapist" && normalize(user.specialization || "") === normalize(r.therapy_type || ""))
+                                  );
+                                  
+                                  if (!canEdit) return null;
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingTherapyReport(r);
+                                        setEditTherapyReportDate(r.report_date);
+                                        setEditTherapyPresentComplaints(r.present_complaints || "");
+                                        setEditTherapyCurrentObservation(r.current_observation || "");
+                                        setEditTherapyAssessmentDone(r.assessment_done || "");
+                                        setEditTherapyProvisionalDiagnosis(r.provisional_diagnosis || "");
+                                        setEditTherapyProgressLevel(r.progress_level || "Excellent");
+                                        setEditTherapyGoals(r.goals_achieved || {});
+                                        setEditTherapyError(null);
+                                      }}
+                                      className="px-4 py-2 bg-[#E38B52] text-white rounded-lg text-xs font-semibold shadow hover:bg-[#D67A3F] transition-all hover:scale-105 active:scale-95"
+                                    >
+                                      Edit Report
+                                    </button>
+                                  );
+                                })()}
                               </div>
                             </details>
                           ))}
@@ -13593,6 +13729,220 @@ const addCellToColumn = (columnKey) => {
           animation: float-particle 5s infinite ease-in-out;
         }
       `}</style>
+      {/* Edit Therapy Report Modal */}
+      {editingTherapyReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl mx-4 my-8 overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between items-center mb-6 pb-4 border-b">
+              <h2 className="text-2xl font-bold text-[#170F49]">
+                Edit {editingTherapyReport.therapy_type} Report
+              </h2>
+              <button
+                type="button"
+                onClick={() => setEditingTherapyReport(null)}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            
+            <form onSubmit={handleEditTherapyReportSave} className="space-y-4">
+              <div>
+                <label className="block text-[#170F49] font-medium mb-1">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52]"
+                  value={editTherapyReportDate}
+                  onChange={(e) => setEditTherapyReportDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#170F49] font-medium mb-1">
+                  Present Complaints
+                </label>
+                <textarea
+                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none"
+                  rows="2"
+                  value={editTherapyPresentComplaints}
+                  onChange={(e) => setEditTherapyPresentComplaints(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#170F49] font-medium mb-1">
+                  Current Observation
+                </label>
+                <textarea
+                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none"
+                  rows="2"
+                  value={editTherapyCurrentObservation}
+                  onChange={(e) => setEditTherapyCurrentObservation(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#170F49] font-medium mb-1">
+                  Assessment Done
+                </label>
+                <textarea
+                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none"
+                  rows="2"
+                  value={editTherapyAssessmentDone}
+                  onChange={(e) => setEditTherapyAssessmentDone(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#170F49] font-medium mb-1">
+                  Provisional Diagnosis
+                </label>
+                <textarea
+                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none"
+                  rows="2"
+                  value={editTherapyProvisionalDiagnosis}
+                  onChange={(e) => setEditTherapyProvisionalDiagnosis(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#170F49] font-medium mb-3">
+                  Goals Addressed
+                </label>
+                <div className="space-y-4 max-h-[30vh] overflow-y-auto p-1 border rounded-lg bg-gray-50">
+                  {Object.entries(editTherapyGoals).map(([goalKey, goalData]) => (
+                    <div
+                      key={goalKey}
+                      className="border rounded-lg p-3 bg-white shadow-sm"
+                    >
+                      <div className="flex items-center mb-2">
+                        <input
+                          type="checkbox"
+                          id={`edit-${goalKey}`}
+                          checked={goalData.checked || false}
+                          onChange={(e) =>
+                            setEditTherapyGoals({
+                              ...editTherapyGoals,
+                              [goalKey]: {
+                                ...editTherapyGoals[goalKey],
+                                checked: e.target.checked,
+                              },
+                            })
+                          }
+                          className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
+                        />
+                        <label
+                          htmlFor={`edit-${goalKey}`}
+                          className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer"
+                        >
+                          {goalData.label || goalKey.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
+                        </label>
+                      </div>
+                      
+                      <div className="mt-2 space-y-2">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-[#170F49] mb-0.5">Goal</label>
+                          <textarea
+                            placeholder="Enter goal details"
+                            value={goalData.notes || ""}
+                            onChange={(e) =>
+                              setEditTherapyGoals({
+                                ...editTherapyGoals,
+                                [goalKey]: {
+                                  ...editTherapyGoals[goalKey],
+                                  notes: e.target.value.substring(0, 1000),
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-1.5 rounded border text-xs focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
+                            rows="2"
+                            maxLength="1000"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-[#170F49] mb-0.5">Responses</label>
+                          <textarea
+                            placeholder="Enter response or progress"
+                            value={goalData.response || ""}
+                            onChange={(e) =>
+                              setEditTherapyGoals({
+                                ...editTherapyGoals,
+                                [goalKey]: {
+                                  ...editTherapyGoals[goalKey],
+                                  response: e.target.value.substring(0, 1000),
+                                },
+                              })
+                            }
+                            className="w-full px-3 py-1.5 rounded border text-xs focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
+                            rows="2"
+                            maxLength="1000"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[#170F49] font-medium mb-1">
+                  Progress Level
+                </label>
+                <select
+                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52]"
+                  value={editTherapyProgressLevel}
+                  onChange={(e) => setEditTherapyProgressLevel(e.target.value)}
+                >
+                  <option>Excellent</option>
+                  <option>Good</option>
+                  <option>Moderate</option>
+                  <option>Needs Improvement</option>
+                </select>
+              </div>
+
+              {editTherapyError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                  {editTherapyError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-lg bg-gray-200 text-[#170F49] hover:bg-gray-300 transition"
+                  onClick={() => setEditingTherapyReport(null)}
+                  disabled={editTherapySubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-[#E38B52] text-white font-semibold shadow hover:bg-[#D67A3F] transition disabled:opacity-50 flex items-center"
+                  disabled={editTherapySubmitting}
+                >
+                  {editTherapySubmitting ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {/* Summary Modal */}
       {showSummary && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">

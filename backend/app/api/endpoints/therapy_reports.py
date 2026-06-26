@@ -275,6 +275,57 @@ def list_reports_for_student(
     return reports
 
 
+@router.put("/{report_id}", response_model=schemas.therapy_report.TherapyReport)
+def update_report(
+    *,
+    db: Session = Depends(deps.get_db),
+    report_id: int,
+    report_in: schemas.therapy_report.TherapyReportCreate,
+    current_user: schemas.user.User = Depends(deps.get_current_active_user),
+) -> Any:
+    """Update an existing therapy report."""
+    from app.models.therapy_report import TherapyReport
+    report = db.query(TherapyReport).filter(TherapyReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Therapy report not found")
+        
+    role = str(getattr(current_user, "role", "") or "").lower()
+    if role == "teacher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Teachers are not authorized to update therapy reports."
+        )
+    if role == "therapist":
+        specialization = _get_therapist_specialization(db, current_user.email)
+        if not specialization:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Therapists must have a specialization assigned to update reports."
+            )
+        if _normalize_therapy_type(report.therapy_type) != _normalize_therapy_type(specialization):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You are only authorized to update reports under your therapy type: {specialization}."
+            )
+            
+    # Update fields
+    report.report_date = report_in.report_date
+    report.therapy_type = report_in.therapy_type
+    report.present_complaints = report_in.present_complaints
+    report.current_observation = report_in.current_observation
+    report.assessment_done = report_in.assessment_done
+    report.provisional_diagnosis = report_in.provisional_diagnosis
+    report.progress_notes = report_in.progress_notes
+    report.goals_achieved = report_in.goals_achieved
+    report.progress_level = report_in.progress_level
+    
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+    _populate_therapist_names(db, [report])
+    return report
+
+
 @router.post("/summary/ai/test", response_model=TherapyAISummaryResponse)
 def ai_summarize_reports_test(
     payload: TherapyAISummaryRequest = Body(...),
@@ -1316,7 +1367,7 @@ def _generate_fallback_analysis(reports, student, payload, metrics, date_range):
 
 def _goals_to_readable_text(goals_achieved, max_length=500):
     """Convert goals_achieved (dict or JSON string) into readable text for prompts.
-    Returns a string like 'Behavioral Management: notes here; Emotional Regulation: notes here'
+    Returns a string like 'Behavioral Management: Goal: text | Response: text'
     instead of dumping raw dict/JSON."""
     parsed = _parse_goals_achieved(goals_achieved)
     if parsed is None:
@@ -1329,8 +1380,14 @@ def _goals_to_readable_text(goals_achieved, max_length=500):
         if isinstance(value, dict):
             label = value.get('label', key)
             notes = value.get('notes', '').strip()
+            response = value.get('response', '').strip()
+            goal_text = []
             if notes:
-                parts.append(f"{label}: {notes}")
+                goal_text.append(f"Goal: {notes}")
+            if response:
+                goal_text.append(f"Response: {response}")
+            if goal_text:
+                parts.append(f"{label} ({' | '.join(goal_text)})")
         elif isinstance(value, str) and value.strip():
             parts.append(f"{key}: {value.strip()}")
     
@@ -1870,7 +1927,7 @@ REQUIRED SECTIONS (Use these EXACT titles in this EXACT order, with ** bold mark
         for report in reports:
             parsed = _parse_goals_achieved(report.goals_achieved)
             if isinstance(parsed, dict):
-                logging.info(f"Processing report ID={report.id} for section '{title}': keys={list(parsed.keys())}")
+                logging.info(f"Processing report ID={getattr(report, 'id', 'None')} for section '{title}': keys={list(parsed.keys())}")
                 
                 for key, value in parsed.items():
                     if isinstance(value, dict):
@@ -1948,7 +2005,7 @@ REQUIRED SECTIONS (Use these EXACT titles in this EXACT order, with ** bold mark
                         if title.lower().replace(' ', '_').startswith(key.lower().replace(' ', '_')[:10]):
                             all_notes.append(value)
             else:
-                logging.warning(f"Report ID={report.id}: goals_achieved could not be parsed (type={type(report.goals_achieved)})")
+                logging.warning(f"Report ID={getattr(report, 'id', 'None')}: goals_achieved could not be parsed (type={type(report.goals_achieved)})")
         
         logging.info(f"Section '{title}': Found {len(all_notes)} notes")
         section_notes_map[title] = all_notes
