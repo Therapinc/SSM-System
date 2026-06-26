@@ -760,6 +760,7 @@ const StudentPage = () => {
 
   // Special Ed
   const fileInputRef = useRef(null);
+  const loadedStudentDbIdRef = useRef(null);
   const [phaseSavedStatus, setPhaseSavedStatus] = useState({}); // Track which phases are saved per table
   const [savedTables, setSavedTables] = useState([]);  
   const [unsavedTableIndex, setUnsavedTableIndex] = useState(null); // Track which table has unsaved edits
@@ -999,6 +1000,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
   // Sync IEP month data to database
   useEffect(() => {
     if (!initialLoadDone || !id) return;
+    if (String(loadedStudentDbIdRef.current) !== String(id)) return;
     const syncIepData = async () => {
       try {
         const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -1018,6 +1020,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
   // Sync Special Education tables to database
   useEffect(() => {
     if (!initialLoadDone || !id) return;
+    if (String(loadedStudentDbIdRef.current) !== String(id)) return;
     const syncSpecTables = async () => {
       try {
         const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -1037,6 +1040,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
   // Sync IEP program records to database
   useEffect(() => {
     if (!initialLoadDone || !id) return;
+    if (String(loadedStudentDbIdRef.current) !== String(id)) return;
     const syncIepProgramRecords = async () => {
       try {
         const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -3724,6 +3728,7 @@ const addCellToColumn = (columnKey) => {
 
   const fetchStudent = async () => {
     try {
+      loadedStudentDbIdRef.current = null;
       setInitialLoadDone(false);
       setLoading(true);
       const baseUrl =
@@ -3984,6 +3989,7 @@ const addCellToColumn = (columnKey) => {
       const programList = Array.isArray(finalIepProgram) ? finalIepProgram.map(normalizeIepRecord) : [];
       setIepFormRecords(programList);
 
+      loadedStudentDbIdRef.current = id;
       setInitialLoadDone(true);
     } catch (e) {
       setStudent(null);
