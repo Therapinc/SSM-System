@@ -150,9 +150,8 @@ const DynamicScrollButtons = () => {
 
   return (
     <div
-      className={`fixed z-50 bottom-8 right-8 flex flex-col gap-3 transition-opacity duration-300 ${
-        isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-      }`}
+      className={`fixed z-50 bottom-8 right-8 flex flex-col gap-3 transition-opacity duration-300 ${isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
     >
       {isScrollingUp ? (
         // Show Scroll to Top Button when scrolling UP
@@ -723,16 +722,67 @@ const StudentPage = () => {
   const [visibleCount, setVisibleCount] = useState(5); // show latest 5 by default
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [presetRange, setPresetRange] = useState("last_30_days");
+
+  const calculatePresetDates = (preset) => {
+    const today = new Date();
+    const getYYYYMMDD = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    if (preset === "last_30_days") {
+      const start = new Date();
+      start.setDate(today.getDate() - 30);
+      return { from: getYYYYMMDD(start), to: getYYYYMMDD(today) };
+    } else if (preset === "current_month") {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { from: getYYYYMMDD(start), to: getYYYYMMDD(today) };
+    } else if (preset === "prev_month") {
+      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const end = new Date(today.getFullYear(), today.getMonth(), 0);
+      return { from: getYYYYMMDD(start), to: getYYYYMMDD(end) };
+    } else if (preset === "current_trimester") {
+      const month = today.getMonth() + 1; // 1-indexed
+      const year = today.getFullYear();
+      let start, end;
+      if (month >= 6 && month <= 9) { // Term 1: June-Sept
+        start = new Date(year, 5, 1);
+        end = new Date(year, 8, 30);
+      } else if (month >= 10 && month <= 12) { // Term 2: Oct-Dec
+        start = new Date(year, 9, 1);
+        end = new Date(year, 11, 31);
+      } else { // Term 3: Jan-May
+        start = new Date(year, 0, 1);
+        end = new Date(year, 4, 31);
+      }
+      if (end > today) {
+        end = today;
+      }
+      return { from: getYYYYMMDD(start), to: getYYYYMMDD(end) };
+    }
+    return { from: "", to: "" };
+  };
+
+  useEffect(() => {
+    const { from, to } = calculatePresetDates(presetRange);
+    setFromDate(from);
+    setToDate(to);
+  }, [presetRange]);
+
   const [showSummary, setShowSummary] = useState(false);
   const [selectedTherapyType, setSelectedTherapyType] = useState("");
   useEffect(() => {
     if (user && user.role === "therapist" && user.specialization) {
       const spec = user.specialization;
+      let targetType = spec;
       if (spec.toLowerCase() === "physical therapy" || spec.toLowerCase() === "physio") {
-        setSelectedTherapyType("Physiotherapy");
-      } else {
-        setSelectedTherapyType(spec);
+        targetType = "Physiotherapy";
       }
+      setSelectedTherapyType(targetType);
+      setRawTherapyType(targetType);
     }
   }, [user]);
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -762,7 +812,7 @@ const StudentPage = () => {
   const fileInputRef = useRef(null);
   const loadedStudentDbIdRef = useRef(null);
   const [phaseSavedStatus, setPhaseSavedStatus] = useState({}); // Track which phases are saved per table
-  const [savedTables, setSavedTables] = useState([]);  
+  const [savedTables, setSavedTables] = useState([]);
   const [unsavedTableIndex, setUnsavedTableIndex] = useState(null); // Track which table has unsaved edits
   const [reportDate, setReportDate] = useState("");
   const [showTableDetails, setShowTableDetails] = useState({});
@@ -778,7 +828,7 @@ const StudentPage = () => {
   const isAnotherTableUnsaved = (table) =>
     unsavedTableIndex !== null &&
     savedTables[unsavedTableIndex] !== table;
-  
+
   const warnIfUnsavedOther = (tableIndex, actionText = "open or modify another table") => {
     if (isAnotherTableUnsaved(savedTables[tableIndex])) {
       showToast(`Save the current table before ${actionText}`, "warning");
@@ -799,56 +849,62 @@ const StudentPage = () => {
   const [generatedSummaries, setGeneratedSummaries] = useState([]);
   const [expandedGeneratedSummaryId, setExpandedGeneratedSummaryId] = useState(null);
 
-  const createEmptyIepData = () => ({
-  selectedMonth: "",
-  sections: {
-    adlSkills: [],
-    academic: [],
-    behaviouralSkills: [],
-  },
-  iepStudent: "",
-  remarks: "",
-  signatures: {
-    principal: "",
-    teacher: "",
-    parent: "",
-  },
-});
+  // Raw reports independent states
+  const [rawFromDate, setRawFromDate] = useState("");
+  const [rawToDate, setRawToDate] = useState("");
+  const [rawTherapyType, setRawTherapyType] = useState("");
+  const [selectedReportIds, setSelectedReportIds] = useState([]);
 
-const normalizeIepData = (data = {}) => {
-  if (data.sections) {
+  const createEmptyIepData = () => ({
+    selectedMonth: "",
+    sections: {
+      adlSkills: [],
+      academic: [],
+      behaviouralSkills: [],
+    },
+    iepStudent: "",
+    remarks: "",
+    signatures: {
+      principal: "",
+      teacher: "",
+      parent: "",
+    },
+  });
+
+  const normalizeIepData = (data = {}) => {
+    if (data.sections) {
+      return {
+        ...createEmptyIepData(),
+        ...data,
+        sections: {
+          adlSkills: data.sections.adlSkills || [],
+          academic: data.sections.academic || [],
+          behaviouralSkills: data.sections.behaviouralSkills || [],
+        },
+      };
+    }
+
+    const legacyRows = Array.isArray(data.tableRows) ? data.tableRows : [];
+    const mapLegacy = (key) =>
+      legacyRows.length
+        ? legacyRows.map((row, index) => ({
+          id: index + 1,
+          text: row?.[key] || "",
+        }))
+        : [];
+
     return {
       ...createEmptyIepData(),
       ...data,
       sections: {
-        adlSkills: data.sections.adlSkills || [],
-        academic: data.sections.academic || [],
-        behaviouralSkills: data.sections.behaviouralSkills || [],
+        adlSkills: mapLegacy("adlSkills"),
+        academic: mapLegacy("academic"),
+        behaviouralSkills: mapLegacy("behaviouralSkills"),
       },
     };
-  }
-
-  const legacyRows = Array.isArray(data.tableRows) ? data.tableRows : [];
-  const mapLegacy = (key) =>
-    legacyRows.length
-      ? legacyRows.map((row, index) => ({
-          id: index + 1,
-          text: row?.[key] || "",
-        }))
-      : [];
-
-  return {
-    ...createEmptyIepData(),
-    ...data,
-    sections: {
-      adlSkills: mapLegacy("adlSkills"),
-      academic: mapLegacy("academic"),
-      behaviouralSkills: mapLegacy("behaviouralSkills"),
-    },
   };
-};
 
-const [iepData, setIepData] = useState(createEmptyIepData());
+  const [iepData, setIepData] = useState(createEmptyIepData());
 
   // per-month saved IEPs: { "January 2026": { ...iepData }, ... }
   const [savedIepByMonth, setSavedIepByMonth] = useState({});
@@ -864,11 +920,11 @@ const [iepData, setIepData] = useState(createEmptyIepData());
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const MONTHS = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December"
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
   ];
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
-  
+
   const isValidYear = (() => {
     if (!selectedYear) return false;
     const num = Number(selectedYear);
@@ -884,12 +940,12 @@ const [iepData, setIepData] = useState(createEmptyIepData());
       showToast("Save the current IEP report before changing the month.", "warning");
       return;
     }
-  
+
     setIepData((prev) => ({
       ...createEmptyIepData(),
       selectedMonth: month,
     }));
-  
+
     const monthYearKey = `${month} ${selectedYear}`;
     const key = `iep_data_student_${id}_by_month`;
     try {
@@ -983,19 +1039,64 @@ const [iepData, setIepData] = useState(createEmptyIepData());
     }
   }, [id, savedIepByMonth, initialLoadDone]);
 
-  // Load AI summaries from localStorage on mount
-  useEffect(() => {
-    const summariesKey = `ai_summaries_student_${id}`;
+  // Helper to load AI summaries from database history list
+  const fetchSummaryHistory = async () => {
     try {
-      const stored = localStorage.getItem(summariesKey);
-      if (stored) {
-        const summaries = JSON.parse(stored);
-        setGeneratedSummaries(Array.isArray(summaries) ? summaries : []);
+      const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const res = await fetch(`${baseUrl}/api/v1/therapy-reports/summary/history/${student?.studentId || id}`, {
+        headers
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGeneratedSummaries(data);
+        return data;
       }
-    } catch (e) {
-      console.error("Failed to load AI summaries from localStorage:", e);
+    } catch (err) {
+      console.error("Failed to load AI summaries from database:", err);
     }
-  }, [id]);
+    return [];
+  };
+
+  // Load AI summaries from database on mount and filter changes
+  useEffect(() => {
+    const dismissedKey = `ai_summary_dismissed_${id}`;
+    // Reset active summary viewer first to avoid showing old data
+    setAiAnalysis(null);
+    setAiSummary("");
+    setAiSummaryError(null);
+    setTranslatedSummary(null);
+
+    const loadHistory = async () => {
+      const historyList = await fetchSummaryHistory();
+
+      // Only auto-surface the latest summary if the user hasn't explicitly dismissed it
+      const wasDismissed = sessionStorage.getItem(dismissedKey) === "true";
+      if (!wasDismissed && historyList && historyList.length > 0) {
+        const matchingSummary = selectedTherapyType
+          ? historyList.find(s => s.therapyType === selectedTherapyType)
+          : historyList[0];
+
+        if (matchingSummary) {
+          setAiAnalysis({
+            summaries: matchingSummary.summaries,
+            summary: matchingSummary.summary || (matchingSummary.summaries ? Object.entries(matchingSummary.summaries).map(([s, t]) => `**${s}**\n${t}`).join("\n\n") : ""),
+            date_range: { start_date: matchingSummary.dateRange?.start, end_date: matchingSummary.dateRange?.end },
+            therapy_type: matchingSummary.therapyType,
+            used_reports: matchingSummary.reportCount,
+            model: matchingSummary.model || "Llama 3.2 3B"
+          });
+          setAiSummary(JSON.stringify(matchingSummary.summaries));
+        }
+      }
+    };
+
+    if (id) {
+      loadHistory();
+    }
+  }, [id, selectedTherapyType]);
 
   // Sync IEP month data to database
   useEffect(() => {
@@ -1077,13 +1178,13 @@ const [iepData, setIepData] = useState(createEmptyIepData());
       showToast("Please enter the year before creating the IEP table.", "error");
       return;
     }
-  
+
     const monthYearKey = `${iepData.selectedMonth} ${selectedYear}`;
     const storageKey = `iep_data_student_${id}_by_month`;
-  
+
     try {
       const mapping = JSON.parse(localStorage.getItem(storageKey) || "{}");
-  
+
       if (mapping?.[monthYearKey]) {
         setExistingIepMonthKey(monthYearKey);
         setIepFormVisible(false);
@@ -1092,7 +1193,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
         showToast("That IEP report already exists.", "warning");
         return;
       }
-  
+
       const blankReport = normalizeIepData({
         ...createEmptyIepData(),
         selectedMonth: iepData.selectedMonth,
@@ -1149,11 +1250,12 @@ const [iepData, setIepData] = useState(createEmptyIepData());
 
   const [savingIep, setSavingIep] = useState(false);
 
-  
+
 
   // Handle sending AI summary to parent
   const handleSendToParent = async () => {
-    if (!aiAnalysis?.summary) return;
+    const summaryText = getUnifiedSummaryText(aiAnalysis);
+    if (!summaryText) return;
     setSendingToParent(true);
     setSentToParent(false);
     try {
@@ -1165,7 +1267,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
         student_id: studentId,
         title: `Progress Summary - ${student?.name || studentId}`,
         message: "A new AI-generated progress summary is available for your child.",
-        report_summary: translatedSummary || aiAnalysis.summary,
+        report_summary: translatedSummary || summaryText,
         report_from_date: fromDate || null,
         report_to_date: toDate || null,
         therapy_type: selectedTherapyType || null,
@@ -1201,7 +1303,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
         process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
       const token = localStorage.getItem("token");
 
-      const summaryText = aiAnalysis?.summary || "";
+      const summaryText = getUnifiedSummaryText(aiAnalysis);
 
       if (!summaryText.trim()) {
         throw new Error(
@@ -1262,7 +1364,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
       },
     }));
   };
-  
+
   const addIepSectionItem = (sectionKey) => {
     setIepData((prev) => {
       const currentItems = prev.sections?.[sectionKey] || [];
@@ -1270,7 +1372,7 @@ const [iepData, setIepData] = useState(createEmptyIepData());
         currentItems.length > 0
           ? Math.max(...currentItems.map((item) => item.id)) + 1
           : 1;
-  
+
       return {
         ...prev,
         sections: {
@@ -1280,12 +1382,12 @@ const [iepData, setIepData] = useState(createEmptyIepData());
       };
     });
   };
-  
+
   const removeIepSectionItem = (sectionKey, itemId) => {
     setIepData((prev) => {
       const currentItems = prev.sections?.[sectionKey] || [];
       if (currentItems.length === 0) return prev;
-  
+
       return {
         ...prev,
         sections: {
@@ -1340,14 +1442,14 @@ const [iepData, setIepData] = useState(createEmptyIepData());
       return updated;
     });
   };
-  
+
 
   const loadIepData = () => {
     try {
       const key = `iep_data_student_${id}_by_month`;
       const mapping = JSON.parse(localStorage.getItem(key) || "{}");
       setSavedIepByMonth(mapping || {});
-  
+
       if (iepData?.selectedMonth) {
         const monthYearKey = `${iepData.selectedMonth} ${selectedYear}`;
         if (mapping?.[monthYearKey]) {
@@ -1361,32 +1463,32 @@ const [iepData, setIepData] = useState(createEmptyIepData());
 
 
 
-// add a new row where only `columnKey` is intended to be edited (other cells empty)
-const addCellToColumn = (columnKey) => {
-  setIepData(prev => {
-    const sections = { ...prev.sections };
-    const list = [...(sections[columnKey] || [])];
-    const nextId = (list[list.length - 1]?.id || 0) + 1;
-    list.push({ id: nextId, text: "" });
-    sections[columnKey] = list;
-    return { ...prev, sections };
-  });
-};
+  // add a new row where only `columnKey` is intended to be edited (other cells empty)
+  const addCellToColumn = (columnKey) => {
+    setIepData(prev => {
+      const sections = { ...prev.sections };
+      const list = [...(sections[columnKey] || [])];
+      const nextId = (list[list.length - 1]?.id || 0) + 1;
+      list.push({ id: nextId, text: "" });
+      sections[columnKey] = list;
+      return { ...prev, sections };
+    });
+  };
 
   const downloadIepAsPDF = (iepSource = iepData) => {
     if (iepFormVisible || editingIepMonth) {
       showToast("Please save or cancel the open IEP edit before downloading.", "error");
       return;
     }
-  
+
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const margin = 30;
-    
+
     const titleTopPadding = 18;
     const titleY = margin + titleTopPadding;
-    
+
     doc.setFontSize(14);
     doc.setFont("times", "bold");
     doc.text(
@@ -1395,39 +1497,39 @@ const addCellToColumn = (columnKey) => {
       titleY,
       { align: "center" }
     );
-    
+
     doc.setFontSize(11);
     doc.setFont("times", "normal");
     doc.text(`Name : ${student?.name || ""}`, margin, titleY + 20);
-    
+
     const tableTop = titleY + 50;
     const tableLeft = margin;
     const tableWidth = pageW - margin * 2;
     const colWidth = Math.floor(tableWidth / 3);
-    
+
     const cellPadding = 8;
     const usableColW = colWidth - cellPadding * 2;
     const lineHeight = 14;
     const headerH = 32;
     const minRowH = 36;
-  
+
     const adl = iepSource?.sections?.adlSkills || [];
     const academic = iepSource?.sections?.academic || [];
     const behavioural = iepSource?.sections?.behaviouralSkills || [];
     const rowsCount = Math.max(adl.length, academic.length, behavioural.length, 3); // ensure some rows
-    
+
     const rowHeights = [];
     const rowTextLines = [];
-    
+
     for (let r = 0; r < rowsCount; r++) {
       const c0 = String(adl[r]?.text ?? "");
       const c1 = String(academic[r]?.text ?? "");
       const c2 = String(behavioural[r]?.text ?? "");
-    
+
       const l0 = doc.splitTextToSize(c0, usableColW);
       const l1 = doc.splitTextToSize(c1, usableColW);
       const l2 = doc.splitTextToSize(c2, usableColW);
-    
+
       const rh = Math.max(
         Math.max(l0.length, l1.length, l2.length) * lineHeight + cellPadding * 2,
         minRowH
@@ -1435,20 +1537,20 @@ const addCellToColumn = (columnKey) => {
       rowHeights.push(rh);
       rowTextLines.push([l0, l1, l2]);
     }
-    
+
     const tableBodyHeight = rowHeights.reduce((a, b) => a + b, 0);
     const tableHeight = headerH + tableBodyHeight;
-    
+
     // draw outer table border (bigger table)
     doc.setLineWidth(0.8);
     doc.rect(tableLeft, tableTop, tableWidth, tableHeight, "S");
-    
+
     // draw vertical dividers
     const x1 = tableLeft + colWidth;
     const x2 = tableLeft + colWidth * 2;
     doc.line(x1, tableTop, x1, tableTop + tableHeight);
     doc.line(x2, tableTop, x2, tableTop + tableHeight);
-    
+
     // header
     doc.setFontSize(11);
     doc.setFont("times", "bold");
@@ -1459,10 +1561,10 @@ const addCellToColumn = (columnKey) => {
       doc.text(headerTitles[i], hx, hy);
     }
 
-        // draw horizontal line under header
+    // draw horizontal line under header
     doc.setLineWidth(0.7);
     doc.line(tableLeft, tableTop + headerH, tableLeft + tableWidth, tableTop + headerH);
-    
+
     // render rows
     doc.setFontSize(11);
     doc.setFont("times", "normal");
@@ -1470,22 +1572,22 @@ const addCellToColumn = (columnKey) => {
     for (let r = 0; r < rowsCount; r++) {
       const rh = rowHeights[r];
       const lines = rowTextLines[r];
-    
+
       for (let c = 0; c < 3; c++) {
         const x = tableLeft + c * colWidth + cellPadding;
         doc.text(lines[c], x, y + cellPadding + 7);
       }
       y += rh;
     }
-    
+
     // gap after table
     y += 18;
-    
+
     // IEP label + REMARKS (moved accordingly)
     doc.setFontSize(12);
     doc.setFont("times", "bold");
     doc.text("IEP OF THE STUDENT :", margin, y);
-    
+
     // render IEP textbox content (from saved source)
     doc.setFontSize(10);
     doc.setFont("times", "normal");
@@ -1497,28 +1599,28 @@ const addCellToColumn = (columnKey) => {
     } else {
       y += 28;
     }
-    
+
     y += 28;
 
     doc.setFontSize(11);
     doc.setFont("times", "bold");
     doc.text("REMARKS :", margin, y);
     y += 14;
-    
+
     // increased remarks box height
     const remarksBoxHeight = 100; // adjust as needed
     const remarksBoxWidth = tableWidth;
     doc.rect(margin, y, remarksBoxWidth, remarksBoxHeight);
-    
+
     // write remarks text inside box with small left padding
     doc.setFontSize(10);
     doc.setFont("times", "normal");
     const remarksText = String(iepSource?.remarks || "");
     const remarksLines = doc.splitTextToSize(remarksText, remarksBoxWidth - cellPadding * 2);
     doc.text(remarksLines, margin + cellPadding, y + 12);
-    
+
     y += remarksBoxHeight + 26; // move cursor below box
-    
+
     // signatures (computed after remarks box so they sit beneath it)
     const sigBottomMargin = 55;
     const sigLineY = pageH - sigBottomMargin;
@@ -1527,18 +1629,18 @@ const addCellToColumn = (columnKey) => {
     const sigX1 = margin + sigW;
     const sigX2 = margin + sigW * 2;
     const sigLineLength = sigW - 40;
-    
+
     doc.setLineWidth(0.7);
     doc.line(sigX0 + 20, sigLineY, sigX0 + 20 + sigLineLength, sigLineY);
     doc.line(sigX1 + 20, sigLineY, sigX1 + 20 + sigLineLength, sigLineY);
     doc.line(sigX2 + 20, sigLineY, sigX2 + 20 + sigLineLength, sigLineY);
-    
+
     doc.setFontSize(10);
     doc.setFont("times", "normal");
     doc.text("Principal", sigX0 + 20, sigLineY + 14);
     doc.text("Class Teacher", sigX1 + 20, sigLineY + 14);
     doc.text("Parent / Guardian", sigX2 + 20, sigLineY + 14);
-  
+
     // Save PDF
     doc.save(`${(student?.name || "student").replace(/\s+/g, "_")}-iep.pdf`);
   };
@@ -1912,7 +2014,7 @@ const addCellToColumn = (columnKey) => {
     return (
       <div className="mb-8 p-5 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-md">
         <h3 className="text-lg font-bold text-[#170F49] mb-4">{label}</h3>
-        
+
         <div className="mb-4">
           <label className="block text-sm font-semibold text-[#170F49] mb-1">Short Term Goal</label>
           <textarea
@@ -2010,7 +2112,7 @@ const addCellToColumn = (columnKey) => {
     return (
       <div className="mb-8 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm">
         <h3 className="text-lg font-bold text-[#170F49] mb-4">{label}</h3>
-        
+
         {term.shortTermGoal && (
           <div className="mb-4">
             <div className="text-sm font-semibold text-[#170F49] mb-1">Short Term Goal</div>
@@ -2066,9 +2168,7 @@ const addCellToColumn = (columnKey) => {
   };
 
   const renderSummaryContent = (summaryText, isStreaming = false) => {
-    const text = String(summaryText || "").trim();
-
-    if (!text) {
+    if (isStreaming || (!aiAnalysis && !summaryText)) {
       return (
         <div className="rounded-xl border border-orange-200 bg-orange-50/70 p-4 text-sm text-gray-700">
           <div className="font-semibold text-[#C56930]">Generating summary...</div>
@@ -2079,9 +2179,93 @@ const addCellToColumn = (columnKey) => {
       );
     }
 
+    let summariesDict = null;
+    if (aiAnalysis && aiAnalysis.summaries) {
+      summariesDict = aiAnalysis.summaries;
+    } else {
+      try {
+        const parsed = JSON.parse(summaryText);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          summariesDict = parsed;
+        }
+      } catch (e) { }
+    }
+
+    let summaryTitle = selectedTherapyType || "Therapy";
+
+    if (summariesDict) {
+      const sections = Object.entries(summariesDict).map(([heading, content]) => ({
+        heading,
+        content: String(content || "").trim(),
+      }));
+
+      if (sections.length === 0) {
+        return (
+          <div className="rounded-xl border border-orange-200 bg-orange-50/70 p-4 text-sm text-gray-700">
+            No progress details found for the active sub-areas in the selected reports.
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-3">
+          <div className="mb-2 rounded-xl border border-[#E38B52]/40 bg-gradient-to-r from-orange-100 to-orange-50 px-4 py-3">
+            <div className="text-lg sm:text-xl font-extrabold text-[#B85D2A] tracking-wide uppercase">
+              {summaryTitle} - Progress Summary
+            </div>
+          </div>
+
+          {sections.map((section, sectionIndex) => {
+            const sectionKey = `${section.heading.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${sectionIndex}`;
+            const isCollapsed = !!collapsedSummarySections[sectionKey];
+
+            return (
+              <div key={sectionKey} className="rounded-xl border border-orange-200/70 bg-white/90">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCollapsedSummarySections((prev) => ({
+                      ...prev,
+                      [sectionKey]: !prev[sectionKey],
+                    }))
+                  }
+                  className="w-full flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-left hover:bg-orange-50/70 transition-colors"
+                >
+                  <h5 className="text-sm sm:text-base font-bold text-[#B65E2A]">
+                    {section.heading}
+                  </h5>
+                  <span className="text-[#E38B52] text-xs font-semibold">
+                    {isCollapsed ? "Expand" : "Collapse"}
+                  </span>
+                </button>
+
+                {!isCollapsed && (
+                  <div className="mt-1 px-4 pb-4 space-y-3">
+                    <div className="rounded-lg px-3 py-2 bg-white/80 border border-orange-100">
+                      <p className="text-sm sm:text-[15px] text-gray-800 leading-7 whitespace-pre-wrap">
+                        {section.content}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    const text = String(summaryText || "").trim();
+    if (!text) {
+      return (
+        <div className="rounded-xl border border-orange-200 bg-orange-50/70 p-4 text-sm text-gray-700">
+          No detailed clinical observations were available in the selected reports.
+        </div>
+      );
+    }
+
     const lines = text.split("\n");
     const sections = [];
-    let summaryTitle = selectedTherapyType || "Therapy";
     let currentSection = { heading: "Summary", lines: [] };
 
     const pushSection = () => {
@@ -2107,7 +2291,7 @@ const addCellToColumn = (columnKey) => {
 
       if (isMainTitle) {
         const titleWithoutSuffix = cleanedHeading
-          .replace(/\s*[Ã¯Â¿Â½-]\s*progress summary\s*$/i, "")
+          .replace(/\s*[—-]\s*progress summary\s*$/i, "")
           .replace(/\s*progress summary\s*$/i, "")
           .trim();
         summaryTitle = titleWithoutSuffix || summaryTitle;
@@ -2168,8 +2352,8 @@ const addCellToColumn = (columnKey) => {
                       return <div key={`${sectionKey}-spacer-${lineIndex}`} className="h-2" />;
                     }
 
-                    const isBullet = /^[-Ã¯Â¿Â½*]\s+/.test(line);
-                    const bulletText = isBullet ? line.replace(/^[-Ã¯Â¿Â½*]\s+/, "") : line;
+                    const isBullet = /^[-•*]\s+/.test(line);
+                    const bulletText = isBullet ? line.replace(/^[-•*]\s+/, "") : line;
                     const isFinalVisibleLine =
                       isStreaming &&
                       sectionIndex === sections.length - 1 &&
@@ -2178,14 +2362,13 @@ const addCellToColumn = (columnKey) => {
                     return (
                       <div
                         key={`${sectionKey}-line-${lineIndex}`}
-                        className={`rounded-lg px-3 py-2 ${
-                          isBullet
-                            ? "bg-white/80 border border-orange-100"
-                            : "bg-transparent"
-                        }`}
+                        className={`rounded-lg px-3 py-2 ${isBullet
+                          ? "bg-white/80 border border-orange-100"
+                          : "bg-transparent"
+                          }`}
                       >
                         <p className="text-sm sm:text-[15px] text-gray-800 leading-7">
-                          {isBullet && <span className="text-[#E38B52] font-bold mr-2">Ã¯Â¿Â½</span>}
+                          {isBullet && <span className="text-[#E38B52] font-bold mr-2">•</span>}
                           {bulletText}
                           {isFinalVisibleLine && (
                             <span className="inline-block ml-1 text-[#E38B52] font-semibold animate-pulse">
@@ -2230,39 +2413,472 @@ const addCellToColumn = (columnKey) => {
 
   const normalizeAIProgressSummary = (summary) => {
     return String(summary || "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+      .replace(/\r\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  };
+
+  const getUnifiedSummaryText = (analysis) => {
+    if (!analysis) return "";
+    if (analysis.summaries) {
+      return Object.entries(analysis.summaries)
+        .map(([section, text]) => `**${section}**\n${text}`)
+        .join("\n\n");
+    }
+    return analysis.summary || "";
+  };
+
+  const handleDownloadRawReports = (reportsToDownload) => {
+    if (!reportsToDownload || reportsToDownload.length === 0) {
+      alert("No reports available to download");
+      return;
+    }
+
+    const pdf = new jsPDF();
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const marginLeft = 15;
+    const marginRight = 15;
+    let yPosition = 20;
+
+    // Add school logo to top-right
+    const logoWidth = 30;
+    const logoHeight = 30;
+    const logoX = pageWidth - logoWidth - marginRight;
+    const logoY = 10;
+    try {
+      pdf.addImage(schoolLogo, "JPEG", logoX, logoY, logoWidth, logoHeight);
+    } catch (logoError) {
+      console.error("Error adding logo to PDF:", logoError);
+      // Try again without format specification
+      try {
+        pdf.addImage(schoolLogo, logoX, logoY, logoWidth, logoHeight);
+      } catch (e2) {
+        console.error("Second attempt to add logo failed:", e2);
+      }
+    }
+
+    // Title
+    pdf.setFontSize(18);
+    pdf.setFont("times", "bold");
+    pdf.text(
+      `Therapy Reports - ${student?.name || "Student"}`,
+      marginLeft,
+      yPosition,
+    );
+    yPosition += 10;
+
+    // Date range
+    pdf.setFontSize(10);
+    pdf.setFont("times", "normal");
+    const dates = reportsToDownload.map((r) => new Date(r.report_date)).filter((d) => !isNaN(d.getTime()));
+    const dateRangeText = dates.length > 0
+      ? `Date Range: ${new Date(Math.min(...dates)).toLocaleDateString()} to ${new Date(Math.max(...dates)).toLocaleDateString()}`
+      : "All Reports";
+    pdf.text(dateRangeText, marginLeft, yPosition);
+    yPosition += 5;
+
+    const therapyTypes = [...new Set(reportsToDownload.map((r) => r.therapy_type).filter(Boolean))];
+    if (therapyTypes.length === 1) {
+      pdf.text(
+        `Therapy Type: ${therapyTypes[0]}`,
+        marginLeft,
+        yPosition,
+      );
+      yPosition += 5;
+    }
+
+    pdf.text(
+      `Total Reports: ${reportsToDownload.length}`,
+      marginLeft,
+      yPosition,
+    );
+    yPosition += 10;
+
+    // Reports
+    reportsToDownload.forEach((report, index) => {
+      if (yPosition > pageHeight - 40) {
+        pdf.addPage();
+        yPosition = 20;
+      }
+
+      pdf.setFontSize(14);
+      pdf.setFont("times", "bold");
+      pdf.text(
+        `Report ${index + 1}`,
+        marginLeft,
+        yPosition,
+      );
+      yPosition += 8;
+
+      pdf.setFontSize(10);
+      pdf.setFont("times", "normal");
+
+      pdf.text(
+        `Date: ${new Date(report.report_date).toLocaleDateString()}`,
+        marginLeft,
+        yPosition,
+      );
+      yPosition += 5;
+
+      pdf.text(
+        `Therapy Type: ${report.therapy_type || "N/A"}`,
+        marginLeft,
+        yPosition,
+      );
+      yPosition += 5;
+
+      pdf.text(
+        `Therapist: ${report.therapist_name || "N/A"}`,
+        marginLeft,
+        yPosition,
+      );
+      yPosition += 5;
+
+      if (report.progress_level) {
+        pdf.text(
+          `Progress Level: ${report.progress_level}`,
+          marginLeft,
+          yPosition,
+        );
+        yPosition += 5;
+      }
+
+      yPosition += 3;
+
+      const clinicalFields = [
+        ["Present Complaints", report.present_complaints],
+        ["Current Observation", report.current_observation],
+        ["Assessment Done", report.assessment_done],
+        ["Provisional Diagnosis", report.provisional_diagnosis],
+      ];
+
+      clinicalFields.forEach(([label, value]) => {
+        const text = typeof value === "string" ? value.trim() : value;
+        if (!text) {
+          return;
+        }
+
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.setFont("times", "bold");
+        pdf.text(`${label}:`, marginLeft, yPosition);
+        yPosition += 5;
+        pdf.setFont("times", "normal");
+        const lines = pdf.splitTextToSize(
+          String(value),
+          pageWidth - marginLeft - marginRight,
+        );
+        lines.forEach((line) => {
+          if (yPosition > pageHeight - 20) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          pdf.text(line, marginLeft + 5, yPosition);
+          yPosition += 5;
+        });
+        yPosition += 3;
+      });
+
+      // Progress Notes
+      if (report.progress_notes) {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.setFont("times", "bold");
+        pdf.text(
+          "Progress Notes:",
+          marginLeft,
+          yPosition,
+        );
+        yPosition += 5;
+        pdf.setFont("times", "normal");
+        const progressLines = pdf.splitTextToSize(
+          report.progress_notes,
+          pageWidth - marginLeft - marginRight,
+        );
+        progressLines.forEach((line) => {
+          if (yPosition > pageHeight - 20) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          pdf.text(line, marginLeft + 5, yPosition);
+          yPosition += 5;
+        });
+        yPosition += 3;
+      }
+
+      // Goals Achieved - detailed breakdown of all sections
+      if (report.goals_achieved) {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.setFont("times", "bold");
+        pdf.text(
+          "Goals Addressed:",
+          marginLeft,
+          yPosition,
+        );
+        yPosition += 5;
+        pdf.setFont("times", "normal");
+
+        if (
+          typeof report.goals_achieved === "object" &&
+          !Array.isArray(report.goals_achieved)
+        ) {
+          const activeSections = Object.entries(report.goals_achieved).filter(
+            ([_, data]) => data && (data.checked || (data.notes && data.notes.trim()) || (data.response && data.response.trim()))
+          );
+
+          if (activeSections.length > 0) {
+            activeSections.forEach(
+              ([sectionKey, sectionData]) => {
+                if (yPosition > pageHeight - 20) {
+                  pdf.addPage();
+                  yPosition = 20;
+                }
+
+                // Format section title (e.g., "receptive_language" -> "Receptive Language")
+                const sectionTitle = (sectionData && sectionData.label) || sectionKey
+                  .split("_")
+                  .map(
+                    (word) =>
+                      word.charAt(0).toUpperCase() +
+                      word.slice(1),
+                  )
+                  .join(" ");
+
+                pdf.setFont("times", "bold");
+                pdf.text(
+                  ` ${sectionTitle}:`,
+                  marginLeft + 5,
+                  yPosition,
+                );
+                yPosition += 5;
+                pdf.setFont("times", "normal");
+
+                // If it has notes or response, display them
+                if (sectionData && (sectionData.notes || sectionData.response)) {
+                  if (sectionData.notes) {
+                    const noteLines = pdf.splitTextToSize(
+                      `Goal: ${sectionData.notes}`,
+                      pageWidth - marginLeft - marginRight - 15,
+                    );
+                    noteLines.forEach((line) => {
+                      if (yPosition > pageHeight - 20) {
+                        pdf.addPage();
+                        yPosition = 20;
+                      }
+                      pdf.text(
+                        line,
+                        marginLeft + 10,
+                        yPosition,
+                      );
+                      yPosition += 5;
+                    });
+                  }
+                  if (sectionData.response) {
+                    const respLines = pdf.splitTextToSize(
+                      `Response: ${sectionData.response}`,
+                      pageWidth - marginLeft - marginRight - 15,
+                    );
+                    respLines.forEach((line) => {
+                      if (yPosition > pageHeight - 20) {
+                        pdf.addPage();
+                        yPosition = 20;
+                      }
+                      pdf.text(
+                        line,
+                        marginLeft + 10,
+                        yPosition,
+                      );
+                      yPosition += 5;
+                    });
+                  }
+                } else {
+                  // Checked but no notes or response
+                  pdf.text(
+                    "Addressed",
+                    marginLeft + 10,
+                    yPosition,
+                  );
+                  yPosition += 5;
+                }
+
+                yPosition += 2;
+              },
+            );
+          } else {
+            pdf.text(
+              "No goals addressed",
+              marginLeft + 5,
+              yPosition,
+            );
+            yPosition += 5;
+          }
+        } else if (
+          typeof report.goals_achieved === "string" &&
+          report.goals_achieved.trim()
+        ) {
+          // If goals_achieved is just a string
+          const goalLines = pdf.splitTextToSize(
+            report.goals_achieved,
+            pageWidth - marginLeft - marginRight - 5,
+          );
+          goalLines.forEach((line) => {
+            if (yPosition > pageHeight - 20) {
+              pdf.addPage();
+              yPosition = 20;
+            }
+            pdf.text(line, marginLeft + 5, yPosition);
+            yPosition += 5;
+          });
+        } else {
+          pdf.text(
+            "No goals addressed",
+            marginLeft + 5,
+            yPosition,
+          );
+          yPosition += 5;
+        }
+        yPosition += 3;
+      }
+
+      // Challenges
+      if (report.challenges) {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.setFont("times", "bold");
+        pdf.text("Challenges:", marginLeft, yPosition);
+        yPosition += 5;
+        pdf.setFont("times", "normal");
+        const challengeLines = pdf.splitTextToSize(
+          report.challenges,
+          pageWidth - marginLeft - marginRight,
+        );
+        challengeLines.forEach((line) => {
+          if (yPosition > pageHeight - 20) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          pdf.text(line, marginLeft + 5, yPosition);
+          yPosition += 5;
+        });
+        yPosition += 3;
+      }
+
+      // Recommendations (if available)
+      if (report.recommendations) {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.setFont("times", "bold");
+        pdf.text(
+          "Recommendations:",
+          marginLeft,
+          yPosition,
+        );
+        yPosition += 5;
+        pdf.setFont("times", "normal");
+        const recLines = pdf.splitTextToSize(
+          report.recommendations,
+          pageWidth - marginLeft - marginRight,
+        );
+        recLines.forEach((line) => {
+          if (yPosition > pageHeight - 20) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          pdf.text(line, marginLeft + 5, yPosition);
+          yPosition += 5;
+        });
+        yPosition += 3;
+      }
+
+      // Next Goals (if available)
+      if (report.next_goals) {
+        if (yPosition > pageHeight - 20) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+        pdf.setFont("times", "bold");
+        pdf.text("Next Goals:", marginLeft, yPosition);
+        yPosition += 5;
+        pdf.setFont("times", "normal");
+        const nextGoalLines = pdf.splitTextToSize(
+          report.next_goals,
+          pageWidth - marginLeft - marginRight,
+        );
+        nextGoalLines.forEach((line) => {
+          if (yPosition > pageHeight - 20) {
+            pdf.addPage();
+            yPosition = 20;
+          }
+          pdf.text(line, marginLeft + 5, yPosition);
+          yPosition += 5;
+        });
+        yPosition += 3;
+      }
+
+      // Add a separator line between reports
+      if (yPosition > pageHeight - 20) {
+        pdf.addPage();
+        yPosition = 20;
+      }
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(
+        marginLeft,
+        yPosition,
+        pageWidth - marginRight,
+        yPosition,
+      );
+      yPosition += 8;
+    });
+
+    pdf.save(
+      `therapy_reports_${student?.name || "student"}_${new Date().toISOString().split("T")[0]}.pdf`,
+    );
   };
 
   const handleAISummarize = async () => {
+    // Clear dismissed flag so the new result always shows
+    sessionStorage.removeItem(`ai_summary_dismissed_${id}`);
     setAiSummaryError(null);
     setAiSummary("");
     setAiAnalysis(null);
     setTranslatedSummary(null);
     setCollapsedSummarySections({});
-    // Build server payload based on current filters
+
     const payload = {
       student_id: student?.studentId || id,
-      from_date: fromDate || null,
-      to_date: toDate || null,
-      therapy_type: selectedTherapyType || null,
-      model: aiModel,
-      max_length: 280,
-      min_length: 60,
+      therapy_type: selectedTherapyType,
+      preset_range: presetRange,
     };
+
     if (!payload.student_id) {
       setAiSummaryError("Missing student id");
       return;
     }
+    if (!payload.therapy_type) {
+      setAiSummaryError("Please select a therapy type first.");
+      return;
+    }
+
     setAiSummarizing(true);
     const abortController = new AbortController();
     aiSummaryAbortControllerRef.current = abortController;
+
     try {
-      const baseUrl =
-        process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+      const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
       const token = localStorage.getItem("token");
-      const res = await fetch(`${baseUrl}/api/v1/therapy-reports/summary/ai/stream`, {
+      const res = await fetch(`${baseUrl}/api/v1/therapy-reports/summary/ai`, {
         method: "POST",
         signal: abortController.signal,
         headers: {
@@ -2271,132 +2887,31 @@ const addCellToColumn = (columnKey) => {
         },
         body: JSON.stringify(payload),
       });
+
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`${res.status} ${text}`);
-      }
-
-      if (!res.body) {
-        throw new Error("Streaming response body is not available");
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let streamedSummary = "";
-      let gotCompleteEvent = false;
-
-      const processSseEvent = (rawEvent) => {
-        if (!rawEvent) return;
-
-        const lines = rawEvent
-          .split("\n")
-          .map((line) => line.trimEnd())
-          .filter(Boolean);
-        if (!lines.length) return;
-
-        let eventType = "message";
-        const dataLines = [];
-
-        for (const line of lines) {
-          if (line.startsWith("event:")) {
-            eventType = line.slice(6).trim();
-          } else if (line.startsWith("data:")) {
-            dataLines.push(line.slice(5).trim());
-          }
-        }
-
-        const dataText = dataLines.join("\n");
-        if (!dataText) return;
-
-        let parsed;
+        let errorMsg = text;
         try {
-          parsed = JSON.parse(dataText);
-        } catch {
-          return;
-        }
-
-        if (eventType === "summary") {
-          const nextChunk = parsed?.chunk || "";
-          if (nextChunk) {
-            streamedSummary += nextChunk;
-            setAiSummary(streamedSummary);
-          }
-          return;
-        }
-
-        if (eventType === "summary_replace") {
-          const replacement = parsed?.summary || "";
-          streamedSummary = replacement;
-          setAiSummary(replacement);
-          return;
-        }
-
-        if (eventType === "complete") {
-          gotCompleteEvent = true;
-          const normalizedSummary = normalizeAIProgressSummary(parsed?.summary || streamedSummary || "");
-          const normalizedData = { ...parsed, summary: normalizedSummary };
-          setAiAnalysis(normalizedData);
-          setAiSummary(normalizedSummary || "(No summary returned)");
-          
-          // Save to generated summaries for viewing later
-          const newSummary = {
-            id: Date.now(),
-            summary: normalizedSummary,
-            dateRange: {
-              start: fromDate || "All dates",
-              end: toDate || "Current",
-            },
-            therapyType: selectedTherapyType || "All therapies",
-            reportCount: parsed?.used_reports || 0,
-            generatedAt: new Date().toLocaleString(),
-          };
-          setGeneratedSummaries(prev => {
-            const updated = [newSummary, ...prev];
-            // Also save to localStorage
-            const summariesKey = `ai_summaries_student_${id}`;
-            try {
-              localStorage.setItem(summariesKey, JSON.stringify(updated));
-            } catch (e) {
-              console.error("Failed to save AI summaries to localStorage:", e);
-            }
-            return updated;
-          });
-          return;
-        }
-
-        if (eventType === "error") {
-          throw new Error(parsed?.message || "AI summary streaming failed");
-        }
-      };
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-          if (buffer.trim()) {
-            processSseEvent(buffer.trim());
-          }
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split("\n\n");
-        buffer = events.pop() || "";
-        for (const evt of events) {
-          processSseEvent(evt.trim());
-        }
+          const parsedErr = JSON.parse(text);
+          errorMsg = parsedErr.detail || text;
+        } catch { }
+        throw new Error(errorMsg);
       }
 
-      if (!gotCompleteEvent) {
-        throw new Error("AI summary stream closed before completion");
-      }
+      const data = await res.json();
+      setAiAnalysis(data);
+      setAiSummary(JSON.stringify(data.summaries));
+
+      // Refresh summary history from database
+      await fetchSummaryHistory();
+
     } catch (e) {
       if (e?.name === "AbortError") {
         setAiSummaryError("Generation stopped");
         return;
       }
       console.error("AI summarize failed", e);
-      setAiSummaryError(e.message);
+      setAiSummaryError(e.message || "Failed to generate AI summary.");
     } finally {
       aiSummaryAbortControllerRef.current = null;
       setAiSummarizing(false);
@@ -2505,6 +3020,77 @@ const addCellToColumn = (columnKey) => {
     pdf.save(fileName);
   };
 
+  // Reusable PDF generator for any summary object (used for per-item download in history)
+  const generateSummaryPDFFromData = (summaryData) => {
+    if (!summaryData || !student) return;
+
+    const pdf = new jsPDF();
+    const pageWidth = pdf.internal.pageSize.width;
+    const marginLeft = 20;
+    const marginRight = 20;
+    const contentWidth = pageWidth - marginLeft - marginRight;
+    let yPos = 20;
+
+    const checkPageBreak = (needed = 10) => {
+      if (yPos + needed > 275) { pdf.addPage(); yPos = 20; }
+    };
+
+    // Header
+    pdf.setFontSize(16);
+    pdf.setFont("times", "bold");
+    pdf.text("AI Therapy Progress Summary", marginLeft, yPos);
+    yPos += 9;
+
+    // Meta
+    pdf.setFontSize(10);
+    pdf.setFont("times", "normal");
+    pdf.text(`Student: ${student.name || "N/A"}`, marginLeft, yPos); yPos += 6;
+    pdf.text(`Student ID: ${student.student_id || "N/A"}`, marginLeft, yPos); yPos += 6;
+    if (student.class_name) { pdf.text(`Class: ${student.class_name}`, marginLeft, yPos); yPos += 6; }
+    pdf.text(`Therapy Type: ${summaryData.therapyType || "N/A"}`, marginLeft, yPos); yPos += 6;
+    pdf.text(`Reports Analyzed: ${summaryData.reportCount || 0}`, marginLeft, yPos); yPos += 6;
+    if (summaryData.dateRange) {
+      pdf.text(`Analysis Period: ${summaryData.dateRange.start || "N/A"} to ${summaryData.dateRange.end || "N/A"}`, marginLeft, yPos); yPos += 6;
+    }
+    if (summaryData.generatedAt) {
+      pdf.text(`Generated: ${summaryData.generatedAt}`, marginLeft, yPos); yPos += 6;
+    }
+    yPos += 4;
+
+    // Section summaries
+    const summariesDict = summaryData.summaries;
+    if (summariesDict && typeof summariesDict === "object") {
+      Object.entries(summariesDict).forEach(([heading, content]) => {
+        checkPageBreak(12);
+        pdf.setFontSize(11);
+        pdf.setFont("times", "bold");
+        pdf.text(heading, marginLeft, yPos);
+        yPos += 6;
+        pdf.setFontSize(10);
+        pdf.setFont("times", "normal");
+        const lines = pdf.splitTextToSize(String(content || ""), contentWidth);
+        lines.forEach((line) => { checkPageBreak(6); pdf.text(line, marginLeft + 4, yPos); yPos += 5; });
+        yPos += 4;
+      });
+    } else {
+      const fallbackText = summaryData.summary || getUnifiedSummaryText(summaryData);
+      const lines = pdf.splitTextToSize(fallbackText, contentWidth);
+      lines.forEach((line) => { checkPageBreak(6); pdf.text(line, marginLeft, yPos); yPos += 5; });
+    }
+
+    // Footer
+    const totalPages = pdf.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(8);
+      pdf.text(`Generated on: ${new Date().toLocaleString()}`, marginLeft, 287);
+      pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 40, 287);
+    }
+
+    const safeDate = (summaryData.generatedAt || new Date().toISOString()).replace(/[/:, ]/g, "-").slice(0, 19);
+    pdf.save(`AI_Summary_${student.student_id || "student"}_${safeDate}.pdf`);
+  };
+
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState(null);
   const [developmentHistoryDraft, setDevelopmentHistoryDraft] = useState("");
@@ -2531,25 +3117,25 @@ const addCellToColumn = (columnKey) => {
   const [documentUploading, setDocumentUploading] = useState(false);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [uploadedDocTypes, setUploadedDocTypes] = useState({});
-    const [showDocumentDeleteConfirm, setShowDocumentDeleteConfirm] = useState(false);
+  const [showDocumentDeleteConfirm, setShowDocumentDeleteConfirm] = useState(false);
   const [pendingDocumentDelete, setPendingDocumentDelete] = useState(null);
   const [previewDocument, setPreviewDocument] = useState(null);
-    const SPECIAL_DOC_TYPES = ["aadhar", "birth_certificate", "ration_card"];
-        
-    
-    const DOCUMENT_TYPE_LABELS = {
-      aadhar: "Aadhar",
-      birth_certificate: "Birth Certificate",
-      disability_certificate: "Disability Certificate",
-      ration_card: "Ration Card",
-      unique_disability: "UDID Card",
-      hospital_assessment: "Medical Reports",
-      passbook: "Passbook",
-      nish_assessment: "Assessment Report",
-    };
+  const SPECIAL_DOC_TYPES = ["aadhar", "birth_certificate", "ration_card"];
+
+
+  const DOCUMENT_TYPE_LABELS = {
+    aadhar: "Aadhar",
+    birth_certificate: "Birth Certificate",
+    disability_certificate: "Disability Certificate",
+    ration_card: "Ration Card",
+    unique_disability: "UDID Card",
+    hospital_assessment: "Medical Reports",
+    passbook: "Passbook",
+    nish_assessment: "Assessment Report",
+  };
   const DOCUMENT_UPLOAD_RESET_MS = 3000;
   const documentUploadTimersRef = useRef({});
-  
+
   const clearDocumentUploadTimer = (docTypeId) => {
     const timer = documentUploadTimersRef.current[docTypeId];
     if (timer) {
@@ -2557,7 +3143,7 @@ const addCellToColumn = (columnKey) => {
       delete documentUploadTimersRef.current[docTypeId];
     }
   };
-  
+
   const syncUploadedDocTypesFromDocuments = (docs = []) => {
     const next = {};
     docs.forEach((doc) => {
@@ -2570,8 +3156,8 @@ const addCellToColumn = (columnKey) => {
   };
   const documentInputRef = useRef(null);
 
-    const [uploadedDocumentsByType, setUploadedDocumentsByType] = useState({});
-  
+  const [uploadedDocumentsByType, setUploadedDocumentsByType] = useState({});
+
   const getDocumentTypeId = (doc) =>
     doc?.documentType || doc?.document_type || doc?.type || "";
 
@@ -2586,20 +3172,20 @@ const addCellToColumn = (columnKey) => {
 
   const getDocumentGroupLabel = (doc) =>
     getDocumentCategoryLabel(doc) || "Other Documents";
-  
+
   const syncUploadedDocumentsByType = (docs = []) => {
     const next = {};
-  
+
     docs.forEach((doc) => {
       const typeId = getDocumentTypeId(doc);
       if (!typeId) return;
-  
+
       if (!next[typeId]) next[typeId] = [];
       next[typeId].push(doc);
     });
-  
+
     setUploadedDocumentsByType(next);
-  
+
     setUploadedDocTypes(
       SPECIAL_DOC_TYPES.reduce((acc, typeId) => {
         acc[typeId] = !!next[typeId]?.length;
@@ -2910,7 +3496,7 @@ const addCellToColumn = (columnKey) => {
       ...editableFields,
       developmentHistoryItems: normalizeDevelopmentHistoryItems(
         student?.development_history_items ||
-          student?.developmentHistoryItems,
+        student?.developmentHistoryItems,
       ),
     });
     setDevelopmentHistoryDraft("");
@@ -3133,11 +3719,11 @@ const addCellToColumn = (columnKey) => {
           try {
             if (fileInputRef && fileInputRef.current)
               fileInputRef.current.value = null;
-          } catch (err) {}
+          } catch (err) { }
           if (photoPreview) {
             try {
               URL.revokeObjectURL(photoPreview);
-            } catch (err) {}
+            } catch (err) { }
           }
         } catch (err) {
           console.warn("Photo upload during save failed", err);
@@ -3211,13 +3797,13 @@ const addCellToColumn = (columnKey) => {
           },
         }
       );
-      
+
       const updatedReport = res.data;
       // Update reports state
       setRawReports((prev) =>
         prev.map((r) => (r.id === updatedReport.id ? updatedReport : r))
       );
-      
+
       setEditingTherapyReport(null);
       showToast("Therapy report updated successfully!", "success");
     } catch (err) {
@@ -3350,7 +3936,7 @@ const addCellToColumn = (columnKey) => {
       // If it's just a local preview, discard it
       try {
         URL.revokeObjectURL(photoPreview);
-      } catch (err) {}
+      } catch (err) { }
       setPhotoPreview(null);
       setPhotoFile(null);
       if (fileInputRef.current) fileInputRef.current.value = null;
@@ -3468,7 +4054,7 @@ const addCellToColumn = (columnKey) => {
     }
   };
 
-    const fetchDocuments = async () => {
+  const fetchDocuments = async () => {
     setDocumentsLoading(true);
     try {
       const baseUrl =
@@ -3477,12 +4063,12 @@ const addCellToColumn = (columnKey) => {
       const config = token
         ? { headers: { Authorization: `Bearer ${token}` } }
         : {};
-  
+
       const res = await axios.get(
         `${baseUrl}/api/v1/students/${id}/documents`,
         config,
       );
-  
+
       const fetchedDocuments = res.data.documents || [];
       setDocuments(fetchedDocuments);
       syncUploadedDocTypesFromDocuments(fetchedDocuments);
@@ -3597,16 +4183,16 @@ const addCellToColumn = (columnKey) => {
     };
   }, [previewDocument]);
 
-    const confirmDeleteDocument = (documentId, documentName, documentTypeId) => {
+  const confirmDeleteDocument = (documentId, documentName, documentTypeId) => {
     setPendingDocumentDelete({ documentId, documentName, documentTypeId });
     setShowDocumentDeleteConfirm(true);
   };
-  
-    const handleDeleteDocument = async () => {
+
+  const handleDeleteDocument = async () => {
     if (!pendingDocumentDelete) return;
-  
+
     const { documentId, documentName, documentTypeId } = pendingDocumentDelete;
-  
+
     try {
       const baseUrl =
         process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -3614,12 +4200,12 @@ const addCellToColumn = (columnKey) => {
       const config = token
         ? { headers: { Authorization: `Bearer ${token}` } }
         : {};
-  
+
       await axios.delete(
         `${baseUrl}/api/v1/students/${id}/documents/${documentId}`,
         config,
       );
-  
+
       setDocuments((prev) => prev.filter((doc) => doc.id !== documentId));
       setUploadedDocumentsByType((prev) => {
         const next = { ...prev };
@@ -3629,12 +4215,12 @@ const addCellToColumn = (columnKey) => {
         if (next[documentTypeId]?.length === 0) delete next[documentTypeId];
         return next;
       });
-  
+
       if (SPECIAL_DOC_TYPES.includes(documentTypeId)) {
         clearDocumentUploadTimer(documentTypeId);
         setUploadedDocTypes((prev) => ({ ...prev, [documentTypeId]: false }));
       }
-  
+
       showToast(`Document "${documentName}" deleted successfully!`, "success");
       await fetchDocuments();
     } catch (error) {
@@ -3646,7 +4232,7 @@ const addCellToColumn = (columnKey) => {
     }
   };
 
-    const handleDocumentTypeUpload = async (file, docTypeId, docTypeLabel) => {
+  const handleDocumentTypeUpload = async (file, docTypeId, docTypeLabel) => {
     try {
       setDocumentUploading(true);
       const baseUrl =
@@ -3657,7 +4243,7 @@ const addCellToColumn = (columnKey) => {
       formData.append("documentType", docTypeId);
       formData.append("documentType", docTypeId);
       formData.append("documentTypeLabel", docTypeLabel);
-  
+
       const response = await axios.post(
         `${baseUrl}/api/v1/students/${id}/documents`,
         formData,
@@ -3668,11 +4254,11 @@ const addCellToColumn = (columnKey) => {
           },
         }
       );
-  
-            if (response.status !== 200) throw new Error("Upload failed");
-      
+
+      if (response.status !== 200) throw new Error("Upload failed");
+
       showToast(`${docTypeLabel} uploaded successfully`, "success");
-      
+
       const fetchedDocuments = await fetchDocuments();
       const realUploadedDoc =
         (fetchedDocuments || [])
@@ -3683,11 +4269,11 @@ const addCellToColumn = (columnKey) => {
               doc.name === file.name &&
               Number(doc.file_size) === Number(file.size),
           ) || null;
-      
+
       if (!realUploadedDoc) {
         throw new Error("Uploaded document was not found after refresh");
       }
-      
+
       setUploadedDocumentsByType((prev) => ({
         ...prev,
         [docTypeId]: [
@@ -3698,9 +4284,9 @@ const addCellToColumn = (columnKey) => {
           },
         ],
       }));
-      
+
       setUploadedDocTypes((prev) => ({ ...prev, [docTypeId]: true }));
-      
+
       if (!SPECIAL_DOC_TYPES.includes(docTypeId)) {
         clearDocumentUploadTimer(docTypeId);
         documentUploadTimersRef.current[docTypeId] = window.setTimeout(() => {
@@ -3708,14 +4294,14 @@ const addCellToColumn = (columnKey) => {
           delete documentUploadTimersRef.current[docTypeId];
         }, DOCUMENT_UPLOAD_RESET_MS);
       }
-      
-      
-  
-      
-      
-  
-      
-  
+
+
+
+
+
+
+
+
     } catch (error) {
       console.error("Error uploading document:", error);
       showToast(`Failed to upload ${docTypeLabel}`, "error");
@@ -3923,13 +4509,13 @@ const addCellToColumn = (columnKey) => {
       setStudent(mappedForDisplay);
       const { studentId, photoUrl, address, ...editableFields } =
         mappedForDisplay;
-        setEditData({
-          ...editableFields,
-          developmentHistoryItems: normalizeDevelopmentHistoryItems(
-            mappedForDisplay.development_history_items ||
-              mappedForDisplay.developmentHistoryItems,
-          ),
-        });
+      setEditData({
+        ...editableFields,
+        developmentHistoryItems: normalizeDevelopmentHistoryItems(
+          mappedForDisplay.development_history_items ||
+          mappedForDisplay.developmentHistoryItems,
+        ),
+      });
       setDevelopmentHistoryDraft("");
       setDrugRows(normalizeDrugRows(mappedForDisplay.drug_history));
 
@@ -4062,17 +4648,17 @@ const addCellToColumn = (columnKey) => {
   // manual table
   const handleAddManualTable = () => {
     if (unsavedTableIndex !== null) {
-    showToast("Save the current table before creating a new one", "warning");
-    return;
-  }
+      showToast("Save the current table before creating a new one", "warning");
+      return;
+    }
     if (!reportDate) {
       alert("Please select a report date before creating the table.");
       return;
     }
-  
+
     const nowIso = new Date().toISOString();
     const tableYear = new Date(reportDate).getFullYear();
-  
+
     const baseMetaHeaders = [
       "Student Name",
       "Register Number",
@@ -4082,7 +4668,7 @@ const addCellToColumn = (columnKey) => {
     const sessionHeaders = Array.from({ length: 20 }, (_, i) => String(i + 1));
     const summaryHeaders = ["Total A", "Total B", "I Qr", "II Qr", "III Qr", "IV Qr"];
     const headers = [...baseMetaHeaders, ...sessionHeaders, ...summaryHeaders];
-  
+
     const rows = SPECIAL_EDU_SKILLS.map((skill) => {
       const row = {};
       headers.forEach((h) => {
@@ -4096,7 +4682,7 @@ const addCellToColumn = (columnKey) => {
       });
       return row;
     });
-  
+
     const newTable = {
       headers,
       rows,
@@ -4109,10 +4695,10 @@ const addCellToColumn = (columnKey) => {
       quarterSnapshots: {},
       quarterOverrides: {},
     };
-  
+
     setSavedTables((prev) => {
       const updated = [...prev, newTable];
-  
+
       // persist
       try {
         if (typeof window !== "undefined" && id) {
@@ -4124,7 +4710,7 @@ const addCellToColumn = (columnKey) => {
       } catch (err) {
         console.warn("Failed to persist manually added Special Education table", err);
       }
-  
+
       // Determine where the new table appears when the UI sorts newest-first,
       // then mark that index as opened and keep questions closed.
       const sorted = [...updated].sort((a, b) => {
@@ -4133,7 +4719,7 @@ const addCellToColumn = (columnKey) => {
         return db - da;
       });
       const newIndex = sorted.findIndex((t) => t === newTable);
-  
+
       setShowTableDetails((prevDetails) => ({
         ...prevDetails,
         [newIndex]: true,
@@ -4146,7 +4732,7 @@ const addCellToColumn = (columnKey) => {
   };
 
 
-  
+
   // Helper function to format dates in a human-friendly way (no seconds)
   const formatDate = (dateString) => {
     if (!dateString) return null;
@@ -4175,7 +4761,7 @@ const addCellToColumn = (columnKey) => {
     return new Date(`${month} 1, ${year}`);
   };
 
-    const warnIfEditingIep = () => {
+  const warnIfEditingIep = () => {
     if (iepFormVisible || editingIepMonth) {
       showToast("Save the IEP report before leaving or opening another report", "warning");
       return true;
@@ -4314,7 +4900,7 @@ const addCellToColumn = (columnKey) => {
             <textarea value={iepData.remarks} onChange={(e) => handleIepInputChange("remarks", e.target.value)} placeholder="Enter additional remarks..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] resize-none" rows={4} />
           </div>
 
-          
+
         </div>
       </div>
     );
@@ -4322,18 +4908,18 @@ const addCellToColumn = (columnKey) => {
 
   // Check if a phase is unlocked based on previous phases being saved
   const isPhaseUnlocked = (table, targetPhase) => {
-  if (targetPhase === "1st assmt") return true;
+    if (targetPhase === "1st assmt") return true;
 
-  // prefer persisted savedPhases stored on the table object
-  const tableKey = savedTables.indexOf(table);
-  const persistedStatus = table && table.savedPhases ? table.savedPhases : null;
-  const phaseStatus = persistedStatus || (phaseSavedStatus[tableKey] || {});
+    // prefer persisted savedPhases stored on the table object
+    const tableKey = savedTables.indexOf(table);
+    const persistedStatus = table && table.savedPhases ? table.savedPhases : null;
+    const phaseStatus = persistedStatus || (phaseSavedStatus[tableKey] || {});
 
-  const phaseOrder = ["1st assmt", "1st Qtr", "2nd Qtr", "3rd Qtr", "4th Qtr"];
-  const targetIdx = phaseOrder.indexOf(targetPhase);
-  const prevPhase = phaseOrder[targetIdx - 1];
+    const phaseOrder = ["1st assmt", "1st Qtr", "2nd Qtr", "3rd Qtr", "4th Qtr"];
+    const targetIdx = phaseOrder.indexOf(targetPhase);
+    const prevPhase = phaseOrder[targetIdx - 1];
 
-  return !!phaseStatus[prevPhase];
+    return !!phaseStatus[prevPhase];
   };
 
   const handleSetTableEditable = (targetTable, editable) => {
@@ -4344,7 +4930,7 @@ const addCellToColumn = (columnKey) => {
     } else {
       // Exiting edit mode (saving) - clear unsaved flag
       setUnsavedTableIndex(null);
-      
+
       setPhaseSavedStatus((prev) => ({
         ...prev,
         [savedTables.indexOf(targetTable)]: {
@@ -4353,16 +4939,16 @@ const addCellToColumn = (columnKey) => {
         },
       }));
     }
-  
+
     setSavedTables((prev) => {
       const nowIso = !editable ? new Date().toISOString() : null;
       const updated = prev.map((t) => {
         if (t !== targetTable) return t;
-      
+
         const savedPhases = !editable
           ? { ...(t.savedPhases || {}), [t.assessment_phase || "1st assmt"]: true }
           : (t.savedPhases || {});
-      
+
         return {
           ...t,
           isEditable: editable,
@@ -4370,7 +4956,7 @@ const addCellToColumn = (columnKey) => {
           savedPhases,
         };
       });
-  
+
       try {
         if (typeof window !== "undefined" && id) {
           const key = `special-education-tables:${id}`;
@@ -4379,7 +4965,7 @@ const addCellToColumn = (columnKey) => {
       } catch (err) {
         console.warn("Failed to persist table edit state", err);
       }
-  
+
       return updated;
     });
   };
@@ -4405,13 +4991,13 @@ const addCellToColumn = (columnKey) => {
       }
 
       return updated;
-    });    
+    });
   };
 
-    const buildEditedExportRows = (table) => {
+  const buildEditedExportRows = (table) => {
     const rows = (table?.rows || []).map((row) => ({ ...row }));
     const snapshots = table?.quarterSnapshots || {};
-  
+
     Object.entries(snapshots).forEach(([phase, phaseData]) => {
       Object.entries(phaseData || {}).forEach(([cellKey, value]) => {
         const [rowIndexStr, colName] = String(cellKey).split(":");
@@ -4421,11 +5007,11 @@ const addCellToColumn = (columnKey) => {
         }
       });
     });
-  
+
     return rows;
   };
 
-    const loadPdfLogo = async (logoUrl) => {
+  const loadPdfLogo = async (logoUrl) => {
     try {
       return await new Promise((resolve, reject) => {
         const img = new Image();
@@ -4447,33 +5033,33 @@ const addCellToColumn = (columnKey) => {
     }
   };
 
-    const getPhaseCounts = (row, rowIdx, targetPhase, sessionHeaders, snapshots) => {
-      let a = 0;
-      let b = 0;
-    
-      sessionHeaders.forEach((colName) => {
-        // try numeric field first, then "Session N" variant
-        const raw = row[colName] ?? row[`Session ${colName}`] ?? "";
-        const baseVal = typeof raw === "string" ? raw.trim().toUpperCase() : "";
-    
-        // compute effective value from snapshots
-        const cellKey = `${rowIdx}:${colName}`;
-        const effective = getEffectiveValueForPhase(baseVal, cellKey, targetPhase, snapshots);
-    
-        if (effective === "A") a++;
-        else if (effective === "B") b++;
-      });
-    
-      return { aCount: a, bCount: b };
-    };
+  const getPhaseCounts = (row, rowIdx, targetPhase, sessionHeaders, snapshots) => {
+    let a = 0;
+    let b = 0;
 
-    // returns { effective, previous } where `previous` is the last different value before `effective`
+    sessionHeaders.forEach((colName) => {
+      // try numeric field first, then "Session N" variant
+      const raw = row[colName] ?? row[`Session ${colName}`] ?? "";
+      const baseVal = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+
+      // compute effective value from snapshots
+      const cellKey = `${rowIdx}:${colName}`;
+      const effective = getEffectiveValueForPhase(baseVal, cellKey, targetPhase, snapshots);
+
+      if (effective === "A") a++;
+      else if (effective === "B") b++;
+    });
+
+    return { aCount: a, bCount: b };
+  };
+
+  // returns { effective, previous } where `previous` is the last different value before `effective`
   function detectHistoricalChange(baseVal, cellKey, phase, snapshots = {}) {
     const phases = SPECIAL_EDU_PHASE_ORDER; // ['1st Qtr','2nd Qtr','3rd Qtr','4th Qtr']
     const idx = Math.max(0, phases.indexOf(phase));
     let effective = baseVal;
     let previous = null;
-  
+
     for (let i = 0; i <= idx; i++) {
       const p = phases[i];
       const snap = snapshots[p];
@@ -4485,17 +5071,17 @@ const addCellToColumn = (columnKey) => {
         }
       }
     }
-  
+
     // If nothing in snapshots but effective differs from baseVal, mark previous as baseVal
     if (previous === null && effective !== baseVal) previous = baseVal;
-  
+
     return { effective, previous };
   }
 
   const handleExportToPDF = async (table, index) => {
     if (!table || !table.rows || table.rows.length === 0) return;
     const rows = table.rows || [];
-  
+
     try {
       const doc = new jsPDF({
         orientation: "landscape",
@@ -4506,46 +5092,46 @@ const addCellToColumn = (columnKey) => {
       const snapshots = table.quarterSnapshots || {};
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-  
+
       const marginLeft = 6;
       const marginRight = 6;
       const marginTop = 6;
       const marginBottom = 6;
-  
+
       const studentName = table.rows?.[0]?.["Student Name"] || student?.name || "Unknown";
-     
-      
-  
+
+
+
       const rawHeaders =
         table.headers && table.headers.length
           ? table.headers
           : table.rows && table.rows.length
             ? Object.keys(table.rows[0] || {})
             : [];
-      
+
       const allHeaders = rawHeaders.filter(
         (h) =>
           h !== "Student Name" &&
           h !== "Register Number" &&
           h !== "Assessment Date",
       );
-      
+
       const normalize = (h) =>
         String(h || "")
           .toLowerCase()
           .replace(/\s+/g, "")
           .replace(/[^a-z0-9]/g, "");
-      
+
       const totalAKey = allHeaders.find((h) => normalize(h) === "totala");
       const totalBKey = allHeaders.find((h) => normalize(h) === "totalb");
-      
+
       const quarterDefs = [
         { pattern: "iqr", label: "I Qr", phase: "1st Qtr" },
         { pattern: "iiqr", label: "II Qr", phase: "2nd Qtr" },
         { pattern: "iiiqr", label: "III Qr", phase: "3rd Qtr" },
         { pattern: "ivqr", label: "IV Qr", phase: "4th Qtr" },
       ];
-      
+
       const quarterKeys = quarterDefs
         .map((def) => ({
           def,
@@ -4554,18 +5140,18 @@ const addCellToColumn = (columnKey) => {
           label: def.label,
         }))
         .filter((item) => item.key);
-      
+
       const summarySet = new Set(
         [totalAKey, totalBKey, ...quarterKeys.map((q) => q.key)].filter(Boolean),
       );
-      
+
       const baseHeaders = allHeaders.filter((h) => !summarySet.has(h));
       const skillHeader =
         baseHeaders.find((h) => String(h).toLowerCase().includes("skill")) ||
         baseHeaders[0];
-      
+
       const sessionHeaders = baseHeaders.filter((h) => h !== skillHeader);
-  
+
       const phaseTotalsByRow = (table.rows || []).map((row, rowIdx) => ({
         "1st assmt": getPhaseCounts(row, rowIdx, "1st assmt", sessionHeaders, snapshots),
         "1st Qtr": getPhaseCounts(row, rowIdx, "1st Qtr", sessionHeaders, snapshots),
@@ -4573,9 +5159,9 @@ const addCellToColumn = (columnKey) => {
         "3rd Qtr": getPhaseCounts(row, rowIdx, "3rd Qtr", sessionHeaders, snapshots),
         "4th Qtr": getPhaseCounts(row, rowIdx, "4th Qtr", sessionHeaders, snapshots),
       }));
-          
+
       const visibleColumns = [];
-  
+
       visibleColumns.push({
         group: null,
         header: skillHeader,
@@ -4584,7 +5170,7 @@ const addCellToColumn = (columnKey) => {
         isSkill: true,
         getValue: (row) => row[skillHeader],
       });
-  
+
       sessionHeaders.forEach((h) => {
         visibleColumns.push({
           group: null,
@@ -4595,7 +5181,7 @@ const addCellToColumn = (columnKey) => {
           getValue: (row) => row[h],
         });
       });
-  
+
       if (totalAKey) {
         visibleColumns.push({
           group: "1st Assmt",
@@ -4606,7 +5192,7 @@ const addCellToColumn = (columnKey) => {
             phaseTotalsByRow[rowIdx]?.["1st assmt"]?.aCount ?? 0
         });
       }
-  
+
       if (totalBKey) {
         visibleColumns.push({
           group: "1st Assmt",
@@ -4617,7 +5203,7 @@ const addCellToColumn = (columnKey) => {
             phaseTotalsByRow[rowIdx]?.["1st assmt"]?.bCount ?? 0
         });
       }
-  
+
       quarterKeys.forEach(({ key, phase, label }) => {
         visibleColumns.push({
           group: label,
@@ -4636,7 +5222,7 @@ const addCellToColumn = (columnKey) => {
             phaseTotalsByRow[rowIdx]?.[phase]?.bCount ?? 0,
         });
       });
-  
+
       const colWidths = visibleColumns.map((col, idx) => {
         if (idx === 0) return 46;
         if (
@@ -4646,28 +5232,28 @@ const addCellToColumn = (columnKey) => {
           return 6.0;
         return 7.0;
       });
-  
+
       const tableWidth = pageWidth - marginLeft - marginRight;
       const widthScale = tableWidth / colWidths.reduce((sum, w) => sum + w, 0);
       const scaledColWidths = colWidths.map((w) => w * widthScale);
-  
+
       const logoDataUrl = schoolLogo;
-  
+
       let y = marginTop;
-  
+
       const drawSchoolHeader = () => {
         const logoW = 28;
         const logoH = 28;
         const logoX = marginLeft;
         const logoY = y;
-      
+
         try {
           // use local import (schoolLogo) Ã¢â‚¬â€ avoids CORS
           doc.addImage(schoolLogo, "PNG", logoX, logoY, logoW, logoH);
         } catch (e) {
           console.warn("Logo draw failed:", e);
         }
-      
+
         // center title, shifted down to align with logo
         doc.setFont("times", "bold");
         doc.setFontSize(12);
@@ -4677,7 +5263,7 @@ const addCellToColumn = (columnKey) => {
           y + 8,
           { align: "center" }
         );
-      
+
         doc.setFont("times", "normal");
         doc.setFontSize(8.5);
         doc.text(
@@ -4692,30 +5278,30 @@ const addCellToColumn = (columnKey) => {
           y + 16,
           { align: "center" }
         );
-      
+
         y += Math.max(logoH, 20) + 2;
         doc.setDrawColor(90);
         doc.line(marginLeft, y, pageWidth - marginRight, y);
         y += 6;
       };
-  
+
       const quarterEditDates = table.quarterEditDates || {};
       const centerX = pageWidth / 2;
 
-      
-      
+
+
       const drawLegendCell = (x, yPos, mode) => {
         const w = 5.2;
         const h = 4.0;
         doc.rect(x, yPos, w, h, "S");
-      
+
         const left = x + 0.6;
         const right = x + w - 0.6;
         const top = yPos + 0.6;
         const bottom = yPos + h - 0.6;
         const midX = x + w / 2;
         const midY = yPos + h / 2;
-      
+
         if (mode === "horizontal") {
           doc.line(left, top, right, top);
           doc.line(left, midY, right, midY);
@@ -4738,7 +5324,7 @@ const addCellToColumn = (columnKey) => {
 
           const yShiftt = 0.45;
 
-          
+
 
           // same exact line length
           const x1 = left;
@@ -4779,18 +5365,18 @@ const addCellToColumn = (columnKey) => {
           })
           .replace(/\//g, "-");
       };
-      
+
       const drawMeta = () => {
         const legendX = pageWidth - marginRight - 68;
         const legendTextY = y;
         const legendLineGap = 4.3;
         const iconX = legendX + 34;
-      
+
         doc.setFont("times", "normal");
         doc.setFontSize(7.2);
-      
+
         doc.text(`Student: ${studentName}`, marginLeft, y, { align: "left" });
-      
+
         doc.text(
           [
             `1st Asst : ${formatDdMmYyyy(table.report_date)}`,
@@ -4803,10 +5389,10 @@ const addCellToColumn = (columnKey) => {
           y,
           { align: "center" }
         );
-      
+
         doc.setFontSize(6.8);
-        
-        
+
+
 
         doc.text("Over the red [I Qr]", legendX, legendTextY, { align: "left" });
         drawLegendCell(iconX, legendTextY - 2.2, "horizontal");
@@ -4819,10 +5405,10 @@ const addCellToColumn = (columnKey) => {
 
         doc.text("Over the red [IV Qr]", legendX, legendTextY + legendLineGap * 3, { align: "left" });
         drawLegendCell(iconX, legendTextY + legendLineGap * 3 - 2.2, "diagonal");
-      
+
         y += 22;
       };
-  
+
       const drawCell = (x, yPos, width, height, text, style = {}) => {
         const {
           fillColor = [255, 255, 255],
@@ -4831,18 +5417,18 @@ const addCellToColumn = (columnKey) => {
           align = "center",
           fontSize = 5.8,
         } = style;
-  
+
         doc.setFillColor(fillColor[0], fillColor[1], fillColor[2]);
         doc.setDrawColor(120);
         doc.rect(x, yPos, width, height, "FD");
-  
+
         doc.setTextColor(textColor[0], textColor[1], textColor[2]);
         doc.setFont("times", bold ? "bold" : "normal");
         doc.setFontSize(fontSize);
-  
+
         const split = doc.splitTextToSize(String(text ?? ""), Math.max(1, width - 1.2));
         const lines = Array.isArray(split) ? split : [String(split)];
-  
+
         const startY = yPos + (height - (lines.length - 1) * 2.4) / 2 + 0.8;
         lines.forEach((line, idx) => {
           doc.text(
@@ -4853,34 +5439,34 @@ const addCellToColumn = (columnKey) => {
           );
         });
       };
-  
+
       const drawGroupedHeader = () => {
         const topRowHeight = 6.5;
         const secondRowHeight = 5.2;
-  
+
         let x = marginLeft;
         let i = 0;
-  
+
         while (i < visibleColumns.length) {
           const col = visibleColumns[i];
-  
+
           if (!col.group) {
             const w = scaledColWidths[i];
             doc.setFillColor(245, 245, 245);
             doc.setDrawColor(120);
             doc.rect(x, y, w, topRowHeight + secondRowHeight, "FD");
-  
+
             doc.setFont("times", "bold");
             doc.setFontSize(6.4);
             doc.setTextColor(55, 55, 55);
             doc.text(String(col.header), x + w / 2, y + 5.2, { align: "center" });
-  
+
             x += w;
             i += 1;
             continue;
           }
 
-  
+
           let span = 0;
           while (
             i + span < visibleColumns.length &&
@@ -4888,49 +5474,49 @@ const addCellToColumn = (columnKey) => {
           ) {
             span += 1;
           }
-  
+
           const groupWidth = visibleColumns
             .slice(i, i + span)
             .reduce((sum, _, idx) => sum + scaledColWidths[i + idx], 0);
-  
+
           doc.setFillColor(245, 245, 245);
           doc.setDrawColor(120);
           doc.rect(x, y, groupWidth, topRowHeight, "FD");
-  
+
           doc.setFont("times", "bold");
           doc.setFontSize(6.4);
           doc.setTextColor(55, 55, 55);
           doc.text(String(col.group), x + groupWidth / 2, y + 3.6, { align: "center" });
-  
+
           let innerX = x;
           for (let j = 0; j < span; j += 1) {
             const current = visibleColumns[i + j];
             const w = scaledColWidths[i + j];
-  
+
             doc.setFillColor(245, 245, 245);
             doc.setDrawColor(120);
             doc.rect(innerX, y + topRowHeight, w, secondRowHeight, "FD");
-  
+
             doc.setFont("times", "bold");
             doc.setFontSize(6.0);
             doc.text(String(current.subLabel || current.header), innerX + w / 2, y + topRowHeight + 2.8, {
               align: "center",
             });
-  
+
             innerX += w;
           }
-  
+
           x += groupWidth;
           i += span;
         }
-  
+
         y += topRowHeight + secondRowHeight;
       };
-  
+
       drawSchoolHeader();
       drawMeta();
       drawGroupedHeader();
-  
+
       const skillFontSize = 7.6;
       const rowFontSize = 7.2;
       const rowHeight = 6.4;
@@ -4954,17 +5540,17 @@ const addCellToColumn = (columnKey) => {
 
         return String(col.getValue(row, rowIdx) ?? "");
       };
-  
+
       rows.forEach((row, rowIdx) => {
         let x = marginLeft;
-        
+
         visibleColumns.forEach((col, colIdx) => {
           // compute the visible value (apply snapshots for quarter edits)
           const value = getPdfCellValue(row, rowIdx, col);
-        
+
           const isSession = !col.group && sessionHeaders.includes(col.fieldName);
           const isGroupCell = !!col.group;
-        
+
           if (col.isSkill) {
             drawCell(x, y, scaledColWidths[colIdx], rowHeight, value, {
               fillColor: [246, 246, 246],
@@ -4977,19 +5563,19 @@ const addCellToColumn = (columnKey) => {
             const field = col.fieldName; // numeric string like "1","2",...
             const raw = table.rows?.[rowIdx]?.[field] ?? table.rows?.[rowIdx]?.[`Session ${field}`] ?? "";
             const baseVal = typeof raw === "string" ? raw.trim().toUpperCase() : "";
-          
+
             const keyVariants = [
               `${rowIdx}:${field}`,
               `${rowIdx}:Session ${field}`,
               `${rowIdx}:${String(field).trim()}`,
             ];
-          
+
             // walk phases to detect which quarter made the change
             const phases = SPECIAL_EDU_PHASE_ORDER;
             const idx = Math.max(0, phases.indexOf(exportPhase));
             let effective = baseVal;
             let changePhase = null; // which quarter caused the change
-          
+
             for (let i = 0; i <= idx; i++) {
               const p = phases[i];
               const snap = snapshots[p] || {};
@@ -5008,35 +5594,35 @@ const addCellToColumn = (columnKey) => {
               }
             }
 
-           
-          
+
+
             // For 1st assmt: display A (no lines)
             // For quarters: display B but with pattern based on changePhase
             const displayVal =
               exportPhase === "1st assmt" && effective === "A"
                 ? "A"
                 : baseVal; // display base value (B) for quarters
-          
+
             const cellVal = String(displayVal || "").trim().toUpperCase();
-          
+
             drawCell(x, y, scaledColWidths[colIdx], rowHeight, cellVal, {
               fillColor:
                 cellVal === "A"
                   ? [229, 243, 255]
                   : cellVal === "B"
-                  ? [255, 232, 232]
-                  : [255, 255, 255],
+                    ? [255, 232, 232]
+                    : [255, 255, 255],
               textColor:
                 cellVal === "A"
                   ? [31, 78, 121]
                   : cellVal === "B"
-                  ? [168, 28, 28]
-                  : [0, 0, 0],
+                    ? [168, 28, 28]
+                    : [0, 0, 0],
               bold: true,
               align: "center",
               fontSize: rowFontSize,
             });
-          
+
             // draw line pattern based on which quarter made the change (only if B was edited to A)
             if (baseVal === "B" && effective === "A" && changePhase) {
               const pad = 0.8;
@@ -5046,10 +5632,10 @@ const addCellToColumn = (columnKey) => {
               const startY = y + pad;
               const endY = y + rowHeight - pad;
               const gap = 1.5;
-          
+
               doc.setDrawColor(31, 78, 121);
               doc.setLineWidth(0.35);
-          
+
               if (changePhase === "1st Qtr") {
                 // three horizontal lines, slightly lower and extended
                 const hOffset = 0.6;      // push lines lower
@@ -5068,12 +5654,12 @@ const addCellToColumn = (columnKey) => {
                 // grid = horizontal + vertical
                 const hOffset = 0.6;
                 const hExtend = 0.4;
-              
+
                 // horizontal lines
                 doc.line(startX - hExtend, startY + hOffset, endX + hExtend, startY + hOffset);
                 doc.line(startX - hExtend, startY + gap + hOffset, endX + hExtend, startY + gap + hOffset);
                 doc.line(startX - hExtend, startY + gap * 2 + hOffset, endX + hExtend, startY + gap * 2 + hOffset);
-              
+
                 // vertical lines
                 const mid = startX + (endX - startX) / 2;
                 doc.line(startX + 1, startY, startX + 1, endY);
@@ -5097,7 +5683,7 @@ const addCellToColumn = (columnKey) => {
                   startY + yShift + (endY - startY) * lineLength
                 );
 
-              
+
 
                 // right
                 doc.line(
@@ -5117,29 +5703,29 @@ const addCellToColumn = (columnKey) => {
                 cellVal === "A"
                   ? [229, 243, 255]
                   : cellVal === "B"
-                  ? [255, 232, 232]
-                  : [255, 255, 255],
+                    ? [255, 232, 232]
+                    : [255, 255, 255],
               textColor:
                 cellVal === "A"
                   ? [31, 78, 121]
                   : cellVal === "B"
-                  ? [168, 28, 28]
-                  : [0, 0, 0],
+                    ? [168, 28, 28]
+                    : [0, 0, 0],
               bold: true,
               align: "center",
               fontSize: rowFontSize,
             });
           }
-        
+
           x += scaledColWidths[colIdx];
         });
-  
+
         y += rowHeight;
       });
-  
+
       const safeName = String(studentName).replace(/[^a-zA-Z0-9_-]+/g, "_");
       doc.save(`special_education_table_${index + 1}_${safeName}.pdf`);
-  
+
       showToast("Table exported to PDF successfully!", "success");
     } catch (error) {
       console.error("Error exporting table to PDF:", error);
@@ -5433,7 +6019,7 @@ const addCellToColumn = (columnKey) => {
     drawField(
       "Address & Phone",
       student.address_and_phone ||
-        `${student.address || ""}${student.phoneNumber ? " | " + student.phoneNumber : ""}`,
+      `${student.address || ""}${student.phoneNumber ? " | " + student.phoneNumber : ""}`,
     );
 
     // 3. Informant Detail
@@ -5834,191 +6420,190 @@ const addCellToColumn = (columnKey) => {
       className="min-h-screen w-full flex flex-col items-center bg-[#f7f7f7] relative overflow-hidden py-20"
     >
 
-    {showDocumentDeleteConfirm && pendingDocumentDelete && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
-          <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
-              <svg
-                className="h-8 w-8 text-red-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                />
-              </svg>
-            </div>
-    
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              Delete Document
-            </h3>
-    
-            <p className="text-sm text-gray-600 mb-6">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-[#170F49]">
-                {pendingDocumentDelete.documentName}
-              </span>
-              ?
-              <br />
-              <span className="text-red-600 font-medium">
-                This action cannot be undone.
-              </span>
-            </p>
-    
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowDocumentDeleteConfirm(false);
-                  setPendingDocumentDelete(null);
-                }}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteDocument}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
+      {showDocumentDeleteConfirm && pendingDocumentDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+                <svg
+                  className="h-8 w-8 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+              </div>
 
-    {showIepDeleteConfirm && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
-          <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
-              <svg
-                className="h-8 w-8 text-red-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                />
-              </svg>
-            </div>
-    
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              Delete IEP Report
-            </h3>
-    
-            <p className="text-sm text-gray-600 mb-6">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-[#170F49]">{deletePendingIepKey}</span>?
-              <br />
-              <span className="text-red-600 font-medium">
-                This action cannot be undone.
-              </span>
-            </p>
-    
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowIepDeleteConfirm(false);
-                  setDeletePendingIepKey(null);
-                }}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={performDeleteIepReport}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                Delete Document
+              </h3>
 
-    {showDeleteConfirm && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
-          <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
-              <svg
-                className="h-8 w-8 text-red-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                />
-              </svg>
-            </div>
-    
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              Delete Table
-            </h3>
-    
-            <p className="text-sm text-gray-600 mb-6">
-              Are you sure you want to delete this table?
-              <br />
-              <span className="text-red-600 font-medium">
-                This action cannot be undone.
-              </span>
-            </p>
-    
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setDeletePendingIndex(null);
-                  showToast("Delete cancelled", "info");
-                }}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (deletePendingIndex !== null) {
-                    handleDeleteTable(deletePendingIndex);
-                    showToast("Table deleted", "success");
-                  }
-                  setShowDeleteConfirm(false);
-                  setDeletePendingIndex(null);
-                }}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
-              >
-                Delete
-              </button>
+              <p className="text-sm text-gray-600 mb-6">
+                Are you sure you want to delete{" "}
+                <span className="font-semibold text-[#170F49]">
+                  {pendingDocumentDelete.documentName}
+                </span>
+                ?
+                <br />
+                <span className="text-red-600 font-medium">
+                  This action cannot be undone.
+                </span>
+              </p>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDocumentDeleteConfirm(false);
+                    setPendingDocumentDelete(null);
+                  }}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteDocument}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
+
+      {showIepDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+                <svg
+                  className="h-8 w-8 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+              </div>
+
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                Delete IEP Report
+              </h3>
+
+              <p className="text-sm text-gray-600 mb-6">
+                Are you sure you want to delete{" "}
+                <span className="font-semibold text-[#170F49]">{deletePendingIepKey}</span>?
+                <br />
+                <span className="text-red-600 font-medium">
+                  This action cannot be undone.
+                </span>
+              </p>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowIepDeleteConfirm(false);
+                    setDeletePendingIepKey(null);
+                  }}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={performDeleteIepReport}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+                <svg
+                  className="h-8 w-8 text-red-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+              </div>
+
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                Delete Table
+              </h3>
+
+              <p className="text-sm text-gray-600 mb-6">
+                Are you sure you want to delete this table?
+                <br />
+                <span className="text-red-600 font-medium">
+                  This action cannot be undone.
+                </span>
+              </p>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setDeletePendingIndex(null);
+                    showToast("Delete cancelled", "info");
+                  }}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (deletePendingIndex !== null) {
+                      handleDeleteTable(deletePendingIndex);
+                      showToast("Table deleted", "success");
+                    }
+                    setShowDeleteConfirm(false);
+                    setDeletePendingIndex(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors duration-200 font-medium"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast.show && (
         <div
-          className={`fixed top-8 right-8 z-[9999] animate-slide-in-right ${
-            toast.type === "success"
-              ? "bg-green-500"
-              : toast.type === "error"
-                ? "bg-red-500"
-                : "bg-blue-500"
-          } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md`}
+          className={`fixed top-8 right-8 z-[9999] animate-slide-in-right ${toast.type === "success"
+            ? "bg-green-500"
+            : toast.type === "error"
+              ? "bg-red-500"
+              : "bg-blue-500"
+            } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md`}
         >
           <div className="flex-shrink-0">
             {toast.type === "success" ? (
@@ -6163,19 +6748,18 @@ const addCellToColumn = (columnKey) => {
                         return;
                       }
                     }
-              
+
                     handleSetTableEditable(editingTable, false);
                     setUnsavedTableIndex(null);
                   }
                 }
-              
+
                 setActiveTab("student-details"); // or case-record / therapy-reports / iep / special-education
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
-                activeTab === "student-details"
-                  ? "text-white"
-                  : "text-[#170F49] hover:text-[#E38B52]"
-              }`}
+              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "student-details"
+                ? "text-white"
+                : "text-[#170F49] hover:text-[#E38B52]"
+                }`}
             >
               Student Details
             </button>
@@ -6190,11 +6774,10 @@ const addCellToColumn = (columnKey) => {
                 }
                 setActiveTab("case-record");
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
-                activeTab === "case-record"
-                  ? "text-white"
-                  : "text-[#170F49] hover:text-[#E38B52]"
-              }`}
+              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "case-record"
+                ? "text-white"
+                : "text-[#170F49] hover:text-[#E38B52]"
+                }`}
             >
               Case Record
             </button>
@@ -6209,11 +6792,10 @@ const addCellToColumn = (columnKey) => {
                 }
                 setActiveTab("therapy-reports");
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
-                activeTab === "therapy-reports"
-                  ? "text-white"
-                  : "text-[#170F49] hover:text-[#E38B52]"
-              }`}
+              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "therapy-reports"
+                ? "text-white"
+                : "text-[#170F49] hover:text-[#E38B52]"
+                }`}
             >
               Therapy Reports
             </button>
@@ -6227,11 +6809,10 @@ const addCellToColumn = (columnKey) => {
                 }
                 setActiveTab("iep");
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
-                activeTab === "iep"
-                  ? "text-white"
-                  : "text-[#170F49] hover:text-[#E38B52]"
-              }`}
+              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "iep"
+                ? "text-white"
+                : "text-[#170F49] hover:text-[#E38B52]"
+                }`}
             >
               Term Report
             </button>
@@ -6246,11 +6827,10 @@ const addCellToColumn = (columnKey) => {
                 }
                 setActiveTab("iep-form");
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
-                activeTab === "iep-form"
-                  ? "text-white"
-                  : "text-[#170F49] hover:text-[#E38B52]"
-              }`}
+              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "iep-form"
+                ? "text-white"
+                : "text-[#170F49] hover:text-[#E38B52]"
+                }`}
             >
               IEP
             </button>
@@ -6265,17 +6845,16 @@ const addCellToColumn = (columnKey) => {
                 }
                 setActiveTab("special-education");
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
-                activeTab === "special-education"
-                  ? "text-white"
-                  : "text-[#170F49] hover:text-[#E38B52]"
-              }`}
+              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "special-education"
+                ? "text-white"
+                : "text-[#170F49] hover:text-[#E38B52]"
+                }`}
             >
               Special Education
             </button>
           </div>
         </div>
-        
+
 
         {/* Main content container */}
         <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
@@ -6301,40 +6880,40 @@ const addCellToColumn = (columnKey) => {
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Center: AI Analysis Expanded */}
                 <main className="w-full lg:w-4/6 flex-1 lg:px-4">
-                  <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
+                  <div className="mb-6 p-6 border-2 border-orange-200 rounded-2xl bg-gradient-to-br from-white via-amber-50/20 to-orange-50/10 shadow-lg relative overflow-hidden">
+                    {/* AI Header */}
+                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-orange-100">
+                      <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 4.5L10.5 8L14 9.5L10.5 11L9 14.5L7.5 11L4 9.5L7.5 8L9 4.5zm10 8.5l1 2.5l2.5 1l-2.5 1l-1 2.5l-1-2.5l-2.5-1l2.5-1l1-2.5zm-2-9l.75 1.75l1.75.75l-1.75.75l-.75 1.75l-.75-1.75l-1.75-.75l1.75-.75l.75-1.75z" />
+                      </svg>
+                      <h3 className="text-lg font-bold text-gray-800">AI Progress Analysis</h3>
+                    </div>
+
                     {/* Horizontal filter bar at the top */}
                     <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-4 w-full">
                       <div className="flex flex-col sm:flex-row flex-wrap items-end gap-6 flex-1">
-                      <div className="flex flex-row items-center min-w-[140px] gap-2">
-                        <span className="text-sm font-semibold text-gray-700">
-                          Start Date
-                        </span>
-                        <div className="relative flex items-center h-10">
-                          <input
-                            ref={startDateRef}
-                            type="date"
-                            value={fromDate}
-                            onChange={(e) => {
-                              setFromDate(e.target.value);
-                              setVisibleCount(5);
-                            }}
-                            className="w-[160px] h-10 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] text-sm text-gray-700 pl-10 pr-3 py-2 shadow-sm transition-all duration-200 cursor-pointer hover:bg-orange-50"
-                            style={{ paddingLeft: "2.2rem" }}
-                            aria-label="Start date"
-                          />
-                          <button
-                            type="button"
-                            className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 text-[#E38B52] focus:outline-none"
-                            tabIndex={-1}
-                            onClick={() =>
-                              startDateRef.current &&
-                              startDateRef.current.showPicker &&
-                              startDateRef.current.showPicker()
-                            }
-                            aria-label="Open start date picker"
-                          >
+                        <div className="flex flex-row items-center min-w-[200px] gap-2">
+                          <span className="text-sm font-semibold text-gray-700">
+                            Date Range
+                          </span>
+                          <div className="relative flex items-center h-10 w-full">
+                            <select
+                              value={presetRange}
+                              onChange={(e) => {
+                                setPresetRange(e.target.value);
+                                setVisibleCount(5);
+                              }}
+                              className="appearance-none w-full min-w-[160px] h-10 bg-white border border-gray-300 rounded-full focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] text-base text-gray-700 pl-9 pr-6 py-2 shadow-sm transition-all duration-200 cursor-pointer hover:bg-orange-50"
+                              title="Select date range preset"
+                              aria-label="Date range preset"
+                            >
+                              <option value="last_30_days">Last 30 Days</option>
+                              <option value="current_month">Current Month</option>
+                              <option value="prev_month">Previous Month</option>
+                              <option value="current_trimester">Current Trimester</option>
+                            </select>
                             <svg
-                              className="w-5 h-5"
+                              className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 text-[#E38B52] pointer-events-none"
                               fill="none"
                               stroke="currentColor"
                               strokeWidth="2"
@@ -6357,107 +6936,51 @@ const addCellToColumn = (columnKey) => {
                                 strokeLinecap="round"
                               />
                             </svg>
-                          </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex flex-row items-center min-w-[140px] gap-2">
-                        <span className="text-sm font-semibold text-gray-700">
-                          End Date
-                        </span>
-                        <div className="relative flex items-center h-10">
-                          <input
-                            ref={endDateRef}
-                            type="date"
-                            value={toDate}
-                            onChange={(e) => {
-                              setToDate(e.target.value);
-                              setVisibleCount(5);
-                            }}
-                            className="w-[160px] h-10 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] text-sm text-gray-700 pl-10 pr-3 py-2 shadow-sm transition-all duration-200 cursor-pointer hover:bg-orange-50"
-                            style={{ paddingLeft: "2.2rem" }}
-                            aria-label="End date"
-                          />
-                          <button
-                            type="button"
-                            className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 text-[#E38B52] focus:outline-none"
-                            tabIndex={-1}
-                            onClick={() =>
-                              endDateRef.current &&
-                              endDateRef.current.showPicker &&
-                              endDateRef.current.showPicker()
-                            }
-                            aria-label="Open end date picker"
-                          >
+                        <div className="flex flex-row items-center min-w-[170px] gap-2">
+                          <span className="text-sm font-semibold text-gray-700">
+                            Therapy
+                          </span>
+                          <div className="relative flex items-center h-10 w-full">
+                            <select
+                              value={selectedTherapyType}
+                              disabled={user?.role === "therapist"}
+                              onChange={(e) => {
+                                setSelectedTherapyType(e.target.value);
+                                setVisibleCount(5);
+                              }}
+                              className="appearance-none w-full min-w-[110px] h-10 bg-white border border-gray-300 rounded-full focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] text-base text-gray-700 pl-9 pr-6 py-2 shadow-sm transition-all duration-200 cursor-pointer hover:bg-orange-50 disabled:bg-gray-100 disabled:opacity-75"
+                              title="Filter by therapy type"
+                              aria-label="Therapy type"
+                            >
+                              <option value="">All Types</option>
+                              <option value="Behavioral Therapy">
+                                Behavioral
+                              </option>
+                              <option value="Occupational Therapy">
+                                Occupational
+                              </option>
+                              <option value="Physiotherapy">Physiotherapy</option>
+                              <option value="Speech Therapy">Speech</option>
+                            </select>
                             <svg
-                              className="w-5 h-5"
+                              className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 text-[#E38B52] pointer-events-none"
                               fill="none"
                               stroke="currentColor"
                               strokeWidth="2"
                               viewBox="0 0 24 24"
                             >
-                              <rect
-                                x="3"
-                                y="4"
-                                width="18"
-                                height="18"
-                                rx="4"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                fill="white"
-                              />
                               <path
-                                d="M16 2v4M8 2v4M3 10h18"
+                                d="M6 9l6 6 6-6"
                                 stroke="currentColor"
                                 strokeWidth="2"
                                 strokeLinecap="round"
+                                strokeLinejoin="round"
                               />
                             </svg>
-                          </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex flex-row items-center min-w-[170px] gap-2">
-                        <span className="text-sm font-semibold text-gray-700">
-                          Therapy
-                        </span>
-                        <div className="relative flex items-center h-10 w-full">
-                          <select
-                            value={selectedTherapyType}
-                            disabled={user?.role === "therapist"}
-                            onChange={(e) => {
-                              setSelectedTherapyType(e.target.value);
-                              setVisibleCount(5);
-                            }}
-                            className="appearance-none w-full min-w-[110px] h-10 bg-white border border-gray-300 rounded-full focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] text-base text-gray-700 pl-9 pr-6 py-2 shadow-sm transition-all duration-200 cursor-pointer hover:bg-orange-50 disabled:bg-gray-100 disabled:opacity-75"
-                            title="Filter by therapy type"
-                            aria-label="Therapy type"
-                          >
-                            <option value="">All Types</option>
-                            <option value="Behavioral Therapy">
-                              Behavioral
-                            </option>
-                            <option value="Occupational Therapy">
-                              Occupational
-                            </option>
-                            <option value="Physiotherapy">Physiotherapy</option>
-                            <option value="Speech Therapy">Speech</option>
-                          </select>
-                          <svg
-                            className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 text-[#E38B52] pointer-events-none"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              d="M6 9l6 6 6-6"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </div>
-                      </div>
                       </div>
                       <div className="flex flex-row items-end gap-2 lg:justify-end lg:min-w-[320px] lg:flex-shrink-0">
                         <button
@@ -6468,15 +6991,14 @@ const addCellToColumn = (columnKey) => {
                             setVisibleCount(5);
                           }}
                           disabled={!(fromDate || toDate || selectedTherapyType)}
-                          className={`px-5 h-10 py-2 rounded-lg text-base font-semibold transition-all duration-200 shadow-md flex items-center ${
-                            fromDate || toDate || selectedTherapyType
-                              ? "bg-gradient-to-r from-gray-600 to-gray-700 text-white hover:from-gray-700 hover:to-gray-800 hover:shadow-lg"
-                              : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          }`}
+                          className={`px-5 h-10 py-2 rounded-lg text-base font-semibold transition-all duration-200 shadow-md flex items-center ${fromDate || toDate || selectedTherapyType
+                            ? "bg-gradient-to-r from-gray-600 to-gray-700 text-white hover:from-gray-700 hover:to-gray-800 hover:shadow-lg"
+                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            }`}
                         >
                           Clear
                         </button>
-                        {/* Stats Display with Count-up Animation (moved here) */}
+                        {/* Stats Display with Count-up Animation */}
                         {(() => {
                           // Calculate filtered reports based on current filters
                           const filteredReports = reports.filter((r) => {
@@ -6496,7 +7018,7 @@ const addCellToColumn = (columnKey) => {
                               if (
                                 !r.therapy_type ||
                                 r.therapy_type.trim() !==
-                                  selectedTherapyType.trim()
+                                selectedTherapyType.trim()
                               )
                                 return false;
                             }
@@ -6506,9 +7028,9 @@ const addCellToColumn = (columnKey) => {
                           const daysBetween =
                             fromDate && toDate
                               ? Math.ceil(
-                                  (new Date(toDate) - new Date(fromDate)) /
-                                    (1000 * 60 * 60 * 24),
-                                ) + 1
+                                (new Date(toDate) - new Date(fromDate)) /
+                                (1000 * 60 * 60 * 24),
+                              ) + 1
                               : 0;
                           const showStats =
                             filteredReports.length > 0 || (fromDate && toDate);
@@ -6577,586 +7099,70 @@ const addCellToColumn = (columnKey) => {
                         })()}
                       </div>
                     </div>
-                    <div className="flex flex-row gap-4 w-full mt-2">
+                    {/* Generate AI Analysis action bar */}
+                    <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4 bg-gradient-to-r from-orange-50/80 to-amber-50/60 rounded-xl border border-[#E38B52]/20">
                       <button
                         onClick={handleAISummarize}
                         disabled={aiSummarizing}
-                        className={`flex-1 px-7 py-3 rounded-2xl text-white font-bold text-lg tracking-wide transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-3 border-2 border-[#E38B52] focus:ring-4 focus:ring-[#E38B52]/30 ${aiSummarizing ? "bg-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-[#E38B52] to-[#D67A3F] hover:from-[#D67A3F] hover:to-[#C56930]"}`}
+                        className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-white font-semibold text-sm tracking-wide transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-2 border border-[#E38B52] focus:ring-2 focus:ring-[#E38B52]/40 active:scale-[0.98] ${aiSummarizing ? "bg-gray-400 border-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-[#E38B52] to-[#D67A3F] hover:from-[#D67A3F] hover:to-[#C56930]"}`}
                       >
                         {aiSummarizing ? (
                           <>
                             <svg
-                              className="animate-spin h-5 w-5"
+                              className="animate-spin h-4 w-4 flex-shrink-0"
                               xmlns="http://www.w3.org/2000/svg"
                               fill="none"
                               viewBox="0 0 24 24"
                             >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            <span>Analyzing with Llama 3.2 3B...</span>
+                            <span>Analyzing...</span>
                           </>
                         ) : (
                           <>
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M13 10V3L4 14h7v7l9-11h-7z"
-                              />
+                            <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M9 4.5L10.5 8L14 9.5L10.5 11L9 14.5L7.5 11L4 9.5L7.5 8L9 4.5zm10 8.5l1 2.5l2.5 1l-2.5 1l-1 2.5l-1-2.5l-2.5-1l2.5-1l1-2.5zm-2-9l.75 1.75l1.75.75l-1.75.75l-.75 1.75l-.75-1.75l-1.75-.75l1.75-.75l.75-1.75z" />
                             </svg>
                             <span>Generate AI Analysis</span>
                           </>
                         )}
                       </button>
-                      {reports.length > 0 && (
-                        <button
-                          onClick={() => {
-                            const filtered = reports.filter((r) => {
-                              if (fromDate) {
-                                if (!r.report_date) return false;
-                                const reportDate = new Date(r.report_date);
-                                const filterFromDate = new Date(fromDate);
-                                if (reportDate < filterFromDate) return false;
-                              }
-                              if (toDate) {
-                                if (!r.report_date) return false;
-                                const reportDate = new Date(r.report_date);
-                                const filterToDate = new Date(toDate);
-                                if (reportDate > filterToDate) return false;
-                              }
-                              if (selectedTherapyType) {
-                                if (
-                                  !r.therapy_type ||
-                                  r.therapy_type.trim() !==
-                                    selectedTherapyType.trim()
-                                )
-                                  return false;
-                              }
-                              return true;
-                            });
-
-                            const pdf = new jsPDF();
-                            const pageWidth = pdf.internal.pageSize.getWidth();
-                            const pageHeight =
-                              pdf.internal.pageSize.getHeight();
-                            const marginLeft = 15;
-                            const marginRight = 15;
-                            let yPosition = 20;
-
-                            // Add school logo to top-right
-                            const logoWidth = 30;
-                            const logoHeight = 30;
-                            const logoX = pageWidth - logoWidth - marginRight;
-                            const logoY = 10;
-                            try {
-                              pdf.addImage(schoolLogo, "JPEG", logoX, logoY, logoWidth, logoHeight);
-                            } catch (logoError) {
-                              console.error("Error adding logo to PDF:", logoError);
-                              // Try again without format specification
-                              try {
-                                pdf.addImage(schoolLogo, logoX, logoY, logoWidth, logoHeight);
-                              } catch (e2) {
-                                console.error("Second attempt to add logo failed:", e2);
-                              }
-                            }
-
-                            // Title
-                            pdf.setFontSize(18);
-                            pdf.setFont("times", "bold");
-                            pdf.text(
-                              `Therapy Reports - ${student?.name || "Student"}`,
-                              marginLeft,
-                              yPosition,
-                            );
-                            yPosition += 10;
-
-                            // Date range
-                            pdf.setFontSize(10);
-                            pdf.setFont("times", "normal");
-                            const dateRangeText =
-                              fromDate || toDate
-                                ? `Date Range: ${fromDate || "Start"} to ${toDate || "End"}`
-                                : "All Reports";
-                            pdf.text(dateRangeText, marginLeft, yPosition);
-                            yPosition += 5;
-
-                            if (selectedTherapyType) {
-                              pdf.text(
-                                `Therapy Type: ${selectedTherapyType}`,
-                                marginLeft,
-                                yPosition,
-                              );
-                              yPosition += 5;
-                            }
-
-                            pdf.text(
-                              `Total Reports: ${filtered.length}`,
-                              marginLeft,
-                              yPosition,
-                            );
-                            yPosition += 10;
-
-                            // Reports
-                            filtered.forEach((report, index) => {
-                              if (yPosition > pageHeight - 40) {
-                                pdf.addPage();
-                                yPosition = 20;
-                              }
-
-                              pdf.setFontSize(14);
-                              pdf.setFont("times", "bold");
-                              pdf.text(
-                                `Report ${index + 1}`,
-                                marginLeft,
-                                yPosition,
-                              );
-                              yPosition += 8;
-
-                              pdf.setFontSize(10);
-                              pdf.setFont("times", "normal");
-
-                              pdf.text(
-                                `Date: ${new Date(report.report_date).toLocaleDateString()}`,
-                                marginLeft,
-                                yPosition,
-                              );
-                              yPosition += 5;
-
-                              pdf.text(
-                                `Therapy Type: ${report.therapy_type || "N/A"}`,
-                                marginLeft,
-                                yPosition,
-                              );
-                              yPosition += 5;
-
-                              pdf.text(
-                                `Therapist: ${report.therapist_name || "N/A"}`,
-                                marginLeft,
-                                yPosition,
-                              );
-                              yPosition += 5;
-
-                              if (report.progress_level) {
-                                pdf.text(
-                                  `Progress Level: ${report.progress_level}`,
-                                  marginLeft,
-                                  yPosition,
-                                );
-                                yPosition += 5;
-                              }
-
-                              yPosition += 3;
-
-                              const clinicalFields = [
-                                ["Present Complaints", report.present_complaints],
-                                ["Current Observation", report.current_observation],
-                                ["Assessment Done", report.assessment_done],
-                                ["Provisional Diagnosis", report.provisional_diagnosis],
-                              ];
-
-                              clinicalFields.forEach(([label, value]) => {
-                                const text = typeof value === "string" ? value.trim() : value;
-                                if (!text) {
-                                  return;
-                                }
-
-                                if (yPosition > pageHeight - 20) {
-                                  pdf.addPage();
-                                  yPosition = 20;
-                                }
-                                pdf.setFont("times", "bold");
-                                pdf.text(`${label}:`, marginLeft, yPosition);
-                                yPosition += 5;
-                                pdf.setFont("times", "normal");
-                                const lines = pdf.splitTextToSize(
-                                  String(value),
-                                  pageWidth - marginLeft - marginRight,
-                                );
-                                lines.forEach((line) => {
-                                  if (yPosition > pageHeight - 20) {
-                                    pdf.addPage();
-                                    yPosition = 20;
-                                  }
-                                  pdf.text(line, marginLeft + 5, yPosition);
-                                  yPosition += 5;
-                                });
-                                yPosition += 3;
-                              });
-
-                              // Progress Notes
-                              if (report.progress_notes) {
-                                if (yPosition > pageHeight - 20) {
-                                  pdf.addPage();
-                                  yPosition = 20;
-                                }
-                                pdf.setFont("times", "bold");
-                                pdf.text(
-                                  "Progress Notes:",
-                                  marginLeft,
-                                  yPosition,
-                                );
-                                yPosition += 5;
-                                pdf.setFont("times", "normal");
-                                const progressLines = pdf.splitTextToSize(
-                                  report.progress_notes,
-                                  pageWidth - marginLeft - marginRight,
-                                );
-                                progressLines.forEach((line) => {
-                                  if (yPosition > pageHeight - 20) {
-                                    pdf.addPage();
-                                    yPosition = 20;
-                                  }
-                                  pdf.text(line, marginLeft + 5, yPosition);
-                                  yPosition += 5;
-                                });
-                                yPosition += 3;
-                              }
-
-                              // Goals Achieved - detailed breakdown of all sections
-                              if (report.goals_achieved) {
-                                if (yPosition > pageHeight - 20) {
-                                  pdf.addPage();
-                                  yPosition = 20;
-                                }
-                                pdf.setFont("times", "bold");
-                                pdf.text(
-                                  "Goals Addressed:",
-                                  marginLeft,
-                                  yPosition,
-                                );
-                                yPosition += 5;
-                                pdf.setFont("times", "normal");
-
-                                if (
-                                  typeof report.goals_achieved === "object" &&
-                                  !Array.isArray(report.goals_achieved)
-                                ) {
-                                  const activeSections = Object.entries(report.goals_achieved).filter(
-                                    ([_, data]) => data && (data.checked || (data.notes && data.notes.trim()) || (data.response && data.response.trim()))
-                                  );
-
-                                  if (activeSections.length > 0) {
-                                    activeSections.forEach(
-                                      ([sectionKey, sectionData]) => {
-                                        if (yPosition > pageHeight - 20) {
-                                          pdf.addPage();
-                                          yPosition = 20;
-                                        }
-
-                                        // Format section title (e.g., "receptive_language" -> "Receptive Language")
-                                        const sectionTitle = (sectionData && sectionData.label) || sectionKey
-                                          .split("_")
-                                          .map(
-                                            (word) =>
-                                              word.charAt(0).toUpperCase() +
-                                              word.slice(1),
-                                          )
-                                          .join(" ");
-
-                                        pdf.setFont("times", "bold");
-                                        pdf.text(
-                                          ` ${sectionTitle}:`,
-                                          marginLeft + 5,
-                                          yPosition,
-                                        );
-                                        yPosition += 5;
-                                        pdf.setFont("times", "normal");
-
-                                        // If it has notes or response, display them
-                                        if (sectionData && (sectionData.notes || sectionData.response)) {
-                                          if (sectionData.notes) {
-                                            const noteLines = pdf.splitTextToSize(
-                                              `Goal: ${sectionData.notes}`,
-                                              pageWidth - marginLeft - marginRight - 15,
-                                            );
-                                            noteLines.forEach((line) => {
-                                              if (yPosition > pageHeight - 20) {
-                                                pdf.addPage();
-                                                yPosition = 20;
-                                              }
-                                              pdf.text(
-                                                line,
-                                                marginLeft + 10,
-                                                yPosition,
-                                              );
-                                              yPosition += 5;
-                                            });
-                                          }
-                                          if (sectionData.response) {
-                                            const respLines = pdf.splitTextToSize(
-                                              `Response: ${sectionData.response}`,
-                                              pageWidth - marginLeft - marginRight - 15,
-                                            );
-                                            respLines.forEach((line) => {
-                                              if (yPosition > pageHeight - 20) {
-                                                pdf.addPage();
-                                                yPosition = 20;
-                                              }
-                                              pdf.text(
-                                                line,
-                                                marginLeft + 10,
-                                                yPosition,
-                                              );
-                                              yPosition += 5;
-                                            });
-                                          }
-                                        } else {
-                                          // Checked but no notes or response
-                                          pdf.text(
-                                            "Addressed",
-                                            marginLeft + 10,
-                                            yPosition,
-                                          );
-                                          yPosition += 5;
-                                        }
-
-                                        yPosition += 2;
-                                      },
-                                    );
-                                  } else {
-                                    pdf.text(
-                                      "No goals addressed",
-                                      marginLeft + 5,
-                                      yPosition,
-                                    );
-                                    yPosition += 5;
-                                  }
-                                } else if (
-                                  typeof report.goals_achieved === "string" &&
-                                  report.goals_achieved.trim()
-                                ) {
-                                  // If goals_achieved is just a string
-                                  const goalLines = pdf.splitTextToSize(
-                                    report.goals_achieved,
-                                    pageWidth - marginLeft - marginRight - 5,
-                                  );
-                                  goalLines.forEach((line) => {
-                                    if (yPosition > pageHeight - 20) {
-                                      pdf.addPage();
-                                      yPosition = 20;
-                                    }
-                                    pdf.text(line, marginLeft + 5, yPosition);
-                                    yPosition += 5;
-                                  });
-                                } else {
-                                  pdf.text(
-                                    "No goals addressed",
-                                    marginLeft + 5,
-                                    yPosition,
-                                  );
-                                  yPosition += 5;
-                                }
-                                yPosition += 3;
-                              }
-
-                              // Challenges
-                              if (report.challenges) {
-                                if (yPosition > pageHeight - 20) {
-                                  pdf.addPage();
-                                  yPosition = 20;
-                                }
-                                pdf.setFont("times", "bold");
-                                pdf.text("Challenges:", marginLeft, yPosition);
-                                yPosition += 5;
-                                pdf.setFont("times", "normal");
-                                const challengeLines = pdf.splitTextToSize(
-                                  report.challenges,
-                                  pageWidth - marginLeft - marginRight,
-                                );
-                                challengeLines.forEach((line) => {
-                                  if (yPosition > pageHeight - 20) {
-                                    pdf.addPage();
-                                    yPosition = 20;
-                                  }
-                                  pdf.text(line, marginLeft + 5, yPosition);
-                                  yPosition += 5;
-                                });
-                                yPosition += 3;
-                              }
-
-                              // Recommendations (if available)
-                              if (report.recommendations) {
-                                if (yPosition > pageHeight - 20) {
-                                  pdf.addPage();
-                                  yPosition = 20;
-                                }
-                                pdf.setFont("times", "bold");
-                                pdf.text(
-                                  "Recommendations:",
-                                  marginLeft,
-                                  yPosition,
-                                );
-                                yPosition += 5;
-                                pdf.setFont("times", "normal");
-                                const recLines = pdf.splitTextToSize(
-                                  report.recommendations,
-                                  pageWidth - marginLeft - marginRight,
-                                );
-                                recLines.forEach((line) => {
-                                  if (yPosition > pageHeight - 20) {
-                                    pdf.addPage();
-                                    yPosition = 20;
-                                  }
-                                  pdf.text(line, marginLeft + 5, yPosition);
-                                  yPosition += 5;
-                                });
-                                yPosition += 3;
-                              }
-
-                              // Next Goals (if available)
-                              if (report.next_goals) {
-                                if (yPosition > pageHeight - 20) {
-                                  pdf.addPage();
-                                  yPosition = 20;
-                                }
-                                pdf.setFont("times", "bold");
-                                pdf.text("Next Goals:", marginLeft, yPosition);
-                                yPosition += 5;
-                                pdf.setFont("times", "normal");
-                                const nextGoalLines = pdf.splitTextToSize(
-                                  report.next_goals,
-                                  pageWidth - marginLeft - marginRight,
-                                );
-                                nextGoalLines.forEach((line) => {
-                                  if (yPosition > pageHeight - 20) {
-                                    pdf.addPage();
-                                    yPosition = 20;
-                                  }
-                                  pdf.text(line, marginLeft + 5, yPosition);
-                                  yPosition += 5;
-                                });
-                                yPosition += 3;
-                              }
-
-                              // Add a separator line between reports
-                              if (yPosition > pageHeight - 20) {
-                                pdf.addPage();
-                                yPosition = 20;
-                              }
-                              pdf.setDrawColor(200, 200, 200);
-                              pdf.line(
-                                marginLeft,
-                                yPosition,
-                                pageWidth - marginRight,
-                                yPosition,
-                              );
-                              yPosition += 8;
-                            });
-
-                            pdf.save(
-                              `therapy_reports_${student?.name || "student"}_${new Date().toISOString().split("T")[0]}.pdf`,
-                            );
-                          }}
-                          className="flex-1 px-7 py-3 border-2 border-[#E38B52] text-[#E38B52] text-lg rounded-2xl bg-white hover:bg-orange-50 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md font-bold"
-                          title="Download filtered therapy reports"
-                        >
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.2"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M12 16v-8m0 8l-4-4m4 4l4-4M4 20h16a2 2 0 002-2V6a2 2 0 00-2-2H4a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
+                      <div className="flex flex-col justify-center min-w-0">
+                        <p className="text-xs font-medium text-gray-700 flex items-center gap-1">
+                          <svg className="w-3 h-3 text-amber-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 4.5L10.5 8L14 9.5L10.5 11L9 14.5L7.5 11L4 9.5L7.5 8L9 4.5zm10 8.5l1 2.5l2.5 1l-2.5 1l-1 2.5l-1-2.5l-2.5-1l2.5-1l1-2.5z" />
                           </svg>
-                          Download Reports
-                        </button>
-                      )}
+                          AI Progress Summary
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          {aiSummarizing ? "Analyzing selected reports with AI…" : "Analyzes reports from the selected period"}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Stats Display with Count-up Animation */}
-                    {(() => {
-                      // Calculate filtered reports based on current filters
-                      const filteredReports = reports.filter((r) => {
-                        if (fromDate) {
-                          if (!r.report_date) return false;
-                          const reportDate = new Date(r.report_date);
-                          const filterFromDate = new Date(fromDate);
-                          if (reportDate < filterFromDate) return false;
-                        }
-                        if (toDate) {
-                          if (!r.report_date) return false;
-                          const reportDate = new Date(r.report_date);
-                          const filterToDate = new Date(toDate);
-                          if (reportDate > filterToDate) return false;
-                        }
-                        if (selectedTherapyType) {
-                          if (
-                            !r.therapy_type ||
-                            r.therapy_type.trim() !== selectedTherapyType.trim()
-                          )
-                            return false;
-                        }
-                        return true;
-                      });
-
-                      // Calculate days between dates
-                      const daysBetween =
-                        fromDate && toDate
-                          ? Math.ceil(
-                              (new Date(toDate) - new Date(fromDate)) /
-                                (1000 * 60 * 60 * 24),
-                            ) + 1
-                          : 0;
-
-                      const showStats =
-                        filteredReports.length > 0 || (fromDate && toDate);
-
-                      // Removed duplicate stats display below filter bar
-                      return null;
-                    })()}
-
                     {aiSummaryError && (
-                      <div className="p-2 mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded">
+                      <div className="p-2 mt-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
                         {aiSummaryError}
                       </div>
                     )}
-                    {aiSummarizing && (
-                      <div className="text-sm text-gray-600 animate-pulse flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-[#E38B52] border-t-transparent rounded-full animate-spin"></div>
-                        Generating summary... live typing in progress
+                    {!aiSummarizing && !aiAnalysis && !aiSummary && (
+                      <div className="mt-4 p-8 rounded-2xl border border-dashed border-gray-300 bg-gray-50/50 text-center text-gray-500 animate-fadeIn">
+                        <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M9 4.5L10.5 8L14 9.5L10.5 11L9 14.5L7.5 11L4 9.5L7.5 8L9 4.5zm10 8.5l1 2.5l2.5 1l-2.5 1l-1 2.5l-1-2.5l-2.5-1l2.5-1l1-2.5zm-2-9l.75 1.75l1.75.75l-1.75.75l-.75 1.75l-.75-1.75l-1.75-.75l1.75-.75l.75-1.75z" />
+                        </svg>
+                        <p className="text-sm font-semibold text-gray-700">No active AI summary displayed</p>
+                        <p className="text-xs text-gray-400 mt-1">Click 'Generate AI Analysis' above to create one from your selected reports, or select a previous summary below.</p>
                       </div>
                     )}
                     {(aiSummarizing || aiAnalysis || aiSummary) && (
                       <div className="mt-4 space-y-4 animate-fadeIn">
                         <div className="relative bg-gradient-to-br from-white via-orange-50/40 to-orange-100/60 backdrop-blur-sm p-8 rounded-2xl border border-[#E38B52]/30 shadow-md shadow-orange-100/30 transition-all duration-300 hover:shadow-lg hover:shadow-orange-200/40">
                           <h4 className="text-3xl font-extrabold text-[#C56930] mb-6 flex items-center gap-3 pb-3">
-                            <svg
-                              className="w-7 h-7 text-[#E38B52]"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                              />
+                            <svg className="w-7 h-7 text-[#E38B52]" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M9 4.5L10.5 8L14 9.5L10.5 11L9 14.5L7.5 11L4 9.5L7.5 8L9 4.5zm10 8.5l1 2.5l2.5 1l-2.5 1l-1 2.5l-1-2.5l-2.5-1l2.5-1l1-2.5zm-2-9l.75 1.75l1.75.75l-1.75.75l-.75 1.75l-.75-1.75l-1.75-.75l1.75-.75l.75-1.75z" />
                             </svg>
-                            Progress Summary
+                            AI Progress Summary
                             <svg
                               className="w-4 h-4 text-orange-400 cursor-help ml-1"
                               fill="none"
@@ -7171,7 +7177,7 @@ const addCellToColumn = (columnKey) => {
                                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                               />
                             </svg>
-                            {aiSummarizing && (
+                            {aiSummarizing ? (
                               <button
                                 onClick={handleStopAISummarize}
                                 className="ml-auto px-3 py-2 border-2 border-red-400 text-red-700 text-sm rounded-xl bg-red-50 hover:bg-red-100 active:scale-95 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-semibold"
@@ -7185,6 +7191,30 @@ const addCellToColumn = (columnKey) => {
                                   <rect x="5" y="5" width="10" height="10" rx="1" />
                                 </svg>
                                 Stop
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  // Remember dismissal so it doesn't auto-reload on refresh
+                                  sessionStorage.setItem(`ai_summary_dismissed_${id}`, "true");
+                                  setAiAnalysis(null);
+                                  setAiSummary("");
+                                  setAiSummaryError(null);
+                                  setTranslatedSummary(null);
+                                }}
+                                className="ml-auto px-3 py-2 border-2 border-gray-300 text-gray-500 text-sm rounded-xl bg-white hover:bg-gray-100 hover:border-gray-400 active:scale-95 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-semibold"
+                                title="Close / dismiss this summary"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Close
                               </button>
                             )}
                           </h4>
@@ -7231,91 +7261,95 @@ const addCellToColumn = (columnKey) => {
                                     </svg>
                                     Download
                                   </button>
-                                  <button
-                                    onClick={handleSendToParent}
-                                    disabled={sendingToParent || sentToParent}
-                                    className={`px-3 py-2 border-2 text-xs sm:text-sm rounded-xl active:scale-95 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
-                                      sentToParent
-                                        ? "border-green-500 text-green-600 bg-green-50"
-                                        : "border-[#E38B52] text-[#E38B52] bg-white hover:bg-orange-50 active:bg-orange-100"
-                                    }`}
-                                    title="Send this summary to the parent portal"
-                                  >
-                                    {sentToParent ? (
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                      </svg>
-                                    ) : (
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                      </svg>
-                                    )}
-                                    {sendingToParent ? "Sending..." : sentToParent ? "Sent" : "Send to Parent"}
-                                  </button>
                                 </div>
                               </div>
                             )}
 
                             <div className="p-3">
-                            {translating ? (
-                              <div className="flex items-center gap-2 text-gray-600">
-                                <div className="w-4 h-4 border-2 border-[#E38B52] border-t-transparent rounded-full animate-spin"></div>
-                                Translating to Malayalam...
-                              </div>
-                            ) : translatedSummary ? (
-                              <div>
-                                <div className="flex items-center justify-between mb-3 pb-2 border-b border-orange-200">
-                                  <span className="text-xs font-semibold text-[#E38B52] uppercase">
-                                    Translated (Malayalam)
-                                  </span>
-                                  <button
-                                    onClick={() => {
-                                      setTranslatedSummary(null);
-                                    }}
-                                    className="text-xs text-gray-500 hover:text-[#E38B52] underline"
-                                  >
-                                    Show Original
-                                  </button>
+                              {translating ? (
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <div className="w-4 h-4 border-2 border-[#E38B52] border-t-transparent rounded-full animate-spin"></div>
+                                  Translating to Malayalam...
                                 </div>
-                                <div className="whitespace-pre-wrap">
-                                  {translatedSummary}
+                              ) : translatedSummary ? (
+                                <div>
+                                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-orange-200">
+                                    <span className="text-xs font-semibold text-[#E38B52] uppercase">
+                                      Translated (Malayalam)
+                                    </span>
+                                    <button
+                                      onClick={() => {
+                                        setTranslatedSummary(null);
+                                      }}
+                                      className="text-xs text-gray-500 hover:text-[#E38B52] underline"
+                                    >
+                                      Show Original
+                                    </button>
+                                  </div>
+                                  <div className="whitespace-pre-wrap">
+                                    {translatedSummary}
+                                  </div>
                                 </div>
-                              </div>
-                            ) : (
-                              renderSummaryContent(
-                                aiSummarizing ? aiSummary : aiAnalysis?.summary,
-                                aiSummarizing,
-                              )
-                            )}
+                              ) : (
+                                renderSummaryContent(
+                                  aiSummarizing ? aiSummary : getUnifiedSummaryText(aiAnalysis),
+                                  aiSummarizing,
+                                )
+                              )}
                             </div>
                           </div>
+
+                          {aiAnalysis?.model === "fallback-data-analysis" && (
+                            <div className="mt-3 text-xs text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-200 flex items-start gap-2 shadow-sm">
+                              <span className="text-sm font-bold">⚠️</span>
+                              <div>
+                                <span className="font-semibold">Fallback Analysis:</span> AI service is currently unavailable or daily requests quota exceeded. This summary was generated using the database-driven fallback generator.
+                              </div>
+                            </div>
+                          )}
+
                           {aiAnalysis?.truncated && (
-                            <div className="mt-3 text-xs text-orange-700 bg-orange-50 p-2 rounded border border-orange-200">
-                              Ã¢Å¡Â Ã¯Â¸Â Analysis was truncated due to content length.
-                              Consider filtering by date range for more detailed
-                              analysis.
+                            <div className="mt-3 text-xs text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-200 flex items-start gap-2 shadow-sm">
+                              <span className="text-sm font-bold">⚠️</span>
+                              <div>
+                                {aiAnalysis.truncation_type === "text_trimmed" ? (
+                                  <span>
+                                    <span className="font-semibold">Note:</span> All reports are included in this summary, but some verbose details were trimmed due to size constraints.
+                                  </span>
+                                ) : (
+                                  <span>
+                                    <span className="font-semibold">Note:</span> Some middle reports were excluded from this summary due to size constraints. Omitted dates: {aiAnalysis.skipped_report_dates?.join(", ") || "N/A"}. (Baseline and latest reports are fully preserved).
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
                       </div>
                     )}
 
+
                     {/* Previously Generated Summaries Section */}
                     {generatedSummaries.length > 0 && (
                       <div className="mt-8 space-y-3">
                         <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                          <svg className="w-5 h-5 text-[#E38B52]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 4.5L10.5 8L14 9.5L10.5 11L9 14.5L7.5 11L4 9.5L7.5 8L9 4.5zm10 8.5l1 2.5l2.5 1l-2.5 1l-1 2.5l-1-2.5l-2.5-1l2.5-1l1-2.5z" />
                           </svg>
                           Previously Generated Summaries
                         </h3>
                         <div className="space-y-2 max-h-96 overflow-y-auto">
-                          {generatedSummaries.slice(0, visibleCount).map((summary) => (
+                          {generatedSummaries.filter(s => !selectedTherapyType || s.therapyType === selectedTherapyType).slice(0, visibleCount).map((summary) => (
                             <details key={summary.id} className="bg-white rounded-lg border p-4 shadow-sm">
                               <summary className="flex justify-between items-center cursor-pointer">
                                 <div>
                                   <div className="text-sm text-[#6F6C90]">{summary.generatedAt}</div>
-                                  <div className="text-lg font-semibold text-[#170F49]">AI Summary</div>
+                                  <div className="text-lg font-semibold text-[#170F49] flex items-center gap-1.5">
+                                    <svg className="w-4 h-4 text-orange-400" fill="currentColor" viewBox="0 0 24 24">
+                                      <path d="M9 4.5L10.5 8L14 9.5L10.5 11L9 14.5L7.5 11L4 9.5L7.5 8L9 4.5z" />
+                                    </svg>
+                                    AI Summary
+                                  </div>
                                   <div className="text-xs text-[#6F6C90]">
                                     Date Range: {summary.dateRange.start} to {summary.dateRange.end}
                                   </div>
@@ -7326,17 +7360,68 @@ const addCellToColumn = (columnKey) => {
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      // delete
-                                      setGeneratedSummaries(prev => {
-                                        const filtered = prev.filter(s => s.id !== summary.id);
-                                        const summariesKey = `ai_summaries_student_${id}`;
-                                        try {
-                                          localStorage.setItem(summariesKey, JSON.stringify(filtered));
-                                        } catch (err) {
-                                          console.error("Failed to update localStorage:", err);
-                                        }
-                                        return filtered;
+                                      generateSummaryPDFFromData(summary);
+                                    }}
+                                    className="px-2.5 py-1 bg-white border border-gray-300 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 flex items-center gap-1"
+                                    title="Download this summary as PDF"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-8m0 8l-4-4m4 4l4-4M4 20h16a2 2 0 002-2V6a2 2 0 00-2-2H4a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    PDF
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setAiAnalysis({
+                                        summaries: summary.summaries,
+                                        summary: summary.summary || (summary.summaries ? Object.entries(summary.summaries).map(([s, t]) => `**${s}**\n${t}`).join("\n\n") : ""),
+                                        date_range: { start_date: summary.dateRange?.start, end_date: summary.dateRange?.end },
+                                        therapy_type: summary.therapyType,
+                                        used_reports: summary.reportCount,
+                                        model: summary.model || "Llama 3.2 3B"
                                       });
+                                      setAiSummary(JSON.stringify(summary.summaries));
+                                      window.scrollTo({ top: 100, behavior: 'smooth' });
+                                    }}
+                                    className="px-2.5 py-1 bg-orange-50 border border-orange-300 text-[#E38B52] text-xs font-semibold rounded-lg hover:bg-[#E38B52] hover:text-white transition-all duration-200"
+                                    title="Load this summary into the main AI analysis viewer"
+                                  >
+                                    Load
+                                  </button>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      
+                                      // Clear active viewer if the deleted summary is currently displayed
+                                      if (aiAnalysis && aiAnalysis.therapy_type === summary.therapyType && aiAnalysis.used_reports === summary.reportCount) {
+                                        setAiAnalysis(null);
+                                        setAiSummary("");
+                                      }
+
+                                      try {
+                                        const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+                                        const token = localStorage.getItem("token");
+                                        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+                                        const res = await fetch(`${baseUrl}/api/v1/therapy-reports/summary/history/${summary.id}`, {
+                                          method: "DELETE",
+                                          headers
+                                        });
+
+                                        if (res.ok) {
+                                          showToast("Summary history deleted successfully!", "success");
+                                          fetchSummaryHistory();
+                                        } else {
+                                          const text = await res.text();
+                                          throw new Error(text || "Failed to delete summary from database.");
+                                        }
+                                      } catch (err) {
+                                        console.error("Failed to delete summary:", err);
+                                        showToast(err.message || "Failed to delete summary history.", "error");
+                                      }
                                     }}
                                     className="px-2 py-1 bg-red-50 border border-red-400 text-red-600 text-xs rounded-lg hover:bg-red-400 hover:text-white transition-all duration-200"
                                   >
@@ -7346,14 +7431,14 @@ const addCellToColumn = (columnKey) => {
                               </summary>
 
                               <div className="mt-4 text-sm text-[#333] space-y-3">
-                                <div className="text-xs text-[#6F6C90] font-semibold">Summary</div>
-                                <div className="whitespace-pre-wrap text-sm text-gray-700">{summary.summary}</div>
+                                <div className="text-xs font-semibold text-[#6F6C90]">Summary</div>
+                                <div className="whitespace-pre-wrap text-sm text-gray-700">{getUnifiedSummaryText(summary)}</div>
                                 <div className="text-xs text-[#6F6C90]">Generated: {summary.generatedAt}</div>
                                 <div className="text-xs text-[#6F6C90]">Therapy: {summary.therapyType}</div>
                               </div>
                             </details>
                           ))}
-                          {generatedSummaries.length > visibleCount && (
+                          {generatedSummaries.filter(s => !selectedTherapyType || s.therapyType === selectedTherapyType).length > visibleCount && (
                             <div className="text-center mt-4">
                               <button
                                 onClick={() => setVisibleCount((v) => v + 5)}
@@ -7372,49 +7457,86 @@ const addCellToColumn = (columnKey) => {
               {/* Reports Section at Bottom */}
               <div className="w-full mt-8">
                 <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 border-2 border-gray-200 shadow-lg">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-4">
                     <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                      <svg
-                        className="w-5 h-5 text-[#E38B52]"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
+                      <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                       </svg>
-                      Therapy Reports
+                      Therapy Reports List (Raw Logs)
                     </h3>
                   </div>
-                  {/* Active Filters Display */}
-                  {(fromDate || toDate || selectedTherapyType) && (
-                    <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <h4 className="text-sm font-medium text-blue-900 mb-2">
-                        Active Filters:
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {fromDate && (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                            Start: {fromDate}
-                          </span>
-                        )}
-                        {toDate && (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                            End: {toDate}
-                          </span>
-                        )}
-                        {selectedTherapyType && (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                            Type: {selectedTherapyType}
-                          </span>
-                        )}
+
+                  {/* BOTTOM FILTERS */}
+                  <div className="mb-6 p-4 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
+                      {/* Start Date */}
+                      <div className="flex flex-col gap-1 w-full">
+                        <label className="text-xs font-semibold text-gray-600">Start Date</label>
+                        <input
+                          type="date"
+                          value={rawFromDate}
+                          onChange={(e) => {
+                            setRawFromDate(e.target.value);
+                            setVisibleCount(5);
+                          }}
+                          className="h-10 px-3 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] transition-all cursor-pointer hover:bg-orange-50/20 w-full"
+                        />
+                      </div>
+                      {/* End Date */}
+                      <div className="flex flex-col gap-1 w-full">
+                        <label className="text-xs font-semibold text-gray-600">End Date</label>
+                        <input
+                          type="date"
+                          value={rawToDate}
+                          onChange={(e) => {
+                            setRawToDate(e.target.value);
+                            setVisibleCount(5);
+                          }}
+                          className="h-10 px-3 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] transition-all cursor-pointer hover:bg-orange-50/20 w-full"
+                        />
+                      </div>
+                      {/* Therapy Type */}
+                      <div className="flex flex-col gap-1 w-full">
+                        <label className="text-xs font-semibold text-gray-600">Therapy Type</label>
+                        <select
+                          value={rawTherapyType}
+                          disabled={user?.role === "therapist"}
+                          onChange={(e) => {
+                            setRawTherapyType(e.target.value);
+                            setVisibleCount(5);
+                          }}
+                          className="h-10 px-3 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] transition-all cursor-pointer hover:bg-orange-50/20 disabled:bg-gray-100 disabled:opacity-75 w-full"
+                        >
+                          <option value="">All Types</option>
+                          <option value="Behavioral Therapy">Behavioral</option>
+                          <option value="Occupational Therapy">Occupational</option>
+                          <option value="Physiotherapy">Physiotherapy</option>
+                          <option value="Speech Therapy">Speech</option>
+                        </select>
                       </div>
                     </div>
-                  )}
+                    {/* Clear Filters Button */}
+                    <button
+                      onClick={() => {
+                        setRawFromDate("");
+                        setRawToDate("");
+                        if (user?.role !== "therapist") {
+                          setRawTherapyType("");
+                        }
+                        setVisibleCount(5);
+                        setSelectedReportIds([]);
+                      }}
+                      disabled={!(rawFromDate || rawToDate || (user?.role !== "therapist" && rawTherapyType))}
+                      className={`h-10 px-4 rounded-lg text-sm font-semibold transition-all duration-200 shadow-md ${
+                        rawFromDate || rawToDate || (user?.role !== "therapist" && rawTherapyType)
+                          ? "bg-gray-600 text-white hover:bg-gray-700 active:scale-95 cursor-pointer"
+                          : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      }`}
+                    >
+                      Clear
+                    </button>
+                  </div>
+
                   {reportsLoading ? (
                     <p className="text-sm text-[#6F6C90]">Loading reports...</p>
                   ) : reports.length === 0 ? (
@@ -7424,22 +7546,22 @@ const addCellToColumn = (columnKey) => {
                   ) : (
                     (() => {
                       const filtered = reports.filter((r) => {
-                        if (fromDate) {
+                        if (rawFromDate) {
                           if (!r.report_date) return false;
                           const reportDate = new Date(r.report_date);
-                          const filterFromDate = new Date(fromDate);
+                          const filterFromDate = new Date(rawFromDate);
                           if (reportDate < filterFromDate) return false;
                         }
-                        if (toDate) {
+                        if (rawToDate) {
                           if (!r.report_date) return false;
                           const reportDate = new Date(r.report_date);
-                          const filterToDate = new Date(toDate);
+                          const filterToDate = new Date(rawToDate);
                           if (reportDate > filterToDate) return false;
                         }
-                        if (selectedTherapyType) {
+                        if (rawTherapyType) {
                           if (
                             !r.therapy_type ||
-                            r.therapy_type.trim() !== selectedTherapyType.trim()
+                            r.therapy_type.trim() !== rawTherapyType.trim()
                           )
                             return false;
                         }
@@ -7448,40 +7570,119 @@ const addCellToColumn = (columnKey) => {
                       const visible = filtered.slice(0, visibleCount);
                       return (
                         <div className="space-y-4">
-                          <div className="flex justify-between items-center pb-2 border-b border-gray-200">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 mb-4 border-b border-gray-200 gap-2">
                             <span className="text-sm text-[#6F6C90]">
                               Showing {Math.min(visibleCount, filtered.length)}{" "}
                               of {filtered.length} reports
                               {filtered.length !== reports.length &&
                                 ` (filtered from ${reports.length} total)`}
                             </span>
-                            {filtered.length > 0 && (
-                              <span className="text-xs text-[#6F6C90]">
-                                Date Range:{" "}
-                                {filtered.length > 0
-                                  ? `${new Date(Math.min(...filtered.map((r) => new Date(r.report_date)))).toLocaleDateString()} - ${new Date(Math.max(...filtered.map((r) => new Date(r.report_date)))).toLocaleDateString()}`
-                                  : "No reports"}
-                              </span>
-                            )}
+                            <div className="flex flex-wrap items-center gap-3">
+                              {/* Select All Checkbox */}
+                              {filtered.length > 0 && (
+                                <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm cursor-pointer hover:bg-orange-50/20 select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={filtered.length > 0 && filtered.every(r => selectedReportIds.includes(r.id))}
+                                    onChange={() => {
+                                      const allSelected = filtered.every(r => selectedReportIds.includes(r.id));
+                                      if (allSelected) {
+                                        setSelectedReportIds(prev => prev.filter(id => !filtered.some(r => r.id === id)));
+                                      } else {
+                                        const newIds = filtered.map(r => r.id);
+                                        setSelectedReportIds(prev => [...new Set([...prev, ...newIds])]);
+                                      }
+                                    }}
+                                    className="w-4 h-4 text-[#E38B52] border-gray-300 rounded focus:ring-[#E38B52]"
+                                  />
+                                  Select All
+                                </label>
+                              )}
+
+                              {/* Download Selected button */}
+                              {selectedReportIds.length > 0 && (
+                                <button
+                                  onClick={() => {
+                                    const selectedReports = reports.filter(r => selectedReportIds.includes(r.id));
+                                    handleDownloadRawReports(selectedReports);
+                                  }}
+                                  className="px-4 py-2 bg-gradient-to-r from-orange-500 to-[#E38B52] text-white text-xs font-bold rounded-lg hover:shadow active:scale-95 transition-all duration-200 flex items-center gap-2"
+                                  title="Download selected reports as PDF"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                  </svg>
+                                  Download Selected ({selectedReportIds.length})
+                                </button>
+                              )}
+
+                              {/* Export Raw Reports button */}
+                              {filtered.length > 0 && (
+                                <button
+                                  onClick={() => handleDownloadRawReports(filtered)}
+                                  className="px-4 py-2 border-2 border-[#E38B52] text-[#E38B52] text-xs font-bold rounded-lg bg-white hover:bg-orange-50 active:scale-95 transition-all duration-200 flex items-center gap-2 shadow-sm"
+                                  title="Export all filtered reports without AI summary"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                  </svg>
+                                  Export Raw Reports (PDF)
+                                </button>
+                              )}
+                            </div>
                           </div>
+                          {filtered.length > 0 && (
+                            <p className="text-xs text-gray-500 mb-2">
+                              Exports the raw daily logs entered by therapists without any AI analysis.
+                            </p>
+                          )}
                           {visible.map((r) => (
                             <details
                               key={r.id}
                               className="bg-white rounded-lg border p-4 shadow-sm"
                             >
-                              <summary className="flex justify-between items-center cursor-pointer">
-                                <div>
-                                  <div className="text-sm text-[#6F6C90]">
-                                    {new Date(
-                                      r.report_date,
-                                    ).toLocaleDateString()}
-                                  </div>
-                                  <div className="text-lg font-semibold text-[#170F49]">
-                                    {r.therapy_type || "Therapy"}
+                              <summary className="flex justify-between items-center cursor-pointer select-none">
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedReportIds.includes(r.id)}
+                                    onChange={(e) => {
+                                      e.stopPropagation(); // prevent accordion toggle!
+                                      if (e.target.checked) {
+                                        setSelectedReportIds(prev => [...prev, r.id]);
+                                      } else {
+                                        setSelectedReportIds(prev => prev.filter(id => id !== r.id));
+                                      }
+                                    }}
+                                    className="w-4 h-4 text-[#E38B52] border-gray-300 rounded focus:ring-[#E38B52] cursor-pointer"
+                                  />
+                                  <div>
+                                    <div className="text-sm text-[#6F6C90]">
+                                      {new Date(r.report_date).toLocaleDateString()}
+                                    </div>
+                                    <div className="text-lg font-semibold text-[#170F49]">
+                                      {r.therapy_type || "Therapy"}
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="text-sm text-[#6F6C90]">
-                                  {r.progress_level || ""}
+                                <div className="flex items-center gap-3 text-sm text-[#6F6C90]">
+                                  <span>{r.progress_level || ""}</span>
+                                  
+                                  {/* Small download icon for one-off export */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation(); // prevent accordion toggle!
+                                      handleDownloadRawReports([r]);
+                                    }}
+                                    className="p-1 hover:text-[#E38B52] hover:bg-orange-50 rounded transition-colors"
+                                    title="Download this single report as PDF"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                  </button>
                                 </div>
                               </summary>
                               <div className="mt-4 text-sm text-[#333] space-y-3">
@@ -7588,7 +7789,7 @@ const addCellToColumn = (columnKey) => {
                                     user.role === "admin" ||
                                     (user.role === "therapist" && normalize(user.specialization || "") === normalize(r.therapy_type || ""))
                                   );
-                                  
+
                                   if (!canEdit) return null;
                                   return (
                                     <button
@@ -7671,26 +7872,26 @@ const addCellToColumn = (columnKey) => {
             </div>
           ) : activeTab === "student-details" ? (
             <div className="max-w-6xl mx-auto p-6">
-            <div className="mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center justify-between">
-              {/* Main Header */}
-              <h2 className="text-2xl font-bold text-[#170F49] flex items-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 mr-2 text-[#E38B52]"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Student Details
-              </h2>
-              
+              <div className="mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center justify-between">
+                {/* Main Header */}
+                <h2 className="text-2xl font-bold text-[#170F49] flex items-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6 mr-2 text-[#E38B52]"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Student Details
+                </h2>
+
                 {/* Edit Button */}
                 {!editMode ? (
                   <button
@@ -7738,7 +7939,7 @@ const addCellToColumn = (columnKey) => {
                   </button>
                 )}
               </div>
-          
+
               {/* Personal Information Section */}
               <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
@@ -7758,7 +7959,7 @@ const addCellToColumn = (columnKey) => {
                   </svg>
                   Personal Information
                 </h3>
-          
+
                 <div className="flex flex-col md:flex-row gap-8">
                   {/* Photo Section */}
                   <div className="flex flex-col items-center gap-4">
@@ -7773,7 +7974,7 @@ const addCellToColumn = (columnKey) => {
                         className="w-full h-full object-cover"
                       />
                     </div>
-          
+
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -7781,7 +7982,7 @@ const addCellToColumn = (columnKey) => {
                       accept="image/png, image/jpeg"
                       style={{ display: "none" }}
                     />
-          
+
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => fileInputRef.current.click()}
@@ -7804,7 +8005,7 @@ const addCellToColumn = (columnKey) => {
                           <line x1="12" y1="3" x2="12" y2="15" />
                         </svg>
                       </button>
-          
+
                       {(student?.photoUrl || student?.photo_url || photoPreview) && (
                         <button
                           onClick={handlePhotoDelete}
@@ -7828,16 +8029,15 @@ const addCellToColumn = (columnKey) => {
                         </button>
                       )}
                     </div>
-          
+
                     {photoFile && (
                       <button
                         onClick={handlePhotoUpload}
                         disabled={photoUploading}
-                        className={`mt-2 px-4 py-2 text-white text-sm rounded-xl transition-all duration-200 shadow-md flex items-center justify-center gap-2 ${
-                          photoUploading
-                            ? "bg-gray-400 cursor-not-allowed"
-                            : "bg-green-500 hover:bg-green-600"
-                        }`}
+                        className={`mt-2 px-4 py-2 text-white text-sm rounded-xl transition-all duration-200 shadow-md flex items-center justify-center gap-2 ${photoUploading
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-green-500 hover:bg-green-600"
+                          }`}
                       >
                         {photoUploading ? (
                           <>
@@ -7883,7 +8083,7 @@ const addCellToColumn = (columnKey) => {
                       </button>
                     )}
                   </div>
-          
+
                   {/* Details Grid */}
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
                     {[
@@ -7938,12 +8138,12 @@ const addCellToColumn = (columnKey) => {
                     ))}
                   </div>
                 </div>
-          
+
                 {aadharEditError && (
                   <p className="text-red-500 text-sm mt-4">{aadharEditError}</p>
                 )}
               </div>
-          
+
               {/* Address Information Section */}
               <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
@@ -7969,7 +8169,7 @@ const addCellToColumn = (columnKey) => {
                   </svg>
                   Address Information
                 </h3>
-          
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {[
                     { label: "Birth Place", key: "birthPlace" },
@@ -7999,7 +8199,7 @@ const addCellToColumn = (columnKey) => {
                   ))}
                 </div>
               </div>
-          
+
               {/* Contact Information Section */}
               <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
@@ -8019,7 +8219,7 @@ const addCellToColumn = (columnKey) => {
                   </svg>
                   Contact Information
                 </h3>
-          
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {[
                     { label: "Phone Number", key: "phoneNumber" },
@@ -8043,7 +8243,7 @@ const addCellToColumn = (columnKey) => {
                   ))}
                 </div>
               </div>
-          
+
               {/* Family Information Section */}
               <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
@@ -8063,7 +8263,7 @@ const addCellToColumn = (columnKey) => {
                   </svg>
                   Family Information
                 </h3>
-          
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {[
                     { label: "Father's Name", key: "fatherName" },
@@ -8086,7 +8286,7 @@ const addCellToColumn = (columnKey) => {
                   ))}
                 </div>
               </div>
-          
+
               {/* Disability Details Section */}
               <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
@@ -8106,7 +8306,7 @@ const addCellToColumn = (columnKey) => {
                   </svg>
                   Disability Details
                 </h3>
-          
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {[
                     { label: "Type of Disability", key: "disabilityType" },
@@ -8130,7 +8330,7 @@ const addCellToColumn = (columnKey) => {
                     </div>
                   ))}
                 </div>
-          
+
                 <div className="mt-6">
                   <p className="text-sm text-[#6F6C90] mb-2 font-semibold">Identification Marks</p>
                   {editMode ? (
@@ -8146,7 +8346,7 @@ const addCellToColumn = (columnKey) => {
                   )}
                 </div>
               </div>
-          
+
               {/* Academic Information Section */}
               <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
@@ -8166,7 +8366,7 @@ const addCellToColumn = (columnKey) => {
                   </svg>
                   Academic Information
                 </h3>
-          
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {[
                     { label: "Class", key: "class", options: CLASS_OPTIONS },
@@ -8217,7 +8417,7 @@ const addCellToColumn = (columnKey) => {
                   ))}
                 </div>
               </div>
-          
+
               {/* Bank Details Section */}
               <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
@@ -8237,7 +8437,7 @@ const addCellToColumn = (columnKey) => {
                   </svg>
                   Bank Details
                 </h3>
-          
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {[
                     { label: "Account Number", key: "accountNumber" },
@@ -8262,7 +8462,7 @@ const addCellToColumn = (columnKey) => {
                   ))}
                 </div>
               </div>
-          
+
               {/* Certificates & Documents Section */}
               <div className="p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
@@ -8319,7 +8519,7 @@ const addCellToColumn = (columnKey) => {
                           </div>
                           <p className="text-xs text-[#6F6C90]">PDF only Ã¢â‚¬Â¢ Max 5MB</p>
                         </div>
-                                                
+
                         <button
                           onClick={() => {
                             const input = document.createElement("input");
@@ -8388,10 +8588,10 @@ const addCellToColumn = (columnKey) => {
                   ))}
                 </div>
 
-                                {/* Documents List */}
+                {/* Documents List */}
                 <div className="space-y-4">
                   <h4 className="text-sm font-semibold text-[#170F49] mb-4">Uploaded Documents</h4>
-                                    {documentsLoading ? (
+                  {documentsLoading ? (
                     <div className="text-center py-8 text-[#6F6C90]">
                       Loading documents...
                     </div>
@@ -8539,16 +8739,16 @@ const addCellToColumn = (columnKey) => {
               </div>
             </div>
           ) : activeTab === "iep" ? (
-                        
+
             <div className="max-w-6xl mx-auto p-6">
-              
+
               <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8m0-8l-3 3m3-3l3 3M4 6h16" />
                 </svg>
                 Term Report
               </h2>
-            
+
               <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-4 flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -8557,273 +8757,272 @@ const addCellToColumn = (columnKey) => {
                   Term Report of: <span className="font-semibold ml-1">{student?.name}</span>
                 </h3>
 
-                
-            
+
+
                 {/* Month and Year selector */}
-                  
-                  <div className="flex flex-col md:flex-row gap-4 items-end">
-                    {/* Month Selector */}
-                    <div className="flex items-center gap-3">
-                      <label className="block text-sm font-semibold text-[#170F49] whitespace-nowrap">Select Month</label>
-                      <select
-                        value={iepData.selectedMonth || ""}
-                        onChange={(e) => handleIepMonthChange(e.target.value)}
-                        className="px-3 py-1.5 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] font-medium"
-                      >
-                        <option value="">Choose a month</option>
-                        {MONTHS.map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <label className="block text-sm font-semibold text-[#170F49] whitespace-nowrap">
-                        Year
-                      </label>
-                      <input
-                        type="number"
-                        min="1900"
-                        max="2100"
-                        value={selectedYear}
-                        onChange={(e) => setSelectedYear(e.target.value)}
-                        className="px-3 py-1.5 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] font-medium w-28"
-                      />
-                    </div>
-                  
-                  </div>
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={createIepTable}
-                      disabled={!iepData.selectedMonth || !selectedYear || !isValidYear}
-                      className={`px-6 py-2.5 border rounded-lg transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap ${
-                        iepData.selectedMonth && selectedYear && isValidYear
-                          ? "bg-white text-[#E38B52] border-[#E38B52] hover:bg-[#FFF3E8]"
-                          : "bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed"
-                      }`}
+
+                <div className="flex flex-col md:flex-row gap-4 items-end">
+                  {/* Month Selector */}
+                  <div className="flex items-center gap-3">
+                    <label className="block text-sm font-semibold text-[#170F49] whitespace-nowrap">Select Month</label>
+                    <select
+                      value={iepData.selectedMonth || ""}
+                      onChange={(e) => handleIepMonthChange(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] font-medium"
                     >
-                      + Create Report
-                    </button>
-                    {existingIepMonthKey && (
-                      <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
-                        <p className="text-sm text-amber-900">
-                          A report already exists for <strong>{existingIepMonthKey}</strong>.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIepFormVisible(false);
-                            setExpandedIepMonth(existingIepMonthKey);
-                            document
-                              .getElementById(`iep-report-${existingIepMonthKey}`)
-                              ?.scrollIntoView({ behavior: "smooth", block: "center" });
-                          }}
-                          className="px-4 py-2 rounded-lg bg-[#E38B52] text-white text-sm hover:bg-[#C8742F]"
-                        >
-                          Go to saved report
-                        </button>
-                      </div>
-                    )}
+                      <option value="">Choose a month</option>
+                      {MONTHS.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
                   </div>
+                  <div className="flex items-center gap-3">
+                    <label className="block text-sm font-semibold text-[#170F49] whitespace-nowrap">
+                      Year
+                    </label>
+                    <input
+                      type="number"
+                      min="1900"
+                      max="2100"
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(e.target.value)}
+                      className="px-3 py-1.5 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] font-medium w-28"
+                    />
+                  </div>
+
+                </div>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={createIepTable}
+                    disabled={!iepData.selectedMonth || !selectedYear || !isValidYear}
+                    className={`px-6 py-2.5 border rounded-lg transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap ${iepData.selectedMonth && selectedYear && isValidYear
+                      ? "bg-white text-[#E38B52] border-[#E38B52] hover:bg-[#FFF3E8]"
+                      : "bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed"
+                      }`}
+                  >
+                    + Create Report
+                  </button>
+                  {existingIepMonthKey && (
+                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+                      <p className="text-sm text-amber-900">
+                        A report already exists for <strong>{existingIepMonthKey}</strong>.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIepFormVisible(false);
+                          setExpandedIepMonth(existingIepMonthKey);
+                          document
+                            .getElementById(`iep-report-${existingIepMonthKey}`)
+                            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className="px-4 py-2 rounded-lg bg-[#E38B52] text-white text-sm hover:bg-[#C8742F]"
+                      >
+                        Go to saved report
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <p className="mt-3 text-xs text-[#6F6C90]">Select the month and year to prepare the IEP report.</p>
-              
-                
+
+
               </div>
               <tbody>
-              <tr>
-                <td colSpan={3} className="p-4 align-top">
-                  {iepFormVisible ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {[
-                        { key: "adlSkills", title: "ADL Skills", addLabel: "Add ADL Skill" },
-                        { key: "academic", title: "Academic", addLabel: "Add Academic Entry" },
-                        { key: "behaviouralSkills", title: "Behavioural", addLabel: "Add Behavioural Skill" },
-                      ].map(({ key, title, addLabel }) => (
-                        <div key={key} className="bg-white p-3 rounded shadow-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium">{title}</h4>
-                            <button
-                              type="button"
-                              className="text-sm text-[#E38B52] hover:underline"
-                              onClick={() => addIepSectionItem(key)}
-                            >
-                              + {addLabel}
-                            </button>
-                          </div>
-            
-                          <div className="flex flex-col gap-2">
-                            {(iepData.sections[key] || []).map((item) => (
-                              <div key={item.id} className="flex gap-2 items-start">
-                                <textarea
-                                  value={item.text}
-                                  onChange={(e) =>
-                                    handleIepSectionChange(key, item.id, e.target.value)
-                                  }
-                                  placeholder="Enter item"
-                                  className="input-edit h-20 resize-none"
-                                />
-                                <button
-                                  type="button"
-                                  className="text-red-500 ml-1"
-                                  onClick={() => removeIepSectionItem(key, item.id)}
-                                  aria-label="Remove item"
-                                >
-                                  <svg
-                                    viewBox="0 0 24 24"
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                <tr>
+                  <td colSpan={3} className="p-4 align-top">
+                    {iepFormVisible ? (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {[
+                          { key: "adlSkills", title: "ADL Skills", addLabel: "Add ADL Skill" },
+                          { key: "academic", title: "Academic", addLabel: "Add Academic Entry" },
+                          { key: "behaviouralSkills", title: "Behavioural", addLabel: "Add Behavioural Skill" },
+                        ].map(({ key, title, addLabel }) => (
+                          <div key={key} className="bg-white p-3 rounded shadow-sm">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium">{title}</h4>
+                              <button
+                                type="button"
+                                className="text-sm text-[#E38B52] hover:underline"
+                                onClick={() => addIepSectionItem(key)}
+                              >
+                                + {addLabel}
+                              </button>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                              {(iepData.sections[key] || []).map((item) => (
+                                <div key={item.id} className="flex gap-2 items-start">
+                                  <textarea
+                                    value={item.text}
+                                    onChange={(e) =>
+                                      handleIepSectionChange(key, item.id, e.target.value)
+                                    }
+                                    placeholder="Enter item"
+                                    className="input-edit h-20 resize-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="text-red-500 ml-1"
+                                    onClick={() => removeIepSectionItem(key, item.id)}
+                                    aria-label="Remove item"
                                   >
-                                    <path d="M3 6h18" />
-                                    <path d="M8 6V4h8v2" />
-                                    <path d="M6 6l1 14h10l1-14" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ))}
-                            {!(iepData.sections[key] || []).length && (
-                              <div className="text-sm text-gray-400">No items yet</div>
-                            )}
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M3 6h18" />
+                                      <path d="M8 6V4h8v2" />
+                                      <path d="M6 6l1 14h10l1-14" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ))}
+                              {!(iepData.sections[key] || []).length && (
+                                <div className="text-sm text-gray-400">No items yet</div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <>
-                      {(() => {
-                        const adlItems = Array.isArray(iepData.sections?.adlSkills) ? iepData.sections.adlSkills : [];
-                        const academicItems = Array.isArray(iepData.sections?.academic) ? iepData.sections.academic : [];
-                        const behaviouralItems = Array.isArray(iepData.sections?.behaviouralSkills) ? iepData.sections.behaviouralSkills : [];
-                        const rowCount = Math.max(adlItems.length, academicItems.length, behaviouralItems.length);
-                    
-                       
-                    
-                        
-                      })()}
-                    </>
-                  )}
-                </td>
-              </tr>
-            </tbody>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        {(() => {
+                          const adlItems = Array.isArray(iepData.sections?.adlSkills) ? iepData.sections.adlSkills : [];
+                          const academicItems = Array.isArray(iepData.sections?.academic) ? iepData.sections.academic : [];
+                          const behaviouralItems = Array.isArray(iepData.sections?.behaviouralSkills) ? iepData.sections.behaviouralSkills : [];
+                          const rowCount = Math.max(adlItems.length, academicItems.length, behaviouralItems.length);
+
+
+
+
+                        })()}
+                      </>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
 
               {pendingNewIepMonth && editingIepMonth === pendingNewIepMonth && renderIepDraftCard()}
 
               {/* Saved IEP Reports List */}
-                <div className="mt-6 mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                  <h3 className="text-lg font-semibold text-[#170F49] mb-4 flex items-center gap-2">Saved Reports</h3>
-                  {(() => {
-                    const keys = Object.keys(savedIepByMonth || {});
-                    const sortedKeys = keys.sort((a, b) => parseMonthYearKey(b) - parseMonthYearKey(a)); // newest first
-                    return sortedKeys.map((monthYearKey) => {
-                      const isExpanded = expandedIepMonth === monthYearKey;
-                      const isEditing = editingIepMonth === monthYearKey;
-                      return (
-                        <div
-                          key={monthYearKey}
-                          id={`iep-report-${monthYearKey}`}
-                          className="border border-[#E38B52]/30 rounded-xl bg-white shadow-md overflow-hidden"
-                        >
-                          <div className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-[#E38B52]/10 to-transparent">
-                            <button
-                              onClick={() => {
-                                if (warnIfEditingIep() && !isExpanded) return;
-                                toggleIepExpand(monthYearKey);
-                              }}
-                              className="text-left flex-1 text-base font-semibold text-[#170F49]"
-                              aria-expanded={isExpanded}
-                            >
-                              TRIMESTER REPORT FOR {monthYearKey.toUpperCase()}
-                            </button>
-                  
-                            <div className="flex items-center gap-2">
-                              
-                  
-                              {isEditing ? (
-                                <>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); saveIepData(); }}
-                                    className="px-3 py-1.5 rounded-md bg-green-600 text-white text-sm hover:bg-green-700"
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const key = `iep_data_student_${id}_by_month`;
-                                      try {
-                                        const mapping = JSON.parse(localStorage.getItem(key) || "{}");
-                                        if (mapping?.[monthYearKey]) {
-                                          setIepData(normalizeIepData(savedIepByMonth[monthYearKey]));
-                                        } else {
-                                          setIepData({
-                                            ...createEmptyIepData(),
-                                            selectedMonth: iepData.selectedMonth,
-                                          });
-                                        }
-                                      } catch (err) {
-                                        console.error("Failed to reload IEP on cancel:", err);
-                                      } finally {
-                                        setEditingIepMonth(null);
-                                      }
-                                    }}
-                                    className="px-3 py-1.5 rounded-md bg-gray-100 text-[#170F49] text-sm hover:bg-gray-200"
-                                  >
-                                    Cancel
-                                  </button>
-                                </>
-                              ) : (
+              <div className="mt-6 mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
+                <h3 className="text-lg font-semibold text-[#170F49] mb-4 flex items-center gap-2">Saved Reports</h3>
+                {(() => {
+                  const keys = Object.keys(savedIepByMonth || {});
+                  const sortedKeys = keys.sort((a, b) => parseMonthYearKey(b) - parseMonthYearKey(a)); // newest first
+                  return sortedKeys.map((monthYearKey) => {
+                    const isExpanded = expandedIepMonth === monthYearKey;
+                    const isEditing = editingIepMonth === monthYearKey;
+                    return (
+                      <div
+                        key={monthYearKey}
+                        id={`iep-report-${monthYearKey}`}
+                        className="border border-[#E38B52]/30 rounded-xl bg-white shadow-md overflow-hidden"
+                      >
+                        <div className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-[#E38B52]/10 to-transparent">
+                          <button
+                            onClick={() => {
+                              if (warnIfEditingIep() && !isExpanded) return;
+                              toggleIepExpand(monthYearKey);
+                            }}
+                            className="text-left flex-1 text-base font-semibold text-[#170F49]"
+                            aria-expanded={isExpanded}
+                          >
+                            TRIMESTER REPORT FOR {monthYearKey.toUpperCase()}
+                          </button>
+
+                          <div className="flex items-center gap-2">
+
+
+                            {isEditing ? (
+                              <>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); saveIepData(); }}
+                                  className="px-3 py-1.5 rounded-md bg-green-600 text-white text-sm hover:bg-green-700"
+                                >
+                                  Save
+                                </button>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (warnIfEditingIep()) return;
-                                    setExpandedIepMonth(monthYearKey);
-                                    setEditingIepMonth(monthYearKey);
-                                    setIepData(normalizeIepData(savedIepByMonth[monthYearKey]));
+                                    const key = `iep_data_student_${id}_by_month`;
+                                    try {
+                                      const mapping = JSON.parse(localStorage.getItem(key) || "{}");
+                                      if (mapping?.[monthYearKey]) {
+                                        setIepData(normalizeIepData(savedIepByMonth[monthYearKey]));
+                                      } else {
+                                        setIepData({
+                                          ...createEmptyIepData(),
+                                          selectedMonth: iepData.selectedMonth,
+                                        });
+                                      }
+                                    } catch (err) {
+                                      console.error("Failed to reload IEP on cancel:", err);
+                                    } finally {
+                                      setEditingIepMonth(null);
+                                    }
                                   }}
-                                  className="px-3 py-1.5 rounded-md bg-[#E38B52] text-white text-sm hover:bg-[#C8742F]"
+                                  className="px-3 py-1.5 rounded-md bg-gray-100 text-[#170F49] text-sm hover:bg-gray-200"
                                 >
-                                  Edit
+                                  Cancel
                                 </button>
-                              )}
-
+                              </>
+                            ) : (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  // Download the saved IEP for this month (uses existing helper)
-                                  if (!savedIepByMonth?.[monthYearKey]) {
-                                    showToast("No saved report to download.", "warning");
-                                    return;
-                                  }
-                                  // If downloadIepAsPDF currently uses in-memory iepData, temporarily set it:
-                                  
-                                  downloadIepAsPDF(savedIepByMonth[monthYearKey]);
+                                  if (warnIfEditingIep()) return;
+                                  setExpandedIepMonth(monthYearKey);
+                                  setEditingIepMonth(monthYearKey);
+                                  setIepData(normalizeIepData(savedIepByMonth[monthYearKey]));
                                 }}
-                                title="Download report"
-                                className="p-2 rounded-md text-[#E38B52] hover:bg-[#FFF3E8]"
-                                aria-label="Download report"
+                                className="px-3 py-1.5 rounded-md bg-[#E38B52] text-white text-sm hover:bg-[#C8742F]"
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l4-4m-4 4l-4-4M21 21H3" />
-                                </svg>
+                                Edit
                               </button>
-                  
-                              <button
-                                onClick={(e) => { e.stopPropagation(); confirmDeleteIepReport(monthYearKey); }}
-                                title="Delete report"
-                                className="p-2 rounded-md text-red-600 hover:bg-red-50"
-                                aria-label="Delete report"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
-                                </svg>
-                              </button>
-                            </div>
+                            )}
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Download the saved IEP for this month (uses existing helper)
+                                if (!savedIepByMonth?.[monthYearKey]) {
+                                  showToast("No saved report to download.", "warning");
+                                  return;
+                                }
+                                // If downloadIepAsPDF currently uses in-memory iepData, temporarily set it:
+
+                                downloadIepAsPDF(savedIepByMonth[monthYearKey]);
+                              }}
+                              title="Download report"
+                              className="p-2 rounded-md text-[#E38B52] hover:bg-[#FFF3E8]"
+                              aria-label="Download report"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l4-4m-4 4l-4-4M21 21H3" />
+                              </svg>
+                            </button>
+
+                            <button
+                              onClick={(e) => { e.stopPropagation(); confirmDeleteIepReport(monthYearKey); }}
+                              title="Delete report"
+                              className="p-2 rounded-md text-red-600 hover:bg-red-50"
+                              aria-label="Delete report"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+                              </svg>
+                            </button>
                           </div>
-                  
-                          {isExpanded && (
+                        </div>
+
+                        {isExpanded && (
                           <div className="px-6 py-6 border-t border-[#E38B52]/20 space-y-6 bg-white/50">
                             {/* Table Section */}
                             {isEditing ? (
@@ -8834,7 +9033,7 @@ const addCellToColumn = (columnKey) => {
                                     <col style={{ width: "33%" }} />
                                     <col style={{ width: "33%" }} />
                                   </colgroup>
-                            
+
                                   <thead className="bg-gradient-to-r from-[#E38B52] to-[#F5A572]">
                                     <tr>
                                       <th className="px-4 py-3 text-left text-sm font-semibold text-white border-r border-white/30">
@@ -8850,7 +9049,7 @@ const addCellToColumn = (columnKey) => {
                                           </button>
                                         </div>
                                       </th>
-                            
+
                                       <th className="px-4 py-3 text-left text-sm font-semibold text-white border-r border-white/30">
                                         <div className="flex items-center justify-between gap-3">
                                           <span>ACADEMIC</span>
@@ -8864,7 +9063,7 @@ const addCellToColumn = (columnKey) => {
                                           </button>
                                         </div>
                                       </th>
-                            
+
                                       <th className="px-4 py-3 text-left text-sm font-semibold text-white">
                                         <div className="flex items-center justify-between gap-3">
                                           <span>BEHAVIOURAL SKILLS</span>
@@ -8880,14 +9079,14 @@ const addCellToColumn = (columnKey) => {
                                       </th>
                                     </tr>
                                   </thead>
-                            
+
                                   <tbody className="bg-white">
                                     {(() => {
                                       const adlItems = Array.isArray(iepData.sections?.adlSkills) ? iepData.sections.adlSkills : [];
                                       const academicItems = Array.isArray(iepData.sections?.academic) ? iepData.sections.academic : [];
                                       const behaviouralItems = Array.isArray(iepData.sections?.behaviouralSkills) ? iepData.sections.behaviouralSkills : [];
                                       const rowCount = Math.max(adlItems.length, academicItems.length, behaviouralItems.length);
-                            
+
                                       if (rowCount === 0) {
                                         return (
                                           <tr>
@@ -8897,7 +9096,7 @@ const addCellToColumn = (columnKey) => {
                                           </tr>
                                         );
                                       }
-                            
+
                                       return Array.from({ length: rowCount }).map((_, index) => (
                                         <tr key={`iep-edit-row-${index}`}>
                                           <td className="px-4 py-3 align-top text-sm text-gray-700 border-r border-gray-200">
@@ -8927,7 +9126,7 @@ const addCellToColumn = (columnKey) => {
                                               <div className="h-20" />
                                             )}
                                           </td>
-                            
+
                                           <td className="px-4 py-3 align-top text-sm text-gray-700 border-r border-gray-200">
                                             {academicItems[index] ? (
                                               <div className="flex items-start gap-2">
@@ -8955,7 +9154,7 @@ const addCellToColumn = (columnKey) => {
                                               <div className="h-20" />
                                             )}
                                           </td>
-                            
+
                                           <td className="px-4 py-3 align-top text-sm text-gray-700">
                                             {behaviouralItems[index] ? (
                                               <div className="flex items-start gap-2">
@@ -9010,7 +9209,7 @@ const addCellToColumn = (columnKey) => {
                                       const academicItems = Array.isArray(iepData.sections?.academic) ? iepData.sections.academic : [];
                                       const behaviouralItems = Array.isArray(iepData.sections?.behaviouralSkills) ? iepData.sections.behaviouralSkills : [];
                                       const rowCount = Math.max(adlItems.length, academicItems.length, behaviouralItems.length);
-                            
+
                                       if (rowCount === 0) {
                                         return (
                                           <tr>
@@ -9020,7 +9219,7 @@ const addCellToColumn = (columnKey) => {
                                           </tr>
                                         );
                                       }
-                            
+
                                       return Array.from({ length: rowCount }).map((_, index) => (
                                         <tr key={`iep-view-row-${index}`}>
                                           <td className="px-4 py-3 align-top text-sm text-gray-700 border-r border-gray-200">
@@ -9039,7 +9238,7 @@ const addCellToColumn = (columnKey) => {
                                 </table>
                               </div>
                             )}
-                
+
                             {/* Remarks */}
                             <div>
                               <label className="block text-sm font-semibold text-[#170F49] mb-2">IEP OF THE STUDENT:</label>
@@ -9052,7 +9251,7 @@ const addCellToColumn = (columnKey) => {
                                 readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
                               />
                             </div>
-                
+
                             <div>
                               <label className="block text-sm font-semibold text-[#170F49] mb-2">Remarks:</label>
                               <textarea
@@ -9064,19 +9263,19 @@ const addCellToColumn = (columnKey) => {
                                 readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
                               />
                             </div>
-                
-                            
-                
-                            
+
+
+
+
                           </div>
-                        
+
                         )}
                       </div>
-                      );
-                    });
-                  })()}
-                </div>
+                    );
+                  });
+                })()}
               </div>
+            </div>
           ) : activeTab === "iep-form" ? (
             <div className="max-w-6xl mx-auto p-6">
               <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
@@ -9409,19 +9608,19 @@ const addCellToColumn = (columnKey) => {
                     />
                   </svg>
                   Assessment of : {" "}
-                    <span>{student.name}</span>
+                  <span>{student.name}</span>
                 </h3>
-              
+
                 <div className="flex flex-col md:flex-row gap-6 items-end">
                   {/* Report Date */}
                   <div className="flex items-center gap-3">
                     <label className="block text-sm font-semibold text-[#170F49] whitespace-nowrap">
                       Report Date
                     </label>
-                    
+
                     <div className="relative w-40 group">
                       <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-[#E38B52]/40 to-[#F5A572]/40 blur-lg opacity-60 group-focus-within:opacity-100 transition-opacity duration-300" />
-                      
+
                       <input
                         type="date"
                         value={reportDate}
@@ -9431,15 +9630,14 @@ const addCellToColumn = (columnKey) => {
                       />
                     </div>
                   </div>
-              
+
                   {/* Create Table Button */}
-                 <button
+                  <button
                     type="button"
                     onClick={handleAddManualTable}
                     disabled={!reportDate}
-                    className={`px-6 py-2.5 bg-white text-[#E38B52] border border-[#E38B52] rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap ${
-                      !reportDate ? "opacity-50 cursor-not-allowed hover:bg-white" : "hover:bg-[#FFF3E8]"
-                    }`}
+                    className={`px-6 py-2.5 bg-white text-[#E38B52] border border-[#E38B52] rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap ${!reportDate ? "opacity-50 cursor-not-allowed hover:bg-white" : "hover:bg-[#FFF3E8]"
+                      }`}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -9458,12 +9656,12 @@ const addCellToColumn = (columnKey) => {
                     Create Table
                   </button>
                 </div>
-              
+
                 <p className="mt-3 text-xs text-[#6F6C90]">
                   Select a date and click Create Table to add a new assessment.
                 </p>
               </div>
-              
+
               {/* Results Section */}
               {savedTables.length > 0 ? (
                 <div className="space-y-6">
@@ -9485,15 +9683,15 @@ const addCellToColumn = (columnKey) => {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                          
+
                             // Block opening another table when a different table has unsaved edits
                             if (warnIfUnsavedOther(tableIndex, "opening this table")) return;
-                          
+
                             if (table.isEditable) {
                               showToast("Save the table before closing it", "warning");
                               return;
                             }
-                          
+
                             setShowTableDetails((prev) => ({
                               ...prev,
                               [tableIndex]: !prev[tableIndex],
@@ -9501,7 +9699,7 @@ const addCellToColumn = (columnKey) => {
                           }}
                           className="bg-gradient-to-r from-[#E38B52] to-[#F5A572] px-6 py-4 flex items-center justify-between cursor-pointer list-none"
                         >
-                        <div className="flex-1">
+                          <div className="flex-1">
                             {/* Primary Info - Always Visible */}
                             <h3 className="text-lg font-bold text-white">
                               {table.table_year || (table.report_date ? new Date(table.report_date).getFullYear() : "Year")} Table
@@ -9516,14 +9714,14 @@ const addCellToColumn = (columnKey) => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                              
+
                                 if (warnIfUnsavedOther(tableIndex, "opening this table")) return;
-                              
+
                                 if (table.isEditable) {
                                   showToast("Save the table before closing it", "warning");
                                   return;
                                 }
-                              
+
                                 setShowTableDetails((prev) => ({
                                   ...prev,
                                   [tableIndex]: !prev[tableIndex],
@@ -9576,9 +9774,9 @@ const addCellToColumn = (columnKey) => {
                               onClick={async (e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                              
+
                                 if (warnIfUnsavedOther(tableIndex, "exporting this table")) return;
-                              
+
                                 if (table.isEditable) {
                                   const phaseToSave = table.assessment_phase || "1st assmt";
                                   if (phaseToSave !== "1st assmt") {
@@ -9588,14 +9786,14 @@ const addCellToColumn = (columnKey) => {
                                       return;
                                     }
                                   }
-                              
+
                                   handleSetTableEditable(table, false);
                                   setTableSavedStatus((prev) => ({ ...prev, [tableIndex]: true }));
                                   setTimeout(() => {
                                     setTableSavedStatus((prev) => ({ ...prev, [tableIndex]: false }));
                                   }, 1000);
                                 }
-                              
+
                                 handleExportToPDF(table, tableIndex);
                               }}
                               className="w-11 h-11 rounded-full bg-white/95 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center text-[#E38B52]"
@@ -9715,8 +9913,8 @@ const addCellToColumn = (columnKey) => {
 
                           const currentSkillMeta = activeKey
                             ? SPECIAL_EDU_SKILLS.find(
-                                (s) => s.key === activeKey,
-                              )
+                              (s) => s.key === activeKey,
+                            )
                             : null;
 
                           const questions = activeKey
@@ -9725,10 +9923,10 @@ const addCellToColumn = (columnKey) => {
 
                           const skillRowIndex = activeKey
                             ? table.rows.findIndex(
-                                (row) =>
-                                  normalizeSectionKey(row[skillColumn]) ===
-                                  activeKey,
-                              )
+                              (row) =>
+                                normalizeSectionKey(row[skillColumn]) ===
+                                activeKey,
+                            )
                             : -1;
 
                           const skillRow =
@@ -9739,21 +9937,21 @@ const addCellToColumn = (columnKey) => {
 
                           const handleToggleCell = (colName, newValue) => {
                             if (!skillRow || !activeKey || !canEdit) return;
-                          
+
                             const phase = table.assessment_phase || '1st assmt';
                             const isQuarterPhase =
                               phase === '1st Qtr' ||
                               phase === '2nd Qtr' ||
                               phase === '3rd Qtr' ||
                               phase === '4th Qtr';
-                          
+
                             setSavedTables(prev => {
                               const nowIso = new Date().toISOString();
-                          
+
                               const updated = prev.map(t => {
                                 if (t !== table) return t;
                                 const rows = t.rows || [];
-                          
+
                                 // For nonÃ¢â‚¬â€˜quarter phases (e.g. 1st assmt), edit the base value directly
                                 if (!isQuarterPhase) {
                                   const newRows = rows.map((row, idx) =>
@@ -9761,7 +9959,7 @@ const addCellToColumn = (columnKey) => {
                                   );
                                   return { ...t, rows: newRows, last_edited_at: nowIso };
                                 }
-                          
+
                                 // For quarter phases (1stÃ¢â‚¬â€œ4th Qtr): only original B can be changed
                                 const row = rows[skillRowIndex] || {};
                                 const rawCurrent = row[colName];
@@ -9769,27 +9967,27 @@ const addCellToColumn = (columnKey) => {
                                   typeof rawCurrent === 'string'
                                     ? rawCurrent.trim().toUpperCase()
                                     : '';
-                          
+
                                 if (baseVal !== 'B') return t; // ignore nonÃ¢â‚¬â€˜B cells in quarter phases
-                          
+
                                 const cellKey = `${skillRowIndex}:${colName}`;
                                 const existingSnapshots = t.quarterSnapshots || {};
                                 const phaseSnapshot = existingSnapshots[phase] || {};
-                          
+
                                 let newPhaseSnapshot = phaseSnapshot;
                                 if (newValue === 'A' || newValue === 'B') {
                                   newPhaseSnapshot = { ...phaseSnapshot, [cellKey]: newValue };
                                 } else {
                                   return t;
                                 }
-                          
+
                                 return {
                                   ...t,
                                   quarterSnapshots: { ...existingSnapshots, [phase]: newPhaseSnapshot },
                                   last_edited_at: nowIso,
                                 };
                               });
-                          
+
                               try {
                                 if (typeof window !== 'undefined' && id) {
                                   window.localStorage.setItem(
@@ -9800,7 +9998,7 @@ const addCellToColumn = (columnKey) => {
                               } catch (err) {
                                 console.warn('Failed to persist updated Special Education tables', err);
                               }
-                          
+
                               return updated;
                             });
                           };
@@ -9818,10 +10016,10 @@ const addCellToColumn = (columnKey) => {
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                              
+
                                       if (table.isEditable) {
                                         const phaseToSave = table.assessment_phase || "1st assmt";
-                                      
+
                                         if (phaseToSave !== "1st assmt") {
                                           const dateVal = (table.quarterEditDates || {})[phaseToSave];
                                           if (!dateVal) {
@@ -9829,7 +10027,7 @@ const addCellToColumn = (columnKey) => {
                                             return;
                                           }
                                         }
-                                      
+
                                         handleSetTableEditable(table, false);
                                         setTableSavedStatus((prev) => ({
                                           ...prev,
@@ -9866,17 +10064,17 @@ const addCellToColumn = (columnKey) => {
                                       "Edit"
                                     )}
                                   </button>
-                              
+
                                   {table.isEditable && (
                                     <div className="flex flex-col gap-2">
                                       <select
                                         value={table.assessment_phase || "1st assmt"}
                                         onMouseDown={(e) => e.stopPropagation()}
-                                        
+
                                         onChange={(e) => {
                                           const phase = e.target.value;
                                           const tableKey = savedTables.indexOf(table);
-                                  
+
                                           if (!isPhaseUnlocked(table, phase)) {
                                             showToast(
                                               `Complete ${SPECIAL_EDU_ASSESSMENT_PHASES[SPECIAL_EDU_ASSESSMENT_PHASES.indexOf(phase) - 1]} before accessing this quarter`,
@@ -9884,7 +10082,7 @@ const addCellToColumn = (columnKey) => {
                                             );
                                             return;
                                           }
-                                  
+
                                           e.stopPropagation();
                                           const nowIso = new Date().toISOString();
                                           setSavedTables((prev) => {
@@ -9913,7 +10111,7 @@ const addCellToColumn = (columnKey) => {
                                           );
                                         })}
                                       </select>
-                                  
+
                                       {table.assessment_phase !== "1st assmt" && (
                                         <input
                                           type="date"
@@ -9929,7 +10127,7 @@ const addCellToColumn = (columnKey) => {
                                       )}
                                     </div>
                                   )}
-                              
+
                                   {/* Show/Hide questions only makes sense when a skill is selected */}
                                   {activeKey && (
                                     <button
@@ -9988,7 +10186,7 @@ const addCellToColumn = (columnKey) => {
                                           typeof rawValue === 'string'
                                             ? rawValue.trim().toUpperCase()
                                             : '';
-                                        
+
                                         const snapshots = table.quarterSnapshots || {};
                                         const effectiveVal = getEffectiveValueForPhase(
                                           baseVal,
@@ -9996,7 +10194,7 @@ const addCellToColumn = (columnKey) => {
                                           phase,
                                           snapshots
                                         );
-                                        
+
                                         const isYes = effectiveVal === 'A';
                                         const isNo = effectiveVal === 'B';
                                         const isActiveQuestion =
@@ -10184,248 +10382,248 @@ const addCellToColumn = (columnKey) => {
                                   .includes("skill"),
                               ) || allHeaders[0];
 
-                          const sessionHeaders = baseHeaders.filter(h => h !== skillColumn);
-                      
-                          // Table key and currently active skill for this table
-                          const tableKey = tableIndex;
-                          const activeKey = activeSkillByTable[tableKey] || null;
-                      
-                          // Build leaf columns (second header row + body)
-                          const leafColumns = [];
-                          
-                          
-                        
-                          
-                          
-                      
-                          // Base columns: one cell, spanning both header rows
-                          baseHeaders.forEach(h => {
-                            const isSkillCol = h === skillColumn;
-                            leafColumns.push({
-                              group: null,
-                              header: String(h).replace(/^Session\s+/i, ''),
-                              subLabel: null,
-                              isSkill: isSkillCol,
-                              fieldName: h,
-                              getValue: row => row[h],
-                            });
-                          });
-                      
-                          // 1st Assessment group: TOTAL A / TOTAL B
-                          if (totalAKey || totalBKey) {
-                            if (totalAKey) {
+                            const sessionHeaders = baseHeaders.filter(h => h !== skillColumn);
+
+                            // Table key and currently active skill for this table
+                            const tableKey = tableIndex;
+                            const activeKey = activeSkillByTable[tableKey] || null;
+
+                            // Build leaf columns (second header row + body)
+                            const leafColumns = [];
+
+
+
+
+
+
+                            // Base columns: one cell, spanning both header rows
+                            baseHeaders.forEach(h => {
+                              const isSkillCol = h === skillColumn;
                               leafColumns.push({
-                                group: '1st Assmt',
+                                group: null,
+                                header: String(h).replace(/^Session\s+/i, ''),
+                                subLabel: null,
+                                isSkill: isSkillCol,
+                                fieldName: h,
+                                getValue: row => row[h],
+                              });
+                            });
+
+                            // 1st Assessment group: TOTAL A / TOTAL B
+                            if (totalAKey || totalBKey) {
+                              if (totalAKey) {
+                                leafColumns.push({
+                                  group: '1st Assmt',
+                                  header: 'A',
+                                  subLabel: 'A',
+                                  getValue: row => row[totalAKey],
+                                });
+                              }
+                              if (totalBKey) {
+                                leafColumns.push({
+                                  group: '1st Assmt',
+                                  header: 'B',
+                                  subLabel: 'B',
+                                  getValue: row => row[totalBKey],
+                                });
+                              }
+                            }
+
+                            // Quarter groups: for now, show existing value under A, leave B empty
+                            quarterKeys.forEach(({ def, key }) => {
+                              if (!key) return;
+                              leafColumns.push({
+                                group: def.label,
                                 header: 'A',
                                 subLabel: 'A',
-                                getValue: row => row[totalAKey],
+                                getValue: row => row[key],
                               });
-                            }
-                            if (totalBKey) {
                               leafColumns.push({
-                                group: '1st Assmt',
+                                group: def.label,
                                 header: 'B',
                                 subLabel: 'B',
-                                getValue: row => row[totalBKey],
+                                getValue: () => '',
                               });
-                            }
-                          }
-                      
-                          // Quarter groups: for now, show existing value under A, leave B empty
-                          quarterKeys.forEach(({ def, key }) => {
-                            if (!key) return;
-                            leafColumns.push({
-                              group: def.label,
-                              header: 'A',
-                              subLabel: 'A',
-                              getValue: row => row[key],
                             });
-                            leafColumns.push({
-                              group: def.label,
-                              header: 'B',
-                              subLabel: 'B',
-                              getValue: () => '',
-                            });
-                          });
-                      
-                          if (!leafColumns.length) return null;
-                      
-                          return (
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
-                                {/* Top header row: base cols (rowSpan=2) + grouped headings */}
-                                <tr>
-                                  {(() => {
-                                    const cells = [];
-                                    let i = 0;
-                                    while (i < leafColumns.length) {
-                                      const col = leafColumns[i];
-                                      if (!col.group) {
-                                        // Simple column spanning both header rows
+
+                            if (!leafColumns.length) return null;
+
+                            return (
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                  {/* Top header row: base cols (rowSpan=2) + grouped headings */}
+                                  <tr>
+                                    {(() => {
+                                      const cells = [];
+                                      let i = 0;
+                                      while (i < leafColumns.length) {
+                                        const col = leafColumns[i];
+                                        if (!col.group) {
+                                          // Simple column spanning both header rows
+                                          cells.push(
+                                            <th
+                                              key={`h1-${i}`}
+                                              rowSpan={2}
+                                              className="px-2 py-1.5 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider"
+                                            >
+                                              {col.header}
+                                            </th>
+                                          );
+                                          i += 1;
+                                          continue;
+                                        }
+                                        // Grouped columns (1st Assessment, I Qr, Ã¢â‚¬Â¦)
+                                        const group = col.group;
+                                        let span = 0;
+                                        while (
+                                          i + span < leafColumns.length &&
+                                          leafColumns[i + span].group === group
+                                        ) {
+                                          span += 1;
+                                        }
                                         cells.push(
                                           <th
-                                            key={`h1-${i}`}
-                                            rowSpan={2}
-                                            className="px-2 py-1.5 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider"
+                                            key={`group-${group}-${i}`}
+                                            colSpan={span}
+                                            className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-600 uppercase tracking-wider"
                                           >
-                                            {col.header}
+                                            {group}
                                           </th>
                                         );
-                                        i += 1;
-                                        continue;
+                                        i += span;
                                       }
-                                      // Grouped columns (1st Assessment, I Qr, Ã¢â‚¬Â¦)
-                                      const group = col.group;
-                                      let span = 0;
-                                      while (
-                                        i + span < leafColumns.length &&
-                                        leafColumns[i + span].group === group
-                                      ) {
-                                        span += 1;
-                                      }
-                                      cells.push(
+                                      return cells;
+                                    })()}
+                                  </tr>
+                                  {/* Second header row: A/B under each grouped heading */}
+                                  <tr>
+                                    {leafColumns.map((col, idx) =>
+                                      col.group ? (
                                         <th
-                                          key={`group-${group}-${i}`}
-                                          colSpan={span}
-                                          className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-600 uppercase tracking-wider"
+                                          key={`h2-${idx}`}
+                                          className="px-2 py-1.5 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider"
                                         >
-                                          {group}
+                                          {col.subLabel || col.header}
                                         </th>
-                                      );
-                                      i += span;
-                                    }
-                                    return cells;
-                                  })()}
-                                </tr>
-                                {/* Second header row: A/B under each grouped heading */}
-                                <tr>
-                                  {leafColumns.map((col, idx) =>
-                                    col.group ? (
-                                      <th
-                                        key={`h2-${idx}`}
-                                        className="px-2 py-1.5 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider"
+                                      ) : null
+                                    )}
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {table.rows?.map((row, rowIdx) => {
+                                    const rawSkillVal = row[skillColumn];
+                                    const normalizedSkill = normalizeSectionKey(rawSkillVal);
+                                    const rowSkillKey = normalizedSkill || null;
+                                    const isRowSelected = rowSkillKey && activeKey === rowSkillKey;
+                                    const phase = table.assessment_phase || '1st assmt';
+                                    const snapshots = table.quarterSnapshots || {};
+
+
+                                    // Function to calculate A/B counts for any specific phase
+                                    const getCountsForPhase = (targetPhase) => {
+                                      return getPhaseCounts(row, rowIdx, targetPhase, sessionHeaders, snapshots);
+                                    };
+
+                                    return (
+                                      <tr
+                                        key={rowIdx}
+                                        className={
+                                          'hover:bg-gray-50 ' +
+                                          (isRowSelected ? 'bg-[#FFEBD7]' : '')
+                                        }
                                       >
-                                        {col.subLabel || col.header}
-                                      </th>
-                                    ) : null
-                                  )}
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {table.rows?.map((row, rowIdx) => {
-                                  const rawSkillVal = row[skillColumn];
-                                  const normalizedSkill = normalizeSectionKey(rawSkillVal);
-                                  const rowSkillKey = normalizedSkill || null;
-                                  const isRowSelected = rowSkillKey && activeKey === rowSkillKey;
-                                  const phase = table.assessment_phase || '1st assmt';
-                                  const snapshots = table.quarterSnapshots || {};
-                              
-                                  
-                                  // Function to calculate A/B counts for any specific phase
-                                  const getCountsForPhase = (targetPhase) => {
-                                    return getPhaseCounts(row, rowIdx, targetPhase, sessionHeaders, snapshots);
-                                  };
-                              
-                                  return (
-                                    <tr
-                                      key={rowIdx}
-                                      className={
-                                        'hover:bg-gray-50 ' +
-                                        (isRowSelected ? 'bg-[#FFEBD7]' : '')
-                                      }
-                                    >
-                                      {leafColumns.map((col, cellIdx) => {
-                                        // Determine if this cell is one of the summary A/B cells
-                                        const isSummaryCell = !!col.group;
-                                        let cellValue;
-                              
-                                        if (isSummaryCell) {
-                                          const label = (col.subLabel || col.header || '').toUpperCase();
-                                          
-                                          // Determine which phase this column represents
-                                          let columnPhase = '1st assmt';
-                                          if (col.group === 'I Qr') columnPhase = '1st Qtr';
-                                          else if (col.group === 'II Qr') columnPhase = '2nd Qtr';
-                                          else if (col.group === 'III Qr') columnPhase = '3rd Qtr';
-                                          else if (col.group === 'IV Qr') columnPhase = '4th Qtr';
-                                          
-                                          let showCounts = true;
-                                          if (columnPhase !== '1st assmt') {
-                                            const phaseSaved =
-                                              table.savedPhases?.[columnPhase] ||
-                                              phaseSavedStatus[tableIndex]?.[columnPhase];
-                                          
-                                            if (!phaseSaved) {
-                                              showCounts = false;
+                                        {leafColumns.map((col, cellIdx) => {
+                                          // Determine if this cell is one of the summary A/B cells
+                                          const isSummaryCell = !!col.group;
+                                          let cellValue;
+
+                                          if (isSummaryCell) {
+                                            const label = (col.subLabel || col.header || '').toUpperCase();
+
+                                            // Determine which phase this column represents
+                                            let columnPhase = '1st assmt';
+                                            if (col.group === 'I Qr') columnPhase = '1st Qtr';
+                                            else if (col.group === 'II Qr') columnPhase = '2nd Qtr';
+                                            else if (col.group === 'III Qr') columnPhase = '3rd Qtr';
+                                            else if (col.group === 'IV Qr') columnPhase = '4th Qtr';
+
+                                            let showCounts = true;
+                                            if (columnPhase !== '1st assmt') {
+                                              const phaseSaved =
+                                                table.savedPhases?.[columnPhase] ||
+                                                phaseSavedStatus[tableIndex]?.[columnPhase];
+
+                                              if (!phaseSaved) {
+                                                showCounts = false;
+                                              }
                                             }
-                                          }
 
-                                          if (showCounts) {
-                                            const { aCount: colACount, bCount: colBCount } =
-                                              getCountsForPhase(columnPhase);
+                                            if (showCounts) {
+                                              const { aCount: colACount, bCount: colBCount } =
+                                                getCountsForPhase(columnPhase);
 
-                                            if (label === 'A') {
-                                              cellValue = colACount || '0';
-                                            } else if (label === 'B') {
-                                              cellValue = colBCount || '0';
+                                              if (label === 'A') {
+                                                cellValue = colACount || '0';
+                                              } else if (label === 'B') {
+                                                cellValue = colBCount || '0';
+                                              } else {
+                                                cellValue = '-';
+                                              }
                                             } else {
+                                              // quadrant not edited yet Ã¢â€ â€™ show "-"
                                               cellValue = '-';
                                             }
                                           } else {
-                                            // quadrant not edited yet Ã¢â€ â€™ show "-"
-                                            cellValue = '-';
+                                            const raw = col.getValue(row);
+                                            cellValue =
+                                              raw === undefined || raw === null || raw === '' ? '-' : raw;
                                           }
-                                        } else {
-                                          const raw = col.getValue(row);
-                                          cellValue =
-                                            raw === undefined || raw === null || raw === '' ? '-' : raw;
-                                        }
-                              
-                                        const fieldName = col.fieldName;
-                                        const isSessionBaseCell =
-                                          !col.group && !col.isSkill && fieldName && sessionHeaders.includes(fieldName);
-                                        
-                                        let hasQuadrantChange = false;
-                                        let overrideQuarter = null;
-                                        if (isSessionBaseCell) {
-                                          const raw = row[fieldName];
-                                          const baseVal =
-                                            typeof raw === 'string' ? raw.trim().toUpperCase() : '';
-                                          const cellKey = `${rowIdx}:${fieldName}`;
-                                          const effectiveVal = getEffectiveValueForPhase(
-                                            baseVal,
-                                            cellKey,
-                                            phase,
-                                            snapshots
-                                          );
-                                          hasQuadrantChange = baseVal === 'B' && effectiveVal === 'A';
-                                          
-                                          // Find which quarter made the change (for correct strike pattern)
-                                          if (hasQuadrantChange) {
-                                            const phaseOrder = ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'];
-                                            const idx = phaseOrder.indexOf(phase);
-                                            if (idx >= 0) {
-                                              for (let i = 0; i <= idx; i++) {
-                                                const p = phaseOrder[i];
-                                                const map = snapshots[p];
-                                                if (map && map[cellKey] === 'A') {
-                                                  overrideQuarter = p;
-                                                  break;
+
+                                          const fieldName = col.fieldName;
+                                          const isSessionBaseCell =
+                                            !col.group && !col.isSkill && fieldName && sessionHeaders.includes(fieldName);
+
+                                          let hasQuadrantChange = false;
+                                          let overrideQuarter = null;
+                                          if (isSessionBaseCell) {
+                                            const raw = row[fieldName];
+                                            const baseVal =
+                                              typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+                                            const cellKey = `${rowIdx}:${fieldName}`;
+                                            const effectiveVal = getEffectiveValueForPhase(
+                                              baseVal,
+                                              cellKey,
+                                              phase,
+                                              snapshots
+                                            );
+                                            hasQuadrantChange = baseVal === 'B' && effectiveVal === 'A';
+
+                                            // Find which quarter made the change (for correct strike pattern)
+                                            if (hasQuadrantChange) {
+                                              const phaseOrder = ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'];
+                                              const idx = phaseOrder.indexOf(phase);
+                                              if (idx >= 0) {
+                                                for (let i = 0; i <= idx; i++) {
+                                                  const p = phaseOrder[i];
+                                                  const map = snapshots[p];
+                                                  if (map && map[cellKey] === 'A') {
+                                                    overrideQuarter = p;
+                                                    break;
+                                                  }
                                                 }
                                               }
                                             }
                                           }
-                                        }
-                                        
-                                        // For color: just use the actual letter we see (A = blue, B = red)
-                                        const isAVisual = !isSummaryCell && cellValue === 'A';
-                                        const isBVisual = !isSummaryCell && cellValue === 'B';
-                                        
-                                        let textClass;
-                                        if (isSummaryCell) textClass = 'text-gray-900 ';
-                                        else if (isAVisual) textClass = 'text-blue-600 ';
-                                        else if (isBVisual) textClass = 'text-red-600 '; // B stays red even when overridden
-                                        else textClass = 'text-gray-900 ';
+
+                                          // For color: just use the actual letter we see (A = blue, B = red)
+                                          const isAVisual = !isSummaryCell && cellValue === 'A';
+                                          const isBVisual = !isSummaryCell && cellValue === 'B';
+
+                                          let textClass;
+                                          if (isSummaryCell) textClass = 'text-gray-900 ';
+                                          else if (isAVisual) textClass = 'text-blue-600 ';
+                                          else if (isBVisual) textClass = 'text-red-600 '; // B stays red even when overridden
+                                          else textClass = 'text-gray-900 ';
 
                                           let cellInner = cellValue;
                                           // Show B with strikethrough pattern based on WHICH quarter the override was made in
@@ -10567,12 +10765,12 @@ const addCellToColumn = (columnKey) => {
                                           ) {
                                             const questionIdx =
                                               sessionHeaders.indexOf(fieldName);
-                                              onClick = () => {
+                                            onClick = () => {
                                               if (isAnotherTableUnsaved(table)) {
                                                 showToast("Save the current table before switching skills", "warning");
                                                 return;
                                               }
-                                              
+
                                               // First, ensure the skill is selected and questions are open
                                               setActiveSkillByTable((prev) => ({
                                                 ...prev,
@@ -10598,7 +10796,7 @@ const addCellToColumn = (columnKey) => {
                                               setTimeout(() => {
                                                 const questionEl =
                                                   questionRefs.current[
-                                                    tableKey
+                                                  tableKey
                                                   ]?.[questionIdx];
                                                 if (questionEl) {
                                                   questionEl.scrollIntoView({
@@ -10640,14 +10838,14 @@ const addCellToColumn = (columnKey) => {
                         </div>
                       </details>
                     ))}
-                </div>                 
-                ) : (
-                  <div className="mt-4 rounded-2xl border border-dashed border-[#E38B52]/30 bg-white/70 p-6 text-center text-sm text-[#6F6C90]">
-                    No table created yet.
-                  </div>
-                )}               
-              
-            </div>          
+                </div>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-dashed border-[#E38B52]/30 bg-white/70 p-6 text-center text-sm text-[#6F6C90]">
+                  No table created yet.
+                </div>
+              )}
+
+            </div>
           ) : (
             <div className="max-w-6xl mx-auto p-6">
               <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
@@ -10668,1397 +10866,293 @@ const addCellToColumn = (columnKey) => {
                 Case Record
               </h2>
               <div className="flex gap-6 items-start">
-              {/* Left Sidebar Navigation */}
-              <aside className="w-64 flex-shrink-0 sticky top-5 self-start">
-                <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-6 border border-white/20 w-64 z-30 max-h-[calc(100vh-40px)] overflow-y-auto">
-                  <div className="mb-6 pb-3 border-b border-[#E38B52]/20">
-                    <h3 className="text-lg font-bold text-[#170F49] mb-3">
-                      Case Record Sections
-                    </h3>
-                    <div className="flex gap-2">
-                      <div className="relative group flex-1">
-                        {!editMode ? (
-                          <>
-                            <button
-                              onClick={handleEditStart}
-                              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white text-[#E38B52] rounded-xl hover:bg-gray-50 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 transform border border-[#E38B52]/20"
-                              title="Edit"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-white text-[#E38B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50 border border-[#E38B52]/20">
-                              Edit
-                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                                <div className="border-4 border-transparent border-t-white"></div>
+                {/* Left Sidebar Navigation */}
+                <aside className="w-64 flex-shrink-0 sticky top-5 self-start">
+                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-6 border border-white/20 w-64 z-30 max-h-[calc(100vh-40px)] overflow-y-auto">
+                    <div className="mb-6 pb-3 border-b border-[#E38B52]/20">
+                      <h3 className="text-lg font-bold text-[#170F49] mb-3">
+                        Case Record Sections
+                      </h3>
+                      <div className="flex gap-2">
+                        <div className="relative group flex-1">
+                          {!editMode ? (
+                            <>
+                              <button
+                                onClick={handleEditStart}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white text-[#E38B52] rounded-xl hover:bg-gray-50 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 transform border border-[#E38B52]/20"
+                                title="Edit"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-white text-[#E38B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50 border border-[#E38B52]/20">
+                                Edit
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                  <div className="border-4 border-transparent border-t-white"></div>
+                                </div>
                               </div>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={handleEditSave}
-                              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg transform"
-                              title="Save changes"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                            </button>
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-white text-green-600 text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50 border border-green-100">
-                              Save
-                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                                <div className="border-4 border-transparent border-t-white"></div>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={handleEditSave}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg transform"
+                                title="Save changes"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              </button>
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-white text-green-600 text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50 border border-green-100">
+                                Save
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                  <div className="border-4 border-transparent border-t-white"></div>
+                                </div>
                               </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      <div className="relative group flex-1">
-                        <button
-                          onClick={handleDownloadCaseRecord}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-[#E38B52] to-[#F5A572] text-white rounded-xl hover:from-[#C8742F] hover:to-[#E38B52] transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 transform"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
+                            </>
+                          )}
+                        </div>
+                        <div className="relative group flex-1">
+                          <button
+                            onClick={handleDownloadCaseRecord}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-[#E38B52] to-[#F5A572] text-white rounded-xl hover:from-[#C8742F] hover:to-[#E38B52] transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 transform"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                            />
-                          </svg>
-                        </button>
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-white text-[#E38B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50 border border-[#E38B52]/20">
-                          Download
-                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                            <div className="border-4 border-transparent border-t-white"></div>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                              />
+                            </svg>
+                          </button>
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-white text-[#E38B52] text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap shadow-lg z-50 border border-[#E38B52]/20">
+                            Download
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                              <div className="border-4 border-transparent border-t-white"></div>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <nav className="space-y-2">
-                    {[
-                      {
-                        id: "identification",
-                        label: "Identification Data",
-                        icon: (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"
-                            />
-                          </svg>
-                        ),
-                      },
-                      {
-                        id: "demographic",
-                        label: "Demographic Data",
-                        icon: (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                            />
-                          </svg>
-                        ),
-                      },
-                      {
-                        id: "contact",
-                        label: "Contact & Medical",
-                        icon: (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                            />
-                          </svg>
-                        ),
-                      },
-                      {
-                        id: "family",
-                        label: "Family History",
-                        icon: (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                            />
-                          </svg>
-                        ),
-                      },
-                      {
-                        id: "development",
-                        label: "Development History",
-                        icon: (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M13 10V3L4 14h7v7l9-11h-7z"
-                            />
-                          </svg>
-                        ),
-                      },
-                      {
-                        id: "education",
-                        label: "Special Education",
-                        icon: (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                            />
-                          </svg>
-                        ),
-                      },
-                      {
-                        id: "medical",
-                        label: "Medical Information",
-                        icon: (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                          </svg>
-                        ),
-                      },
-                      {
-                        id: "documents",
-                        label: "Documents",
-                        icon: (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                          </svg>
-                        ),
-                      },
-                    ].map((section) => (
-                      <button
-                        key={section.id}
-                        onClick={() => setActiveCaseSection(section.id)}
-                        className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-3 ${
-                          activeCaseSection === section.id
+                    <nav className="space-y-2">
+                      {[
+                        {
+                          id: "identification",
+                          label: "Identification Data",
+                          icon: (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"
+                              />
+                            </svg>
+                          ),
+                        },
+                        {
+                          id: "demographic",
+                          label: "Demographic Data",
+                          icon: (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                              />
+                            </svg>
+                          ),
+                        },
+                        {
+                          id: "contact",
+                          label: "Contact & Medical",
+                          icon: (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                              />
+                            </svg>
+                          ),
+                        },
+                        {
+                          id: "family",
+                          label: "Family History",
+                          icon: (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                              />
+                            </svg>
+                          ),
+                        },
+                        {
+                          id: "development",
+                          label: "Development History",
+                          icon: (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M13 10V3L4 14h7v7l9-11h-7z"
+                              />
+                            </svg>
+                          ),
+                        },
+                        {
+                          id: "education",
+                          label: "Special Education",
+                          icon: (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                              />
+                            </svg>
+                          ),
+                        },
+                        {
+                          id: "medical",
+                          label: "Medical Information",
+                          icon: (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                          ),
+                        },
+                        {
+                          id: "documents",
+                          label: "Documents",
+                          icon: (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                          ),
+                        },
+                      ].map((section) => (
+                        <button
+                          key={section.id}
+                          onClick={() => setActiveCaseSection(section.id)}
+                          className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-3 ${activeCaseSection === section.id
                             ? "bg-[#E38B52] text-white shadow-lg"
                             : "bg-white/50 text-[#170F49] hover:bg-white/80"
-                        }`}
-                      >
-                        <span
-                          className={`transition-all duration-300 ${
-                            activeCaseSection === section.id
+                            }`}
+                        >
+                          <span
+                            className={`transition-all duration-300 ${activeCaseSection === section.id
                               ? "text-white"
                               : "text-[#E38B52]"
-                          }`}
-                        >
-                          {section.icon}
-                        </span>
-                        <span className="text-sm font-medium">
-                          {section.label}
-                        </span>
-                      </button>
-                    ))}
-                  </nav>
-                </div>
-              </aside>
-
-              {/* Right Content Area */}
-              <div className="flex-1 min-w-0">
-                {/* Case Record Completion Progress Bar - always visible */}
-                <div className="mb-8 bg-white/50 rounded-2xl p-6 shadow-lg border border-white/30">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-semibold text-[#170F49]">
-                      Case Record Completion
-                    </h3>
-                    <span className="text-xl font-bold text-[#E38B52]">
-                      {caseRecordCompletion}%
-                    </span>
+                              }`}
+                          >
+                            {section.icon}
+                          </span>
+                          <span className="text-sm font-medium">
+                            {section.label}
+                          </span>
+                        </button>
+                      ))}
+                    </nav>
                   </div>
-                  <div className="w-full bg-white/50 rounded-full h-3 shadow-inner">
-                    <div
-                      className="bg-gradient-to-r from-[#F58540] to-[#E38B52] h-3 rounded-full shadow-md transition-all duration-700 ease-out"
-                      style={{ width: `${caseRecordCompletion}%` }}
-                    ></div>
-                  </div>
-                </div>
+                </aside>
 
-                {/* Identification Data Section */}
-                {activeCaseSection === "identification" && (
-                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                    <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 mr-2 text-[#E38B52]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"
-                        />
-                      </svg>
-                      Identification Data
-                    </h2>
-                    <div className="p-6 bg-white/50 rounded-2xl">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <div className="md:col-span-2">
-                          <p className="text-sm text-[#6F6C90]">Name</p>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="name"
-                              value={editData?.name || ""}
-                              onChange={handleEditChange}
-                              className="input-edit"
-                            />
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.name || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-sm text-[#6F6C90]">Admission No</p>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="admissionNumber"
-                              value={editData?.admissionNumber || ""}
-                              onChange={handleEditChange}
-                              className="input-edit"
-                            />
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.admissionNumber || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-sm text-[#6F6C90]">
-                            Date of Birth
-                          </p>
-                          {editMode ? (
-                            <input
-                              type="date"
-                              name="dob"
-                              value={editData?.dob || ""}
-                              onChange={handleEditChange}
-                              className="input-edit"
-                            />
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.dob || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm text-[#6F6C90]">Age</p>
-                          {editMode ? (
-                            <input
-                              type="number"
-                              name="age"
-                              value={editData?.age || ""}
-                              onChange={handleEditChange}
-                              className="input-edit"
-                            />
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.age || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm text-[#6F6C90]">Sex</p>
-                          {editMode ? (
-                            <select
-                              name="gender"
-                              value={editData?.gender || ""}
-                              onChange={handleEditChange}
-                              className="input-edit"
-                            >
-                              <option value="">Select</option>
-                              <option value="Male">Male</option>
-                              <option value="Female">Female</option>
-                              <option value="Other">Other</option>
-                            </select>
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.gender || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-sm text-[#6F6C90]">Education</p>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="class"
-                              value={editData?.class || ""}
-                              onChange={handleEditChange}
-                              className="input-edit"
-                            />
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.class || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-sm text-[#6F6C90]">Blood Group</p>
-                          {editMode ? (
-                            <select
-                              name="bloodGroup"
-                              value={editData?.bloodGroup || ""}
-                              onChange={handleEditSelectChange("bloodGroup")}
-                              className="input-edit"
-                            >
-                              <option value="">Select</option>
-                              {BLOOD_GROUP_OPTIONS.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.bloodGroup || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-sm text-[#6F6C90]">Religion</p>
-                          {editMode ? (
-                            <select
-                              name="religion"
-                              value={editData?.religion || ""}
-                              onChange={handleEditSelectChange("religion")}
-                              className="input-edit"
-                            >
-                              <option value="">Select</option>
-                              {RELIGION_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.religion || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-sm text-[#6F6C90]">
-                            Category (SC/ST/OBC/OEC)
-                          </p>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="category"
-                              value={editData?.category || ""}
-                              onChange={handleEditChange}
-                              className="input-edit"
-                            />
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.category || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div className="md:col-span-4">
-                          <p className="text-sm text-[#6F6C90]">
-                            Aadhar Number
-                          </p>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="aadharNumber"
-                              value={editData?.aadharNumber || ""}
-                              onChange={handleEditChange}
-                              className="input-edit"
-                            />
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.aadharNumber || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Demographic Data Section */}
-                {activeCaseSection === "demographic" && (
-                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                    <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 mr-2 text-[#E38B52]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                        />
-                      </svg>
-                      Demographic Data
-                    </h2>
-                    <div className="space-y-6">
-                      {/* Family Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* Father's Card */}
-                        <div className="bg-white/50 rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
-                          <h3 className="text-lg font-semibold text-[#170F49] mb-4">
-                            Father's Information
-                          </h3>
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-sm text-[#6F6C90]">Name</p>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="fatherName"
-                                  value={editData?.fatherName || ""}
-                                  onChange={handleEditChange}
-                                  className="input-edit"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.fatherName || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-sm text-[#6F6C90]">
-                                Education
-                              </p>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="fatherEducation"
-                                  value={editData?.fatherEducation || ""}
-                                  onChange={handleEditChange}
-                                  className="input-edit"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.fatherEducation || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-sm text-[#6F6C90]">
-                                Occupation
-                              </p>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="fatherOccupation"
-                                  value={editData?.fatherOccupation || ""}
-                                  onChange={handleEditChange}
-                                  className="input-edit"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.fatherOccupation || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Mother's Card */}
-                        <div className="bg-white/50 rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
-                          <h3 className="text-lg font-semibold text-[#170F49] mb-4">
-                            Mother's Information
-                          </h3>
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-sm text-[#6F6C90]">Name</p>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="motherName"
-                                  value={editData?.motherName || ""}
-                                  onChange={handleEditChange}
-                                  className="input-edit"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.motherName || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-sm text-[#6F6C90]">
-                                Education
-                              </p>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="motherEducation"
-                                  value={editData?.motherEducation || ""}
-                                  onChange={handleEditChange}
-                                  className="input-edit"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.motherEducation || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-sm text-[#6F6C90]">
-                                Occupation
-                              </p>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="motherOccupation"
-                                  value={editData?.motherOccupation || ""}
-                                  onChange={handleEditChange}
-                                  className="input-edit"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.motherOccupation || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Guardian's Card */}
-                        <div className="bg-white/50 rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
-                          <h3 className="text-lg font-semibold text-[#170F49] mb-4">
-                            Guardian's Information
-                          </h3>
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-sm text-[#6F6C90]">Name</p>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="guardianName"
-                                  value={editData?.guardianName || ""}
-                                  onChange={handleEditChange}
-                                  className="input-edit"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.guardianName || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-sm text-[#6F6C90]">
-                                Relationship
-                              </p>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="guardianRelationship"
-                                  value={editData?.guardianRelationship || ""}
-                                  onChange={handleEditChange}
-                                  className="input-edit"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.guardianRelationship || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-sm text-[#6F6C90]">
-                                Occupation
-                              </p>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="guardianOccupation"
-                                  value={editData?.guardianOccupation || ""}
-                                  onChange={handleEditChange}
-                                  className="input-edit"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.guardianOccupation || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Additional Info Section */}
-                      <div className="bg-white/50 rounded-2xl p-6 mt-6 shadow-sm">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Total Family Income per Month
-                            </p>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="totalFamilyIncome"
-                                value={editData?.totalFamilyIncome || ""}
-                                onChange={handleEditChange}
-                                className="input-edit"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.totalFamilyIncome || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Address & Phone Number
-                            </p>
-                            <p className="text-[#170F49] font-medium">
-                              {student?.address_and_phone ||
-                                `${student?.address}, ${student?.phoneNumber}`}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Contact & Medical Information */}
-                {activeCaseSection === "contact" && (
-                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                    <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 mr-2 text-[#E38B52]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                      Contact & Medical Information
-                    </h2>
-                    <div className="p-8 bg-white/50 rounded-2xl mb-8 space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-white/60">
-                        <div>
-                          <p className="text-sm text-[#6F6C90]">
-                            Informant's Name
-                          </p>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="informantName"
-                              value={editData?.informantName || ""}
-                              onChange={handleEditChange}
-                              className="input-edit"
-                            />
-                          ) : (
-                            <p className="text-lg text-[#170F49] font-medium">
-                              {student?.informantName || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm text-[#6F6C90]">Relationship</p>
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="informantRelationship"
-                              value={editData?.informantRelationship || ""}
-                              onChange={handleEditChange}
-                              className="input-edit"
-                            />
-                          ) : (
-                            <p className="text-lg text-[#170F49] font-medium">
-                              {student?.informantRelationship || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="pb-6 border-b border-white/60">
-                        <p className="text-sm text-[#6F6C90]">
-                          Duration of Contact
-                        </p>
-                        {editMode ? (
-                          <input
-                            type="text"
-                            name="durationOfContact"
-                            value={editData?.durationOfContact || ""}
-                            onChange={handleEditChange}
-                            className="input-edit"
-                          />
-                        ) : (
-                          <p className="text-lg text-[#170F49] font-medium">
-                            {student?.durationOfContact || "N/A"}
-                          </p>
-                        )}
-                      </div>
-                      <div className="pb-6 border-b border-white/60">
-                        <p className="text-sm text-[#6F6C90]">
-                          Present Complaints
-                        </p>
-                        {editMode ? (
-                          <textarea
-                            name="presentComplaints"
-                            value={editData?.presentComplaints || ""}
-                            onChange={handleEditChange}
-                            rows={4}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] bg-white/80 resize-vertical"
-                          />
-                        ) : (
-                          <p className="text-lg text-[#170F49] font-medium leading-relaxed">
-                            {student?.presentComplaints || "N/A"}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm text-[#6F6C90]">
-                          Previous Consultation and Treatments
-                        </p>
-                        {editMode ? (
-                          <textarea
-                            name="previousTreatments"
-                            value={editData?.previousTreatments || ""}
-                            onChange={handleEditChange}
-                            rows={4}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] bg-white/80 resize-vertical"
-                          />
-                        ) : (
-                          <p className="text-lg text-[#170F49] font-medium leading-relaxed">
-                            {student?.previousTreatments || "N/A"}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Family History */}
-                {activeCaseSection === "family" && (
-                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                    <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 mr-2 text-[#E38B52]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                        />
-                      </svg>
-                      Family History
-                    </h2>
-                    <div className="space-y-6">
-                      {/* Household Composition */}
-                      <div className="p-6 bg-white/50 rounded-2xl">
-                        <h3 className="text-lg font-semibold text-[#170F49] mb-4">
-                          Household Composition
-                        </h3>
-                        {editMode ? (
-                          <div className="overflow-x-auto pb-2">
-                            <table className="min-w-[980px] w-full table-fixed border border-[#E38B52]/20 rounded-xl backdrop-blur-xl overflow-hidden">
-                              <colgroup>
-                                <col className="w-[6%]" />
-                                <col className="w-[19%]" />
-                                <col className="w-[8%]" />
-                                <col className="w-[17%]" />
-                                <col className="w-[17%]" />
-                                <col className="w-[14%]" />
-                                <col className="w-[19%]" />
-                                <col className="w-[4%]" />
-                              </colgroup>
-                              <thead>
-                                <tr className="border-b border-[#E38B52]/20">
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    S.No
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Name
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Age
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Education
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Occupation
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Health
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Income
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {householdRows.map((row) => (
-                                  <tr
-                                    key={row.id}
-                                    className="border-b border-[#E38B52]/10"
-                                  >
-                                    <td className="px-4 py-3 text-sm text-[#170F49]">
-                                      {row.id}
-                                    </td>
-                                    <td className="px-4 py-3 min-w-0">
-                                      <input
-                                        type="text"
-                                        value={row.name}
-                                        onChange={(e) =>
-                                          updateHouseholdRow(
-                                            row.id,
-                                            "name",
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                      />
-                                    </td>
-                                    <td className="px-4 py-3 min-w-0">
-                                      <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        placeholder="Age"
-                                        value={row.age}
-                                        onChange={(e) =>
-                                          updateHouseholdRow(
-                                            row.id,
-                                            "age",
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="block w-full min-w-0 px-2.5 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                      />
-                                    </td>
-                                    <td className="px-4 py-3 min-w-0">
-                                      <input
-                                        type="text"
-                                        value={row.education}
-                                        onChange={(e) =>
-                                          updateHouseholdRow(
-                                            row.id,
-                                            "education",
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                      />
-                                    </td>
-                                    <td className="px-4 py-3 min-w-0">
-                                      <input
-                                        type="text"
-                                        value={row.occupation}
-                                        onChange={(e) =>
-                                          updateHouseholdRow(
-                                            row.id,
-                                            "occupation",
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                      />
-                                    </td>
-                                    <td className="px-4 py-3 min-w-0">
-                                      <input
-                                        type="text"
-                                        value={row.health}
-                                        onChange={(e) =>
-                                          updateHouseholdRow(
-                                            row.id,
-                                            "health",
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                      />
-                                    </td>
-                                    <td className="px-4 py-3 min-w-0">
-                                      <input
-                                        type="text"
-                                        value={row.income}
-                                        onChange={(e) =>
-                                          updateHouseholdRow(
-                                            row.id,
-                                            "income",
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="block w-full min-w-0 px-4 py-2.5 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                      />
-                                    </td>
-                                    <td className="px-2 py-3 text-center align-middle">
-                                      <button
-                                        type="button"
-                                        onClick={() => removeHouseholdRow(row.id)}
-                                        disabled={householdRows.length === 1}
-                                        aria-label="Delete household row"
-                                        title="Delete row"
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
-                                      >
-                                        <svg
-                                          xmlns="http://www.w3.org/2000/svg"
-                                          viewBox="0 0 24 24"
-                                          className="h-5 w-5"
-                                          fill="none"
-                                          stroke="currentColor"
-                                        >
-                                          {/* lid */}
-                                          <path
-                                            d="M9 5h6l1 2H8l1-2z"
-                                            strokeWidth="1.8"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                          />
-                                          {/* body */}
-                                          <rect
-                                            x="8"
-                                            y="7"
-                                            width="8"
-                                            height="11"
-                                            rx="1.5"
-                                            strokeWidth="1.8"
-                                          />
-                                          {/* inner lines */}
-                                          <line
-                                            x1="11"
-                                            y1="10"
-                                            x2="11"
-                                            y2="15"
-                                            strokeWidth="1.8"
-                                            strokeLinecap="round"
-                                          />
-                                          <line
-                                            x1="13"
-                                            y1="10"
-                                            x2="13"
-                                            y2="15"
-                                            strokeWidth="1.8"
-                                            strokeLinecap="round"
-                                          />
-                                        </svg>
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                            <div className="mt-2 px-1 text-xs text-[#6F6C90] italic">
-                              Scroll horizontally to view all household columns.
-                            </div>
-                            <button
-                              type="button"
-                              onClick={addHouseholdRow}
-                              className="mt-4 w-full px-4 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B40] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
-                            >
-                              Add Row
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="w-full border-collapse rounded-xl overflow-hidden">
-                              <thead className="bg-[#E38B52]/10">
-                                <tr>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    S.No
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Name
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Age
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Education
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Occupation
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Health
-                                  </th>
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                    Income
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white/70">
-                                {student?.household && student.household.length > 0 ? (
-                                  student.household.map((member, index) => (
-                                    <tr
-                                      key={index}
-                                      className="border-b border-[#E38B52]/10 last:border-b-0"
-                                    >
-                                      <td className="px-4 py-3 text-sm text-[#170F49]">
-                                        {index + 1}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-[#170F49]">
-                                        {member.name || "N/A"}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-[#170F49]">
-                                        {member.age || "N/A"}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-[#170F49]">
-                                        {member.education || "N/A"}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-[#170F49]">
-                                        {member.occupation || "N/A"}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-[#170F49]">
-                                        {member.health || "N/A"}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-[#170F49]">
-                                        {member.income || "N/A"}
-                                      </td>
-                                    </tr>
-                                  ))
-                                ) : (
-                                  <tr>
-                                    <td
-                                      colSpan="7"
-                                      className="px-4 py-8 text-sm text-[#6F6C90] text-center"
-                                    >
-                                      No household composition data available
-                                    </td>
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Medical History */}
-                      <div className="p-6 bg-white/50 rounded-2xl">
-                        <h3 className="text-lg font-semibold text-[#170F49] mb-4">
-                          Medical History
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Family History of Mental Illness
-                            </p>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="familyHistory.mental_illness"
-                                value={
-                                  editData?.familyHistory?.mental_illness || ""
-                                }
-                                onChange={handleEditChange}
-                                className="input-edit"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.familyHistory?.mental_illness ||
-                                  "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Family History of Mental Retardation
-                            </p>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="familyHistory.mental_retardation"
-                                value={
-                                  editData?.familyHistory?.mental_retardation ||
-                                  ""
-                                }
-                                onChange={handleEditChange}
-                                className="input-edit"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.familyHistory?.mental_retardation ||
-                                  "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Family History of Epilepsy and Others
-                            </p>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="familyHistory.epilepsy"
-                                value={editData?.familyHistory?.epilepsy || ""}
-                                onChange={handleEditChange}
-                                className="input-edit"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.familyHistory?.epilepsy || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Birth History */}
-                      <div className="p-6 bg-white/50 rounded-2xl">
-                        <h3 className="text-lg font-semibold text-[#170F49] mb-4">
-                          Birth History
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Prenatal History
-                            </p>
-                            {editMode ? (
-                              <textarea
-                                name="birthHistory.prenatal"
-                                value={editData?.birthHistory?.prenatal || ""}
-                                onChange={handleEditChange}
-                                className="input-edit"
-                                rows="3"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.birthHistory?.prenatal || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Natal and Neonatal
-                            </p>
-                            {editMode ? (
-                              <textarea
-                                name="birthHistory.natal"
-                                value={editData?.birthHistory?.natal || ""}
-                                onChange={handleEditChange}
-                                className="input-edit"
-                                rows="3"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.birthHistory?.natal || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Postnatal History
-                            </p>
-                            {editMode ? (
-                              <textarea
-                                name="birthHistory.postnatal"
-                                value={editData?.birthHistory?.postnatal || ""}
-                                onChange={handleEditChange}
-                                className="input-edit"
-                                rows="3"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.birthHistory?.postnatal || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Developmental History */}
-                {activeCaseSection === "development" && (
-                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                    <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 mr-2 text-[#E38B52]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                        />
-                      </svg>
-                      Development History
-                    </h2>
-                    <div className="p-6 bg-white/50 rounded-2xl mt-6">
-                      <h3 className="text-lg font-semibold text-[#170F49] mb-4">
-                        Developmental History
+                {/* Right Content Area */}
+                <div className="flex-1 min-w-0">
+                  {/* Case Record Completion Progress Bar - always visible */}
+                  <div className="mb-8 bg-white/50 rounded-2xl p-6 shadow-lg border border-white/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-semibold text-[#170F49]">
+                        Case Record Completion
                       </h3>
-                      {editMode ? (
-                        <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
-                          <div className="flex flex-col md:flex-row gap-3">
-                            <input
-                              type="text"
-                              value={developmentHistoryDraft}
-                              onChange={(e) =>
-                                setDevelopmentHistoryDraft(e.target.value)
-                              }
-                              placeholder="Type a development history item"
-                              className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                            />
-                            <button
-                              type="button"
-                              onClick={addDevelopmentHistoryItem}
-                              className="px-5 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#C8742F] transition-all duration-200 shadow-lg"
-                            >
-                              Add
-                            </button>
-                          </div>
-
-                          <div className="flex flex-wrap gap-3">
-                            {normalizeDevelopmentHistoryItems(
-                              editData?.developmentHistoryItems,
-                            ).map((item, index) => (
-                              <div
-                                key={`${item}-${index}`}
-                                className="flex items-center gap-2 px-3 py-2 rounded-full bg-[#F7F3EE] border border-[#E38B52]/20"
-                              >
-                                <span className="text-sm text-[#170F49]">
-                                  {item}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    removeDevelopmentHistoryItem(index)
-                                  }
-                                  className="text-red-500 font-bold"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-white/70 rounded-xl">
-                          {normalizeDevelopmentHistoryItems(
-                            student?.developmentHistoryItems ||
-                              student?.development_history_items,
-                          ).length > 0 ? (
-                            normalizeDevelopmentHistoryItems(
-                              student?.developmentHistoryItems ||
-                                student?.development_history_items,
-                            ).map((item, index) => (
-                              <div
-                                key={`${item}-${index}`}
-                                className="flex items-start gap-2 rounded-xl border border-green-100 bg-white px-4 py-3 shadow-sm"
-                              >
-                                <span className="text-green-500 font-bold text-lg leading-none mt-0.5">
-                                  ✓
-                                </span>
-                                <p className="text-[#170F49] font-medium break-words">
-                                  {item}
-                                </p>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="col-span-full text-center text-[#6F6C90]">
-                              No development history recorded.
-                            </p>
-                          )}
-                        </div>
-                      )}
+                      <span className="text-xl font-bold text-[#E38B52]">
+                        {caseRecordCompletion}%
+                      </span>
                     </div>
-                    {/* Additional Information Section */}
-                    <div className="mt-6">
+                    <div className="w-full bg-white/50 rounded-full h-3 shadow-inner">
+                      <div
+                        className="bg-gradient-to-r from-[#F58540] to-[#E38B52] h-3 rounded-full shadow-md transition-all duration-700 ease-out"
+                        style={{ width: `${caseRecordCompletion}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Identification Data Section */}
+                  {activeCaseSection === "identification" && (
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
                       <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -12071,1212 +11165,724 @@ const addCellToColumn = (columnKey) => {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth={2}
-                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"
                           />
                         </svg>
-                        Additional Information
+                        Identification Data
                       </h2>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]">
-                              <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
-                                School History
-                              </h3>
-                              {editMode ? (
-                                <textarea
-                                  name="additionalInfo.school_history"
-                                  value={
-                                    editData?.additionalInfo?.school_history || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  rows="4"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
-                                  placeholder="Enter school history"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] text-base leading-relaxed">
-                                  {student?.additionalInfo?.school_history || "N/A"}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]">
-                              <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
-                                Occupational History
-                              </h3>
-                              {editMode ? (
-                                <textarea
-                                  name="additionalInfo.occupational_history"
-                                  value={
-                                    editData?.additionalInfo?.occupational_history ||
-                                    ""
-                                  }
-                                  onChange={handleEditChange}
-                                  rows="4"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
-                                  placeholder="Enter occupational history"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] text-base leading-relaxed">
-                                  {student?.additionalInfo?.occupational_history ||
-                                    "N/A"}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="md:col-span-2 bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]">
-                              <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
-                                Behaviour Problems
-                              </h3>
-                              {editMode ? (
-                                <textarea
-                                  name="assessment.behaviour_problems"
-                                  value={
-                                    editData?.assessment?.behaviour_problems || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  rows="4"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
-                                  placeholder="Describe behaviour problems"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] text-base leading-relaxed">
-                                  {student?.assessment?.behaviour_problems ||
-                                    student?.additionalInfo?.behaviour_problems ||
-                                    "N/A"}
-                                </p>
-                              )}
-                            </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Special Education Assessment Section */}
-                {activeCaseSection === "education" && (
-                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                    <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 mr-2 text-[#E38B52]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h2"
-                        />
-                      </svg>
-                      Special Education Assessment
-                    </h2>
-
-                    {/* Horizontal Navigation for Subsections */}
-                    <div className="mb-8 overflow-x-auto">
-                      <div className="flex gap-1 min-w-max pb-2">
-                        {[
-                          { id: "self-help", label: "Self Help" },
-                          { id: "motor", label: "Motor" },
-                          { id: "sensory", label: "Sensory" },
-                          { id: "socialization", label: "Socialization" },
-                          { id: "cognitive", label: "Cognitive" },
-                          { id: "academic", label: "Academic" },
-                          { id: "prevocational", label: "Prevocational" },
-                          { id: "other-info", label: "Other Info" },
-                        ].map((subsection) => (
-                          <button
-                            key={subsection.id}
-                            onClick={() =>
-                              setActiveEducationSubsection(subsection.id)
-                            }
-                            className={`px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300 whitespace-nowrap ${
-                              activeEducationSubsection === subsection.id
-                                ? "bg-[#E38B52] text-white shadow-lg"
-                                : "bg-white/50 text-[#170F49] hover:bg-white/80"
-                            }`}
-                          >
-                            {subsection.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Self Help */}
-                    {activeEducationSubsection === "self-help" && (
-                      <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                        <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
-                          Self Help
-                        </h3>
-
-                        {/* Food Habits */}
-                        <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
-                          <h4 className="text-md font-medium text-[#170F49]">
-                            Food Habits
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Eating
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.self_help.food_habits.eating"
-                                  value={
-                                    editData?.assessment?.self_help?.food_habits
-                                      ?.eating || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe eating habits and capabilities"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.self_help?.food_habits
-                                    ?.eating || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Drinking
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.self_help.food_habits.drinking"
-                                  value={
-                                    editData?.assessment?.self_help?.food_habits
-                                      ?.drinking || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe drinking habits and capabilities"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.self_help?.food_habits
-                                    ?.drinking || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-6">
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Toilet Habits (Include mention hygenic where
-                              applicable)
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.self_help.toilet_habits"
-                                value={
-                                  editData?.assessment?.self_help
-                                    ?.toilet_habits || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe toilet habits and hygiene practices"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.self_help
-                                  ?.toilet_habits || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Brushing
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.self_help.brushing"
-                                value={
-                                  editData?.assessment?.self_help?.brushing ||
-                                  ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe brushing capabilities and routine"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.self_help?.brushing ||
-                                  "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Bathing
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.self_help.bathing"
-                                value={
-                                  editData?.assessment?.self_help?.bathing || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe bathing capabilities and habits"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.self_help?.bathing ||
-                                  "N/A"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Dressing */}
-                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6">
-                          <h4 className="text-md font-medium text-[#170F49]">
-                            Dressing
-                          </h4>
-                          <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Removing and wearing clothes
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.self_help.dressing.removing_and_wearing"
-                                  value={
-                                    editData?.assessment?.self_help?.dressing
-                                      ?.removing_and_wearing || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe ability to remove and wear clothes independently"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.self_help?.dressing
-                                    ?.removing_and_wearing || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Unbuttoning and Buttoning
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.self_help.dressing.buttoning"
-                                  value={
-                                    editData?.assessment?.self_help?.dressing
-                                      ?.buttoning || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe ability to handle buttons independently"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.self_help?.dressing
-                                    ?.buttoning || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                wearing shoes/Slippers
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.self_help.dressing.footwear"
-                                  value={
-                                    editData?.assessment?.self_help?.dressing
-                                      ?.footwear || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe ability to wear footwear independently"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.self_help?.dressing
-                                    ?.footwear || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Grooming (include shaving skills where
-                                applicable)
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.self_help.dressing.grooming"
-                                  value={
-                                    editData?.assessment?.self_help?.dressing
-                                      ?.grooming || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe grooming abilities including shaving if applicable"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.self_help?.dressing
-                                    ?.grooming || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Motor */}
-                    {activeEducationSubsection === "motor" && (
-                      <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                        <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
-                          Motor
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white rounded-xl p-6 shadow-lg">
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Gross Motor
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.motor.gross_motor"
-                                value={editData?.assessment?.motor?.gross_motor || ""}
-                                onChange={handleEditChange}
-                                placeholder="Describe capabilities in large movements, balance, and coordination"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.motor?.gross_motor || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Fine Motor
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.motor.fine_motor"
-                                value={editData?.assessment?.motor?.fine_motor || ""}
-                                onChange={handleEditChange}
-                                placeholder="Describe capabilities in small, precise movements"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.motor?.fine_motor || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Sensory */}
-                    {activeEducationSubsection === "sensory" && (
-                      <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                        <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
-                          Sensory
-                        </h3>
-                        <div className="bg-white rounded-xl p-6 shadow-lg">
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="assessment.sensory"
-                              value={editData?.assessment?.sensory || ""}
-                              onChange={handleEditChange}
-                              placeholder="Describe sensory responses and processing capabilities"
-                              className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                            />
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.assessment?.sensory || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Socialization */}
-                    {activeEducationSubsection === "socialization" && (
-                      <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                        <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">
-                          Socialization
-                        </h3>
-                        <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Language/Communication
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.socialization.language_communication"
-                                value={
-                                  editData?.assessment?.socialization
-                                    ?.language_communication || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe communication abilities and language skills"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.socialization
-                                  ?.language_communication || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Social behaviour
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.socialization.social_behaviour"
-                                value={
-                                  editData?.assessment?.socialization
-                                    ?.social_behaviour || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe interactions with others and social adaptability"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.socialization
-                                  ?.social_behaviour || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Mobility in the nieghborhood
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.socialization.mobility"
-                                value={
-                                  editData?.assessment?.socialization
-                                    ?.mobility || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe ability to navigate and move around in familiar areas"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.socialization?.mobility ||
-                                  "N/A"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Cognitive */}
-                    {activeEducationSubsection === "cognitive" && (
-                      <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                        <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">
-                          Cognitive
-                        </h3>
-                        <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Attention
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.cognitive.attention"
-                                value={
-                                  editData?.assessment?.cognitive?.attention ||
-                                  ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe attention span and focus capabilities"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.cognitive?.attention ||
-                                  "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Identification of familiar objects
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.cognitive.identification_of_objects"
-                                value={
-                                  editData?.assessment?.cognitive
-                                    ?.identification_of_objects || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe ability to recognize and name common objects"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.cognitive
-                                  ?.identification_of_objects || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Use of familiar objects
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.cognitive.use_of_objects"
-                                value={
-                                  editData?.assessment?.cognitive
-                                    ?.use_of_objects || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe ability to appropriately use common objects"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.cognitive
-                                  ?.use_of_objects || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Following simple instruction
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.cognitive.following_instruction"
-                                value={
-                                  editData?.assessment?.cognitive
-                                    ?.following_instruction || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe ability to understand and follow basic instructions"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.cognitive
-                                  ?.following_instruction || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Awareness of dangrer and hazards
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.cognitive.awareness_of_danger"
-                                value={
-                                  editData?.assessment?.cognitive
-                                    ?.awareness_of_danger || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe understanding of dangerous situations"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.cognitive
-                                  ?.awareness_of_danger || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Concept Formation */}
-                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6">
-                          <h4 className="text-md font-medium text-[#170F49]">
-                            Concept formation (Indicate ability to match,
-                            identify name wherever applicable)
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Color
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.cognitive.concept_formation.color"
-                                  value={
-                                    editData?.assessment?.cognitive
-                                      ?.concept_formation?.color || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe ability to recognize and match colors"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.cognitive
-                                    ?.concept_formation?.color || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Size
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.cognitive.concept_formation.size"
-                                  value={
-                                    editData?.assessment?.cognitive
-                                      ?.concept_formation?.size || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe understanding of size concepts"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.cognitive
-                                    ?.concept_formation?.size || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Sex
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.cognitive.concept_formation.sex"
-                                  value={
-                                    editData?.assessment?.cognitive
-                                      ?.concept_formation?.sex || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe understanding of gender concepts"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.cognitive
-                                    ?.concept_formation?.sex || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Shape
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.cognitive.concept_formation.shape"
-                                  value={
-                                    editData?.assessment?.cognitive
-                                      ?.concept_formation?.shape || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe ability to recognize and name shapes"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.cognitive
-                                    ?.concept_formation?.shape || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Number
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.cognitive.concept_formation.number"
-                                  value={
-                                    editData?.assessment?.cognitive
-                                      ?.concept_formation?.number || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe understanding of numbers and counting"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.cognitive
-                                    ?.concept_formation?.number || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Time
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.cognitive.concept_formation.time"
-                                  value={
-                                    editData?.assessment?.cognitive
-                                      ?.concept_formation?.time || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe understanding of time concepts"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.cognitive
-                                    ?.concept_formation?.time || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Money
-                              </label>
-                              {editMode ? (
-                                <input
-                                  type="text"
-                                  name="assessment.cognitive.concept_formation.money"
-                                  value={
-                                    editData?.assessment?.cognitive
-                                      ?.concept_formation?.money || ""
-                                  }
-                                  onChange={handleEditChange}
-                                  placeholder="Describe understanding of money concepts"
-                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                />
-                              ) : (
-                                <p className="text-[#170F49] font-medium">
-                                  {student?.assessment?.cognitive
-                                    ?.concept_formation?.money || "N/A"}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Academic */}
-                    {activeEducationSubsection === "academic" && (
-                      <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                        <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">
-                          Academic (give brief history: class attended/attending
-                          indicate class/grade/level wherever appropriate)
-                        </h3>
-                        <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Reading
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.academic.reading"
-                                value={
-                                  editData?.assessment?.academic?.reading || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe reading level and comprehension"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.academic?.reading ||
-                                  "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Writing
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.academic.writing"
-                                value={
-                                  editData?.assessment?.academic?.writing || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe writing abilities and skills"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.academic?.writing ||
-                                  "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Arithmetic
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.academic.arithmetic"
-                                value={
-                                  editData?.assessment?.academic?.arithmetic ||
-                                  ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="Describe mathematical understanding and abilities"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.academic?.arithmetic ||
-                                  "N/A"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Prevocational/Domestic */}
-                    {activeEducationSubsection === "prevocational" && (
-                      <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
-                        <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
-                          Prevocational/Domestic (Specify ability and interest)
-                        </h3>
-                        <div className="bg-white rounded-xl p-6 shadow-lg">
-                          {editMode ? (
-                            <input
-                              type="text"
-                              name="assessment.prevocational.ability_and_interest"
-                              value={
-                                editData?.assessment?.prevocational
-                                  ?.ability_and_interest || ""
-                              }
-                              onChange={handleEditChange}
-                              placeholder="Describe prevocational skills and domestic abilities"
-                              className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                            />
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.assessment?.prevocational
-                                ?.ability_and_interest || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-6">
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Items of interest
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.prevocational.items_of_interest"
-                                value={
-                                  editData?.assessment?.prevocational
-                                    ?.items_of_interest || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="List activities and objects that interest the student"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.prevocational
-                                  ?.items_of_interest || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-[#170F49] mb-2">
-                              Items of dislike
-                            </label>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="assessment.prevocational.items_of_dislike"
-                                value={
-                                  editData?.assessment?.prevocational
-                                    ?.items_of_dislike || ""
-                                }
-                                onChange={handleEditChange}
-                                placeholder="List activities and objects that the student dislikes"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.assessment?.prevocational
-                                  ?.items_of_dislike || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Other Info */}
-                    {activeEducationSubsection === "other-info" && (
-                      <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6 mb-8">
-                        <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
-                          Additional Information
-                        </h3>
-                        <div>
-                          <label className="block text-sm font-medium text-[#170F49] mb-2">
-                            Any peculiar behaviour/behaviour problems observed
-                          </label>
-                          {editMode ? (
-                            <textarea
-                              name="assessment.behaviour_problems"
-                              value={
-                                editData?.assessment?.behaviour_problems || ""
-                              }
-                              onChange={handleEditChange}
-                              className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              rows="4"
-                              placeholder="Describe any unusual behaviors or behavioral concerns observed"
-                            ></textarea>
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.assessment?.behaviour_problems || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-[#170F49] mb-2">
-                            Any other
-                          </label>
-                          {editMode ? (
-                            <textarea
-                              name="assessment.any_other"
-                              value={editData?.assessment?.any_other || ""}
-                              onChange={handleEditChange}
-                              className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              rows="4"
-                              placeholder="Add any additional observations or comments"
-                            ></textarea>
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.assessment?.any_other ?? student?.any_other ?? "N/A"}
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-[#170F49] mb-2">
-                            Recommendation
-                          </label>
-                          {editMode ? (
-                            <textarea
-                              name="assessment.recommendation"
-                              value={editData?.assessment?.recommendation || ""}
-                              onChange={handleEditChange}
-                              className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                              rows="4"
-                              placeholder="Provide detailed recommendations for support and intervention"
-                            ></textarea>
-                          ) : (
-                            <p className="text-[#170F49] font-medium">
-                              {student?.assessment?.recommendation ?? student?.recommendation ?? "N/A"}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Medical Information */}
-                {activeCaseSection === "medical" && (
-                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                    <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 mr-2 text-[#E38B52]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
-                        />
-                      </svg>
-                      Medical Information
-                    </h2>
-                    <div className="space-y-6">
-                      {/* Medical Status */}
                       <div className="p-6 bg-white/50 rounded-2xl">
-                        <h3 className="text-lg font-semibold text-[#170F49] mb-4">
-                          Medical Status
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Specific Diagnostic
-                            </p>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                          <div className="md:col-span-2">
+                            <p className="text-sm text-[#6F6C90]">Name</p>
                             {editMode ? (
                               <input
                                 type="text"
-                                name="specific_diagnostic"
-                                value={editData?.specific_diagnostic || ""}
+                                name="name"
+                                value={editData?.name || ""}
                                 onChange={handleEditChange}
                                 className="input-edit"
                               />
                             ) : (
                               <p className="text-[#170F49] font-medium">
-                                {student?.specific_diagnostic || "N/A"}
+                                {student?.name || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div className="md:col-span-2">
+                            <p className="text-sm text-[#6F6C90]">Admission No</p>
+                            {editMode ? (
+                              <input
+                                type="text"
+                                name="admissionNumber"
+                                value={editData?.admissionNumber || ""}
+                                onChange={handleEditChange}
+                                className="input-edit"
+                              />
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.admissionNumber || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div className="md:col-span-2">
+                            <p className="text-sm text-[#6F6C90]">
+                              Date of Birth
+                            </p>
+                            {editMode ? (
+                              <input
+                                type="date"
+                                name="dob"
+                                value={editData?.dob || ""}
+                                onChange={handleEditChange}
+                                className="input-edit"
+                              />
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.dob || "N/A"}
                               </p>
                             )}
                           </div>
                           <div>
+                            <p className="text-sm text-[#6F6C90]">Age</p>
+                            {editMode ? (
+                              <input
+                                type="number"
+                                name="age"
+                                value={editData?.age || ""}
+                                onChange={handleEditChange}
+                                className="input-edit"
+                              />
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.age || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm text-[#6F6C90]">Sex</p>
+                            {editMode ? (
+                              <select
+                                name="gender"
+                                value={editData?.gender || ""}
+                                onChange={handleEditChange}
+                                className="input-edit"
+                              >
+                                <option value="">Select</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.gender || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div className="md:col-span-2">
+                            <p className="text-sm text-[#6F6C90]">Education</p>
+                            {editMode ? (
+                              <input
+                                type="text"
+                                name="class"
+                                value={editData?.class || ""}
+                                onChange={handleEditChange}
+                                className="input-edit"
+                              />
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.class || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div className="md:col-span-2">
+                            <p className="text-sm text-[#6F6C90]">Blood Group</p>
+                            {editMode ? (
+                              <select
+                                name="bloodGroup"
+                                value={editData?.bloodGroup || ""}
+                                onChange={handleEditSelectChange("bloodGroup")}
+                                className="input-edit"
+                              >
+                                <option value="">Select</option>
+                                {BLOOD_GROUP_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.bloodGroup || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div className="md:col-span-2">
+                            <p className="text-sm text-[#6F6C90]">Religion</p>
+                            {editMode ? (
+                              <select
+                                name="religion"
+                                value={editData?.religion || ""}
+                                onChange={handleEditSelectChange("religion")}
+                                className="input-edit"
+                              >
+                                <option value="">Select</option>
+                                {RELIGION_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.religion || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div className="md:col-span-2">
                             <p className="text-sm text-[#6F6C90]">
-                              Medical Conditions
+                              Category (SC/ST/OBC/OEC)
                             </p>
                             {editMode ? (
                               <input
                                 type="text"
-                                name="medical_conditions"
-                                value={editData?.medical_conditions || ""}
+                                name="category"
+                                value={editData?.category || ""}
                                 onChange={handleEditChange}
                                 className="input-edit"
-                                placeholder="Comma-separated"
                               />
                             ) : (
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                {(student?.medical_conditions || "")
-                                  .toString()
-                                  .split(",")
-                                  .filter(Boolean)
-                                  .map((c, idx) => (
-                                    <span
-                                      key={idx}
-                                      className="px-3 py-1 bg-white/70 rounded-full text-sm text-[#170F49]"
-                                    >
-                                      {c.trim()}
-                                    </span>
-                                  ))}
+                              <p className="text-[#170F49] font-medium">
+                                {student?.category || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div className="md:col-span-4">
+                            <p className="text-sm text-[#6F6C90]">
+                              Aadhar Number
+                            </p>
+                            {editMode ? (
+                              <input
+                                type="text"
+                                name="aadharNumber"
+                                value={editData?.aadharNumber || ""}
+                                onChange={handleEditChange}
+                                className="input-edit"
+                              />
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.aadharNumber || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Demographic Data Section */}
+                  {activeCaseSection === "demographic" && (
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 w-6 mr-2 text-[#E38B52]"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                          />
+                        </svg>
+                        Demographic Data
+                      </h2>
+                      <div className="space-y-6">
+                        {/* Family Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {/* Father's Card */}
+                          <div className="bg-white/50 rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
+                            <h3 className="text-lg font-semibold text-[#170F49] mb-4">
+                              Father's Information
+                            </h3>
+                            <div className="space-y-3">
+                              <div>
+                                <p className="text-sm text-[#6F6C90]">Name</p>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="fatherName"
+                                    value={editData?.fatherName || ""}
+                                    onChange={handleEditChange}
+                                    className="input-edit"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.fatherName || "N/A"}
+                                  </p>
+                                )}
                               </div>
-                            )}
+                              <div>
+                                <p className="text-sm text-[#6F6C90]">
+                                  Education
+                                </p>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="fatherEducation"
+                                    value={editData?.fatherEducation || ""}
+                                    onChange={handleEditChange}
+                                    className="input-edit"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.fatherEducation || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm text-[#6F6C90]">
+                                  Occupation
+                                </p>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="fatherOccupation"
+                                    value={editData?.fatherOccupation || ""}
+                                    onChange={handleEditChange}
+                                    className="input-edit"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.fatherOccupation || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Mother's Card */}
+                          <div className="bg-white/50 rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
+                            <h3 className="text-lg font-semibold text-[#170F49] mb-4">
+                              Mother's Information
+                            </h3>
+                            <div className="space-y-3">
+                              <div>
+                                <p className="text-sm text-[#6F6C90]">Name</p>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="motherName"
+                                    value={editData?.motherName || ""}
+                                    onChange={handleEditChange}
+                                    className="input-edit"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.motherName || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm text-[#6F6C90]">
+                                  Education
+                                </p>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="motherEducation"
+                                    value={editData?.motherEducation || ""}
+                                    onChange={handleEditChange}
+                                    className="input-edit"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.motherEducation || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm text-[#6F6C90]">
+                                  Occupation
+                                </p>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="motherOccupation"
+                                    value={editData?.motherOccupation || ""}
+                                    onChange={handleEditChange}
+                                    className="input-edit"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.motherOccupation || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Guardian's Card */}
+                          <div className="bg-white/50 rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
+                            <h3 className="text-lg font-semibold text-[#170F49] mb-4">
+                              Guardian's Information
+                            </h3>
+                            <div className="space-y-3">
+                              <div>
+                                <p className="text-sm text-[#6F6C90]">Name</p>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="guardianName"
+                                    value={editData?.guardianName || ""}
+                                    onChange={handleEditChange}
+                                    className="input-edit"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.guardianName || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm text-[#6F6C90]">
+                                  Relationship
+                                </p>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="guardianRelationship"
+                                    value={editData?.guardianRelationship || ""}
+                                    onChange={handleEditChange}
+                                    className="input-edit"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.guardianRelationship || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm text-[#6F6C90]">
+                                  Occupation
+                                </p>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="guardianOccupation"
+                                    value={editData?.guardianOccupation || ""}
+                                    onChange={handleEditChange}
+                                    className="input-edit"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.guardianOccupation || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Additional Info Section */}
+                        <div className="bg-white/50 rounded-2xl p-6 mt-6 shadow-sm">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Total Family Income per Month
+                              </p>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="totalFamilyIncome"
+                                  value={editData?.totalFamilyIncome || ""}
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.totalFamilyIncome || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Address & Phone Number
+                              </p>
+                              <p className="text-[#170F49] font-medium">
+                                {student?.address_and_phone ||
+                                  `${student?.address}, ${student?.phoneNumber}`}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
+                    </div>
+                  )}
 
-                      {/* Drug History */}
-                      <div className="p-6 bg-white/50 rounded-2xl">
-                        <h3 className="text-lg font-semibold text-[#170F49] mb-4">
-                          Drug History
-                        </h3>
-                        {editMode ? (
-                          <div className="space-y-4">
-                            <div>
-                              <label className="block text-sm font-medium text-[#170F49] mb-2">
-                                Is the child on regular drugs
-                              </label>
+                  {/* Contact & Medical Information */}
+                  {activeCaseSection === "contact" && (
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 w-6 mr-2 text-[#E38B52]"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                        Contact & Medical Information
+                      </h2>
+                      <div className="p-8 bg-white/50 rounded-2xl mb-8 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-white/60">
+                          <div>
+                            <p className="text-sm text-[#6F6C90]">
+                              Informant's Name
+                            </p>
+                            {editMode ? (
                               <input
                                 type="text"
-                                name="is_on_regular_drugs"
-                                value={editData?.is_on_regular_drugs || ""}
+                                name="informantName"
+                                value={editData?.informantName || ""}
                                 onChange={handleEditChange}
-                                placeholder="Yes / No or details"
-                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                className="input-edit"
                               />
-                            </div>
-                            <div className="overflow-hidden">
-                              <table className="w-full border border-[#E38B52]/20 rounded-xl backdrop-blur-xl overflow-hidden">
+                            ) : (
+                              <p className="text-lg text-[#170F49] font-medium">
+                                {student?.informantName || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm text-[#6F6C90]">Relationship</p>
+                            {editMode ? (
+                              <input
+                                type="text"
+                                name="informantRelationship"
+                                value={editData?.informantRelationship || ""}
+                                onChange={handleEditChange}
+                                className="input-edit"
+                              />
+                            ) : (
+                              <p className="text-lg text-[#170F49] font-medium">
+                                {student?.informantRelationship || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="pb-6 border-b border-white/60">
+                          <p className="text-sm text-[#6F6C90]">
+                            Duration of Contact
+                          </p>
+                          {editMode ? (
+                            <input
+                              type="text"
+                              name="durationOfContact"
+                              value={editData?.durationOfContact || ""}
+                              onChange={handleEditChange}
+                              className="input-edit"
+                            />
+                          ) : (
+                            <p className="text-lg text-[#170F49] font-medium">
+                              {student?.durationOfContact || "N/A"}
+                            </p>
+                          )}
+                        </div>
+                        <div className="pb-6 border-b border-white/60">
+                          <p className="text-sm text-[#6F6C90]">
+                            Present Complaints
+                          </p>
+                          {editMode ? (
+                            <textarea
+                              name="presentComplaints"
+                              value={editData?.presentComplaints || ""}
+                              onChange={handleEditChange}
+                              rows={4}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] bg-white/80 resize-vertical"
+                            />
+                          ) : (
+                            <p className="text-lg text-[#170F49] font-medium leading-relaxed">
+                              {student?.presentComplaints || "N/A"}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm text-[#6F6C90]">
+                            Previous Consultation and Treatments
+                          </p>
+                          {editMode ? (
+                            <textarea
+                              name="previousTreatments"
+                              value={editData?.previousTreatments || ""}
+                              onChange={handleEditChange}
+                              rows={4}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] bg-white/80 resize-vertical"
+                            />
+                          ) : (
+                            <p className="text-lg text-[#170F49] font-medium leading-relaxed">
+                              {student?.previousTreatments || "N/A"}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Family History */}
+                  {activeCaseSection === "family" && (
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 w-6 mr-2 text-[#E38B52]"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                          />
+                        </svg>
+                        Family History
+                      </h2>
+                      <div className="space-y-6">
+                        {/* Household Composition */}
+                        <div className="p-6 bg-white/50 rounded-2xl">
+                          <h3 className="text-lg font-semibold text-[#170F49] mb-4">
+                            Household Composition
+                          </h3>
+                          {editMode ? (
+                            <div className="overflow-x-auto pb-2">
+                              <table className="min-w-[980px] w-full table-fixed border border-[#E38B52]/20 rounded-xl backdrop-blur-xl overflow-hidden">
+                                <colgroup>
+                                  <col className="w-[6%]" />
+                                  <col className="w-[19%]" />
+                                  <col className="w-[8%]" />
+                                  <col className="w-[17%]" />
+                                  <col className="w-[17%]" />
+                                  <col className="w-[14%]" />
+                                  <col className="w-[19%]" />
+                                  <col className="w-[4%]" />
+                                </colgroup>
                                 <thead>
                                   <tr className="border-b border-[#E38B52]/20">
                                     <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
                                       S.No
                                     </th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                      Name of drug
+                                      Name
                                     </th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                      Dose if known
+                                      Age
                                     </th>
-                                    <th className="px-2 py-3 text-center text-sm font-semibold text-[#170F49] w-14"></th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Education
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Occupation
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Health
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Income
+                                    </th>
                                   </tr>
                                 </thead>
-                                <tbody className="bg-white/70">
-                                  {drugRows.map((row) => (
+                                <tbody>
+                                  {householdRows.map((row) => (
                                     <tr
                                       key={row.id}
-                                      className="border-b border-[#E38B52]/10 last:border-b-0"
+                                      className="border-b border-[#E38B52]/10"
                                     >
-                                      <td className="px-4 py-3 text-sm text-[#170F49] align-middle">
+                                      <td className="px-4 py-3 text-sm text-[#170F49]">
                                         {row.id}
                                       </td>
-                                      <td className="px-4 py-3 align-middle">
+                                      <td className="px-4 py-3 min-w-0">
                                         <input
                                           type="text"
                                           value={row.name}
                                           onChange={(e) =>
-                                            updateDrugRow(
+                                            updateHouseholdRow(
                                               row.id,
                                               "name",
                                               e.target.value,
                                             )
                                           }
-                                          className="w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                          placeholder="Enter drug name"
+                                          className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                                         />
                                       </td>
-                                      <td className="px-4 py-3 align-middle">
+                                      <td className="px-4 py-3 min-w-0">
                                         <input
                                           type="text"
-                                          value={row.dose}
+                                          inputMode="numeric"
+                                          pattern="[0-9]*"
+                                          placeholder="Age"
+                                          value={row.age}
                                           onChange={(e) =>
-                                            updateDrugRow(
+                                            updateHouseholdRow(
                                               row.id,
-                                              "dose",
+                                              "age",
                                               e.target.value,
                                             )
                                           }
-                                          className="w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
-                                          placeholder="Enter dose"
+                                          className="block w-full min-w-0 px-2.5 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                        />
+                                      </td>
+                                      <td className="px-4 py-3 min-w-0">
+                                        <input
+                                          type="text"
+                                          value={row.education}
+                                          onChange={(e) =>
+                                            updateHouseholdRow(
+                                              row.id,
+                                              "education",
+                                              e.target.value,
+                                            )
+                                          }
+                                          className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                        />
+                                      </td>
+                                      <td className="px-4 py-3 min-w-0">
+                                        <input
+                                          type="text"
+                                          value={row.occupation}
+                                          onChange={(e) =>
+                                            updateHouseholdRow(
+                                              row.id,
+                                              "occupation",
+                                              e.target.value,
+                                            )
+                                          }
+                                          className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                        />
+                                      </td>
+                                      <td className="px-4 py-3 min-w-0">
+                                        <input
+                                          type="text"
+                                          value={row.health}
+                                          onChange={(e) =>
+                                            updateHouseholdRow(
+                                              row.id,
+                                              "health",
+                                              e.target.value,
+                                            )
+                                          }
+                                          className="block w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                        />
+                                      </td>
+                                      <td className="px-4 py-3 min-w-0">
+                                        <input
+                                          type="text"
+                                          value={row.income}
+                                          onChange={(e) =>
+                                            updateHouseholdRow(
+                                              row.id,
+                                              "income",
+                                              e.target.value,
+                                            )
+                                          }
+                                          className="block w-full min-w-0 px-4 py-2.5 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
                                         />
                                       </td>
                                       <td className="px-2 py-3 text-center align-middle">
                                         <button
                                           type="button"
-                                          onClick={() => removeDrugRow(row.id)}
-                                          disabled={drugRows.length === 1}
-                                          aria-label="Delete drug row"
+                                          onClick={() => removeHouseholdRow(row.id)}
+                                          disabled={householdRows.length === 1}
+                                          aria-label="Delete household row"
                                           title="Delete row"
                                           className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
@@ -13327,25 +11933,18 @@ const addCellToColumn = (columnKey) => {
                                   ))}
                                 </tbody>
                               </table>
+                              <div className="mt-2 px-1 text-xs text-[#6F6C90] italic">
+                                Scroll horizontally to view all household columns.
+                              </div>
                               <button
                                 type="button"
-                                onClick={addDrugRow}
+                                onClick={addHouseholdRow}
                                 className="mt-4 w-full px-4 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B40] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
                               >
-                                Add Drug
+                                Add Row
                               </button>
                             </div>
-                          </div>
-                        ) : (
-                          <>
-                            <p className="text-sm text-[#6F6C90] mb-2">
-                              Is the child on regular drugs
-                            </p>
-                            <p className="text-[#170F49] mb-4">
-                              {student?.is_on_regular_drugs
-                                ? student.is_on_regular_drugs
-                                : "N/A"}
-                            </p>
+                          ) : (
                             <div className="overflow-x-auto">
                               <table className="w-full border-collapse rounded-xl overflow-hidden">
                                 <thead className="bg-[#E38B52]/10">
@@ -13354,252 +11953,1848 @@ const addCellToColumn = (columnKey) => {
                                       S.No
                                     </th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                      Name of drug
+                                      Name
                                     </th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
-                                      Dose
+                                      Age
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Education
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Occupation
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Health
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                      Income
                                     </th>
                                   </tr>
                                 </thead>
                                 <tbody className="bg-white/70">
-                                  {(student?.drug_history || []).map((d, i) => (
-                                    <tr
-                                      key={i}
-                                      className="border-b border-[#E38B52]/10"
-                                    >
-                                      <td className="px-4 py-3 text-sm text-[#170F49]">
-                                        {i + 1}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-[#170F49]">
-                                        {d?.name || "N/A"}
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-[#170F49]">
-                                        {d?.dose || "N/A"}
+                                  {student?.household && student.household.length > 0 ? (
+                                    student.household.map((member, index) => (
+                                      <tr
+                                        key={index}
+                                        className="border-b border-[#E38B52]/10 last:border-b-0"
+                                      >
+                                        <td className="px-4 py-3 text-sm text-[#170F49]">
+                                          {index + 1}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-[#170F49]">
+                                          {member.name || "N/A"}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-[#170F49]">
+                                          {member.age || "N/A"}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-[#170F49]">
+                                          {member.education || "N/A"}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-[#170F49]">
+                                          {member.occupation || "N/A"}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-[#170F49]">
+                                          {member.health || "N/A"}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-[#170F49]">
+                                          {member.income || "N/A"}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td
+                                        colSpan="7"
+                                        className="px-4 py-8 text-sm text-[#6F6C90] text-center"
+                                      >
+                                        No household composition data available
                                       </td>
                                     </tr>
-                                  ))}
+                                  )}
                                 </tbody>
                               </table>
                             </div>
-                          </>
+                          )}
+                        </div>
+
+                        {/* Medical History */}
+                        <div className="p-6 bg-white/50 rounded-2xl">
+                          <h3 className="text-lg font-semibold text-[#170F49] mb-4">
+                            Medical History
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Family History of Mental Illness
+                              </p>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="familyHistory.mental_illness"
+                                  value={
+                                    editData?.familyHistory?.mental_illness || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.familyHistory?.mental_illness ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Family History of Mental Retardation
+                              </p>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="familyHistory.mental_retardation"
+                                  value={
+                                    editData?.familyHistory?.mental_retardation ||
+                                    ""
+                                  }
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.familyHistory?.mental_retardation ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Family History of Epilepsy and Others
+                              </p>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="familyHistory.epilepsy"
+                                  value={editData?.familyHistory?.epilepsy || ""}
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.familyHistory?.epilepsy || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Birth History */}
+                        <div className="p-6 bg-white/50 rounded-2xl">
+                          <h3 className="text-lg font-semibold text-[#170F49] mb-4">
+                            Birth History
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Prenatal History
+                              </p>
+                              {editMode ? (
+                                <textarea
+                                  name="birthHistory.prenatal"
+                                  value={editData?.birthHistory?.prenatal || ""}
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                  rows="3"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.birthHistory?.prenatal || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Natal and Neonatal
+                              </p>
+                              {editMode ? (
+                                <textarea
+                                  name="birthHistory.natal"
+                                  value={editData?.birthHistory?.natal || ""}
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                  rows="3"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.birthHistory?.natal || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Postnatal History
+                              </p>
+                              {editMode ? (
+                                <textarea
+                                  name="birthHistory.postnatal"
+                                  value={editData?.birthHistory?.postnatal || ""}
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                  rows="3"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.birthHistory?.postnatal || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Developmental History */}
+                  {activeCaseSection === "development" && (
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 w-6 mr-2 text-[#E38B52]"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                          />
+                        </svg>
+                        Development History
+                      </h2>
+                      <div className="p-6 bg-white/50 rounded-2xl mt-6">
+                        <h3 className="text-lg font-semibold text-[#170F49] mb-4">
+                          Developmental History
+                        </h3>
+                        {editMode ? (
+                          <div className="bg-white p-6 rounded-xl shadow-lg space-y-4">
+                            <div className="flex flex-col md:flex-row gap-3">
+                              <input
+                                type="text"
+                                value={developmentHistoryDraft}
+                                onChange={(e) =>
+                                  setDevelopmentHistoryDraft(e.target.value)
+                                }
+                                placeholder="Type a development history item"
+                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                              />
+                              <button
+                                type="button"
+                                onClick={addDevelopmentHistoryItem}
+                                className="px-5 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#C8742F] transition-all duration-200 shadow-lg"
+                              >
+                                Add
+                              </button>
+                            </div>
+
+                            <div className="flex flex-wrap gap-3">
+                              {normalizeDevelopmentHistoryItems(
+                                editData?.developmentHistoryItems,
+                              ).map((item, index) => (
+                                <div
+                                  key={`${item}-${index}`}
+                                  className="flex items-center gap-2 px-3 py-2 rounded-full bg-[#F7F3EE] border border-[#E38B52]/20"
+                                >
+                                  <span className="text-sm text-[#170F49]">
+                                    {item}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeDevelopmentHistoryItem(index)
+                                    }
+                                    className="text-red-500 font-bold"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-white/70 rounded-xl">
+                            {normalizeDevelopmentHistoryItems(
+                              student?.developmentHistoryItems ||
+                              student?.development_history_items,
+                            ).length > 0 ? (
+                              normalizeDevelopmentHistoryItems(
+                                student?.developmentHistoryItems ||
+                                student?.development_history_items,
+                              ).map((item, index) => (
+                                <div
+                                  key={`${item}-${index}`}
+                                  className="flex items-start gap-2 rounded-xl border border-green-100 bg-white px-4 py-3 shadow-sm"
+                                >
+                                  <span className="text-green-500 font-bold text-lg leading-none mt-0.5">
+                                    ✓
+                                  </span>
+                                  <p className="text-[#170F49] font-medium break-words">
+                                    {item}
+                                  </p>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="col-span-full text-center text-[#6F6C90]">
+                                No development history recorded.
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
+                      {/* Additional Information Section */}
+                      <div className="mt-6">
+                        <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-6 w-6 mr-2 text-[#E38B52]"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          Additional Information
+                        </h2>
 
-                      {/* Allergies */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]">
+                            <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
+                              School History
+                            </h3>
+                            {editMode ? (
+                              <textarea
+                                name="additionalInfo.school_history"
+                                value={
+                                  editData?.additionalInfo?.school_history || ""
+                                }
+                                onChange={handleEditChange}
+                                rows="4"
+                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                                placeholder="Enter school history"
+                              />
+                            ) : (
+                              <p className="text-[#170F49] text-base leading-relaxed">
+                                {student?.additionalInfo?.school_history || "N/A"}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]">
+                            <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
+                              Occupational History
+                            </h3>
+                            {editMode ? (
+                              <textarea
+                                name="additionalInfo.occupational_history"
+                                value={
+                                  editData?.additionalInfo?.occupational_history ||
+                                  ""
+                                }
+                                onChange={handleEditChange}
+                                rows="4"
+                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                                placeholder="Enter occupational history"
+                              />
+                            ) : (
+                              <p className="text-[#170F49] text-base leading-relaxed">
+                                {student?.additionalInfo?.occupational_history ||
+                                  "N/A"}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="md:col-span-2 bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]">
+                            <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
+                              Behaviour Problems
+                            </h3>
+                            {editMode ? (
+                              <textarea
+                                name="assessment.behaviour_problems"
+                                value={
+                                  editData?.assessment?.behaviour_problems || ""
+                                }
+                                onChange={handleEditChange}
+                                rows="4"
+                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 resize-none"
+                                placeholder="Describe behaviour problems"
+                              />
+                            ) : (
+                              <p className="text-[#170F49] text-base leading-relaxed">
+                                {student?.assessment?.behaviour_problems ||
+                                  student?.additionalInfo?.behaviour_problems ||
+                                  "N/A"}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Special Education Assessment Section */}
+                  {activeCaseSection === "education" && (
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 w-6 mr-2 text-[#E38B52]"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h2"
+                          />
+                        </svg>
+                        Special Education Assessment
+                      </h2>
+
+                      {/* Horizontal Navigation for Subsections */}
+                      <div className="mb-8 overflow-x-auto">
+                        <div className="flex gap-1 min-w-max pb-2">
+                          {[
+                            { id: "self-help", label: "Self Help" },
+                            { id: "motor", label: "Motor" },
+                            { id: "sensory", label: "Sensory" },
+                            { id: "socialization", label: "Socialization" },
+                            { id: "cognitive", label: "Cognitive" },
+                            { id: "academic", label: "Academic" },
+                            { id: "prevocational", label: "Prevocational" },
+                            { id: "other-info", label: "Other Info" },
+                          ].map((subsection) => (
+                            <button
+                              key={subsection.id}
+                              onClick={() =>
+                                setActiveEducationSubsection(subsection.id)
+                              }
+                              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300 whitespace-nowrap ${activeEducationSubsection === subsection.id
+                                ? "bg-[#E38B52] text-white shadow-lg"
+                                : "bg-white/50 text-[#170F49] hover:bg-white/80"
+                                }`}
+                            >
+                              {subsection.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Self Help */}
+                      {activeEducationSubsection === "self-help" && (
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                          <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
+                            Self Help
+                          </h3>
+
+                          {/* Food Habits */}
+                          <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
+                            <h4 className="text-md font-medium text-[#170F49]">
+                              Food Habits
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Eating
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.self_help.food_habits.eating"
+                                    value={
+                                      editData?.assessment?.self_help?.food_habits
+                                        ?.eating || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe eating habits and capabilities"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.self_help?.food_habits
+                                      ?.eating || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Drinking
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.self_help.food_habits.drinking"
+                                    value={
+                                      editData?.assessment?.self_help?.food_habits
+                                        ?.drinking || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe drinking habits and capabilities"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.self_help?.food_habits
+                                      ?.drinking || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-6">
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Toilet Habits (Include mention hygenic where
+                                applicable)
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.self_help.toilet_habits"
+                                  value={
+                                    editData?.assessment?.self_help
+                                      ?.toilet_habits || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe toilet habits and hygiene practices"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.self_help
+                                    ?.toilet_habits || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Brushing
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.self_help.brushing"
+                                  value={
+                                    editData?.assessment?.self_help?.brushing ||
+                                    ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe brushing capabilities and routine"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.self_help?.brushing ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Bathing
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.self_help.bathing"
+                                  value={
+                                    editData?.assessment?.self_help?.bathing || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe bathing capabilities and habits"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.self_help?.bathing ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Dressing */}
+                          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6">
+                            <h4 className="text-md font-medium text-[#170F49]">
+                              Dressing
+                            </h4>
+                            <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Removing and wearing clothes
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.self_help.dressing.removing_and_wearing"
+                                    value={
+                                      editData?.assessment?.self_help?.dressing
+                                        ?.removing_and_wearing || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe ability to remove and wear clothes independently"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.self_help?.dressing
+                                      ?.removing_and_wearing || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Unbuttoning and Buttoning
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.self_help.dressing.buttoning"
+                                    value={
+                                      editData?.assessment?.self_help?.dressing
+                                        ?.buttoning || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe ability to handle buttons independently"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.self_help?.dressing
+                                      ?.buttoning || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  wearing shoes/Slippers
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.self_help.dressing.footwear"
+                                    value={
+                                      editData?.assessment?.self_help?.dressing
+                                        ?.footwear || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe ability to wear footwear independently"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.self_help?.dressing
+                                      ?.footwear || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Grooming (include shaving skills where
+                                  applicable)
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.self_help.dressing.grooming"
+                                    value={
+                                      editData?.assessment?.self_help?.dressing
+                                        ?.grooming || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe grooming abilities including shaving if applicable"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.self_help?.dressing
+                                      ?.grooming || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Motor */}
+                      {activeEducationSubsection === "motor" && (
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                          <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
+                            Motor
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white rounded-xl p-6 shadow-lg">
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Gross Motor
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.motor.gross_motor"
+                                  value={editData?.assessment?.motor?.gross_motor || ""}
+                                  onChange={handleEditChange}
+                                  placeholder="Describe capabilities in large movements, balance, and coordination"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.motor?.gross_motor || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Fine Motor
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.motor.fine_motor"
+                                  value={editData?.assessment?.motor?.fine_motor || ""}
+                                  onChange={handleEditChange}
+                                  placeholder="Describe capabilities in small, precise movements"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.motor?.fine_motor || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sensory */}
+                      {activeEducationSubsection === "sensory" && (
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                          <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
+                            Sensory
+                          </h3>
+                          <div className="bg-white rounded-xl p-6 shadow-lg">
+                            {editMode ? (
+                              <input
+                                type="text"
+                                name="assessment.sensory"
+                                value={editData?.assessment?.sensory || ""}
+                                onChange={handleEditChange}
+                                placeholder="Describe sensory responses and processing capabilities"
+                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                              />
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.assessment?.sensory || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Socialization */}
+                      {activeEducationSubsection === "socialization" && (
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                          <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">
+                            Socialization
+                          </h3>
+                          <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Language/Communication
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.socialization.language_communication"
+                                  value={
+                                    editData?.assessment?.socialization
+                                      ?.language_communication || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe communication abilities and language skills"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.socialization
+                                    ?.language_communication || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Social behaviour
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.socialization.social_behaviour"
+                                  value={
+                                    editData?.assessment?.socialization
+                                      ?.social_behaviour || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe interactions with others and social adaptability"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.socialization
+                                    ?.social_behaviour || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Mobility in the nieghborhood
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.socialization.mobility"
+                                  value={
+                                    editData?.assessment?.socialization
+                                      ?.mobility || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe ability to navigate and move around in familiar areas"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.socialization?.mobility ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Cognitive */}
+                      {activeEducationSubsection === "cognitive" && (
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                          <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">
+                            Cognitive
+                          </h3>
+                          <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Attention
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.cognitive.attention"
+                                  value={
+                                    editData?.assessment?.cognitive?.attention ||
+                                    ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe attention span and focus capabilities"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.cognitive?.attention ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Identification of familiar objects
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.cognitive.identification_of_objects"
+                                  value={
+                                    editData?.assessment?.cognitive
+                                      ?.identification_of_objects || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe ability to recognize and name common objects"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.cognitive
+                                    ?.identification_of_objects || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Use of familiar objects
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.cognitive.use_of_objects"
+                                  value={
+                                    editData?.assessment?.cognitive
+                                      ?.use_of_objects || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe ability to appropriately use common objects"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.cognitive
+                                    ?.use_of_objects || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Following simple instruction
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.cognitive.following_instruction"
+                                  value={
+                                    editData?.assessment?.cognitive
+                                      ?.following_instruction || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe ability to understand and follow basic instructions"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.cognitive
+                                    ?.following_instruction || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Awareness of dangrer and hazards
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.cognitive.awareness_of_danger"
+                                  value={
+                                    editData?.assessment?.cognitive
+                                      ?.awareness_of_danger || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe understanding of dangerous situations"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.cognitive
+                                    ?.awareness_of_danger || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Concept Formation */}
+                          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6">
+                            <h4 className="text-md font-medium text-[#170F49]">
+                              Concept formation (Indicate ability to match,
+                              identify name wherever applicable)
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Color
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.cognitive.concept_formation.color"
+                                    value={
+                                      editData?.assessment?.cognitive
+                                        ?.concept_formation?.color || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe ability to recognize and match colors"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.cognitive
+                                      ?.concept_formation?.color || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Size
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.cognitive.concept_formation.size"
+                                    value={
+                                      editData?.assessment?.cognitive
+                                        ?.concept_formation?.size || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe understanding of size concepts"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.cognitive
+                                      ?.concept_formation?.size || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Sex
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.cognitive.concept_formation.sex"
+                                    value={
+                                      editData?.assessment?.cognitive
+                                        ?.concept_formation?.sex || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe understanding of gender concepts"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.cognitive
+                                      ?.concept_formation?.sex || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Shape
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.cognitive.concept_formation.shape"
+                                    value={
+                                      editData?.assessment?.cognitive
+                                        ?.concept_formation?.shape || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe ability to recognize and name shapes"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.cognitive
+                                      ?.concept_formation?.shape || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Number
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.cognitive.concept_formation.number"
+                                    value={
+                                      editData?.assessment?.cognitive
+                                        ?.concept_formation?.number || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe understanding of numbers and counting"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.cognitive
+                                      ?.concept_formation?.number || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Time
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.cognitive.concept_formation.time"
+                                    value={
+                                      editData?.assessment?.cognitive
+                                        ?.concept_formation?.time || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe understanding of time concepts"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.cognitive
+                                      ?.concept_formation?.time || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Money
+                                </label>
+                                {editMode ? (
+                                  <input
+                                    type="text"
+                                    name="assessment.cognitive.concept_formation.money"
+                                    value={
+                                      editData?.assessment?.cognitive
+                                        ?.concept_formation?.money || ""
+                                    }
+                                    onChange={handleEditChange}
+                                    placeholder="Describe understanding of money concepts"
+                                    className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                  />
+                                ) : (
+                                  <p className="text-[#170F49] font-medium">
+                                    {student?.assessment?.cognitive
+                                      ?.concept_formation?.money || "N/A"}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Academic */}
+                      {activeEducationSubsection === "academic" && (
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                          <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">
+                            Academic (give brief history: class attended/attending
+                            indicate class/grade/level wherever appropriate)
+                          </h3>
+                          <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Reading
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.academic.reading"
+                                  value={
+                                    editData?.assessment?.academic?.reading || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe reading level and comprehension"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.academic?.reading ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Writing
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.academic.writing"
+                                  value={
+                                    editData?.assessment?.academic?.writing || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe writing abilities and skills"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.academic?.writing ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Arithmetic
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.academic.arithmetic"
+                                  value={
+                                    editData?.assessment?.academic?.arithmetic ||
+                                    ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="Describe mathematical understanding and abilities"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.academic?.arithmetic ||
+                                    "N/A"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Prevocational/Domestic */}
+                      {activeEducationSubsection === "prevocational" && (
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                          <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
+                            Prevocational/Domestic (Specify ability and interest)
+                          </h3>
+                          <div className="bg-white rounded-xl p-6 shadow-lg">
+                            {editMode ? (
+                              <input
+                                type="text"
+                                name="assessment.prevocational.ability_and_interest"
+                                value={
+                                  editData?.assessment?.prevocational
+                                    ?.ability_and_interest || ""
+                                }
+                                onChange={handleEditChange}
+                                placeholder="Describe prevocational skills and domestic abilities"
+                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                              />
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.assessment?.prevocational
+                                  ?.ability_and_interest || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div className="space-y-6">
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Items of interest
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.prevocational.items_of_interest"
+                                  value={
+                                    editData?.assessment?.prevocational
+                                      ?.items_of_interest || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="List activities and objects that interest the student"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.prevocational
+                                    ?.items_of_interest || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                Items of dislike
+                              </label>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="assessment.prevocational.items_of_dislike"
+                                  value={
+                                    editData?.assessment?.prevocational
+                                      ?.items_of_dislike || ""
+                                  }
+                                  onChange={handleEditChange}
+                                  placeholder="List activities and objects that the student dislikes"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.assessment?.prevocational
+                                    ?.items_of_dislike || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Other Info */}
+                      {activeEducationSubsection === "other-info" && (
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6 mb-8">
+                          <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
+                            Additional Information
+                          </h3>
+                          <div>
+                            <label className="block text-sm font-medium text-[#170F49] mb-2">
+                              Any peculiar behaviour/behaviour problems observed
+                            </label>
+                            {editMode ? (
+                              <textarea
+                                name="assessment.behaviour_problems"
+                                value={
+                                  editData?.assessment?.behaviour_problems || ""
+                                }
+                                onChange={handleEditChange}
+                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                rows="4"
+                                placeholder="Describe any unusual behaviors or behavioral concerns observed"
+                              ></textarea>
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.assessment?.behaviour_problems || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-[#170F49] mb-2">
+                              Any other
+                            </label>
+                            {editMode ? (
+                              <textarea
+                                name="assessment.any_other"
+                                value={editData?.assessment?.any_other || ""}
+                                onChange={handleEditChange}
+                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                rows="4"
+                                placeholder="Add any additional observations or comments"
+                              ></textarea>
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.assessment?.any_other ?? student?.any_other ?? "N/A"}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-[#170F49] mb-2">
+                              Recommendation
+                            </label>
+                            {editMode ? (
+                              <textarea
+                                name="assessment.recommendation"
+                                value={editData?.assessment?.recommendation || ""}
+                                onChange={handleEditChange}
+                                className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                rows="4"
+                                placeholder="Provide detailed recommendations for support and intervention"
+                              ></textarea>
+                            ) : (
+                              <p className="text-[#170F49] font-medium">
+                                {student?.assessment?.recommendation ?? student?.recommendation ?? "N/A"}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Medical Information */}
+                  {activeCaseSection === "medical" && (
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 w-6 mr-2 text-[#E38B52]"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+                          />
+                        </svg>
+                        Medical Information
+                      </h2>
+                      <div className="space-y-6">
+                        {/* Medical Status */}
+                        <div className="p-6 bg-white/50 rounded-2xl">
+                          <h3 className="text-lg font-semibold text-[#170F49] mb-4">
+                            Medical Status
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Specific Diagnostic
+                              </p>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="specific_diagnostic"
+                                  value={editData?.specific_diagnostic || ""}
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.specific_diagnostic || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Medical Conditions
+                              </p>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="medical_conditions"
+                                  value={editData?.medical_conditions || ""}
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                  placeholder="Comma-separated"
+                                />
+                              ) : (
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {(student?.medical_conditions || "")
+                                    .toString()
+                                    .split(",")
+                                    .filter(Boolean)
+                                    .map((c, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="px-3 py-1 bg-white/70 rounded-full text-sm text-[#170F49]"
+                                      >
+                                        {c.trim()}
+                                      </span>
+                                    ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Drug History */}
+                        <div className="p-6 bg-white/50 rounded-2xl">
+                          <h3 className="text-lg font-semibold text-[#170F49] mb-4">
+                            Drug History
+                          </h3>
+                          {editMode ? (
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-sm font-medium text-[#170F49] mb-2">
+                                  Is the child on regular drugs
+                                </label>
+                                <input
+                                  type="text"
+                                  name="is_on_regular_drugs"
+                                  value={editData?.is_on_regular_drugs || ""}
+                                  onChange={handleEditChange}
+                                  placeholder="Yes / No or details"
+                                  className="w-full px-4 py-3 rounded-xl border bg-white shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                />
+                              </div>
+                              <div className="overflow-hidden">
+                                <table className="w-full border border-[#E38B52]/20 rounded-xl backdrop-blur-xl overflow-hidden">
+                                  <thead>
+                                    <tr className="border-b border-[#E38B52]/20">
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                        S.No
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                        Name of drug
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                        Dose if known
+                                      </th>
+                                      <th className="px-2 py-3 text-center text-sm font-semibold text-[#170F49] w-14"></th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white/70">
+                                    {drugRows.map((row) => (
+                                      <tr
+                                        key={row.id}
+                                        className="border-b border-[#E38B52]/10 last:border-b-0"
+                                      >
+                                        <td className="px-4 py-3 text-sm text-[#170F49] align-middle">
+                                          {row.id}
+                                        </td>
+                                        <td className="px-4 py-3 align-middle">
+                                          <input
+                                            type="text"
+                                            value={row.name}
+                                            onChange={(e) =>
+                                              updateDrugRow(
+                                                row.id,
+                                                "name",
+                                                e.target.value,
+                                              )
+                                            }
+                                            className="w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                            placeholder="Enter drug name"
+                                          />
+                                        </td>
+                                        <td className="px-4 py-3 align-middle">
+                                          <input
+                                            type="text"
+                                            value={row.dose}
+                                            onChange={(e) =>
+                                              updateDrugRow(
+                                                row.id,
+                                                "dose",
+                                                e.target.value,
+                                              )
+                                            }
+                                            className="w-full min-w-0 px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-xl text-sm text-[#170F49] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300"
+                                            placeholder="Enter dose"
+                                          />
+                                        </td>
+                                        <td className="px-2 py-3 text-center align-middle">
+                                          <button
+                                            type="button"
+                                            onClick={() => removeDrugRow(row.id)}
+                                            disabled={drugRows.length === 1}
+                                            aria-label="Delete drug row"
+                                            title="Delete row"
+                                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm transition-all duration-200 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                          >
+                                            <svg
+                                              xmlns="http://www.w3.org/2000/svg"
+                                              viewBox="0 0 24 24"
+                                              className="h-5 w-5"
+                                              fill="none"
+                                              stroke="currentColor"
+                                            >
+                                              {/* lid */}
+                                              <path
+                                                d="M9 5h6l1 2H8l1-2z"
+                                                strokeWidth="1.8"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                              />
+                                              {/* body */}
+                                              <rect
+                                                x="8"
+                                                y="7"
+                                                width="8"
+                                                height="11"
+                                                rx="1.5"
+                                                strokeWidth="1.8"
+                                              />
+                                              {/* inner lines */}
+                                              <line
+                                                x1="11"
+                                                y1="10"
+                                                x2="11"
+                                                y2="15"
+                                                strokeWidth="1.8"
+                                                strokeLinecap="round"
+                                              />
+                                              <line
+                                                x1="13"
+                                                y1="10"
+                                                x2="13"
+                                                y2="15"
+                                                strokeWidth="1.8"
+                                                strokeLinecap="round"
+                                              />
+                                            </svg>
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                                <button
+                                  type="button"
+                                  onClick={addDrugRow}
+                                  className="mt-4 w-full px-4 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B40] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
+                                >
+                                  Add Drug
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-sm text-[#6F6C90] mb-2">
+                                Is the child on regular drugs
+                              </p>
+                              <p className="text-[#170F49] mb-4">
+                                {student?.is_on_regular_drugs
+                                  ? student.is_on_regular_drugs
+                                  : "N/A"}
+                              </p>
+                              <div className="overflow-x-auto">
+                                <table className="w-full border-collapse rounded-xl overflow-hidden">
+                                  <thead className="bg-[#E38B52]/10">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                        S.No
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                        Name of drug
+                                      </th>
+                                      <th className="px-4 py-3 text-left text-sm font-semibold text-[#170F49]">
+                                        Dose
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white/70">
+                                    {(student?.drug_history || []).map((d, i) => (
+                                      <tr
+                                        key={i}
+                                        className="border-b border-[#E38B52]/10"
+                                      >
+                                        <td className="px-4 py-3 text-sm text-[#170F49]">
+                                          {i + 1}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-[#170F49]">
+                                          {d?.name || "N/A"}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-[#170F49]">
+                                          {d?.dose || "N/A"}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Allergies */}
+                        <div className="p-6 bg-white/50 rounded-2xl">
+                          <h3 className="text-lg font-semibold text-[#170F49] mb-4">
+                            Allergies
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Drug Allergy
+                              </p>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="drug_allergy"
+                                  value={editData?.drug_allergy || ""}
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.drug_allergy || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Food Allergy
+                              </p>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="food_allergy"
+                                  value={editData?.food_allergy || ""}
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.food_allergy || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm text-[#6F6C90]">
+                                Other Allergies
+                              </p>
+                              {editMode ? (
+                                <input
+                                  type="text"
+                                  name="allergies"
+                                  value={editData?.allergies || ""}
+                                  onChange={handleEditChange}
+                                  className="input-edit"
+                                />
+                              ) : (
+                                <p className="text-[#170F49] font-medium">
+                                  {student?.allergies || "N/A"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Documents Section */}
+                  {activeCaseSection === "documents" && (
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 w-6 mr-2 text-[#E38B52]"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                        Documents
+                      </h2>
                       <div className="p-6 bg-white/50 rounded-2xl">
-                        <h3 className="text-lg font-semibold text-[#170F49] mb-4">
-                          Allergies
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Drug Allergy
-                            </p>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="drug_allergy"
-                                value={editData?.drug_allergy || ""}
-                                onChange={handleEditChange}
-                                className="input-edit"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.drug_allergy || "N/A"}
-                              </p>
-                            )}
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between p-4 bg-white/70 rounded-xl">
+                            <div className="flex items-center gap-3">
+                              <svg
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#E38B52"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                                <line x1="16" y1="13" x2="8" y2="13" />
+                                <line x1="16" y1="17" x2="8" y2="17" />
+                                <line x1="10" y1="9" x2="8" y2="9" />
+                              </svg>
+                              <div>
+                                <p className="font-medium text-[#170F49]">
+                                  Medical Assessment Report
+                                </p>
+                                <p className="text-sm text-[#6F6C90]">
+                                  Updated on: 10 Jan 2024
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button className="p-2 hover:bg-white/80 rounded-lg transition-all duration-200">
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                  <circle cx="12" cy="12" r="3" />
+                                </svg>
+                              </button>
+                              <button className="p-2 hover:bg-white/80 rounded-lg transition-all duration-200">
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                  <polyline points="7 10 12 15 17 10" />
+                                  <line x1="12" y1="15" x2="12" y2="3" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Food Allergy
-                            </p>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="food_allergy"
-                                value={editData?.food_allergy || ""}
-                                onChange={handleEditChange}
-                                className="input-edit"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.food_allergy || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm text-[#6F6C90]">
-                              Other Allergies
-                            </p>
-                            {editMode ? (
-                              <input
-                                type="text"
-                                name="allergies"
-                                value={editData?.allergies || ""}
-                                onChange={handleEditChange}
-                                className="input-edit"
-                              />
-                            ) : (
-                              <p className="text-[#170F49] font-medium">
-                                {student?.allergies || "N/A"}
-                              </p>
-                            )}
+
+                          <div className="flex items-center justify-between p-4 bg-white/70 rounded-xl">
+                            <div className="flex items-center gap-3">
+                              <svg
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#E38B52"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                                <line x1="16" y1="13" x2="8" y2="13" />
+                                <line x1="16" y1="17" x2="8" y2="17" />
+                                <line x1="10" y1="9" x2="8" y2="9" />
+                              </svg>
+                              <div>
+                                <p className="font-medium text-[#170F49]">
+                                  Disability Certificate
+                                </p>
+                                <p className="text-sm text-[#6F6C90]">
+                                  Updated on: 5 Dec 2023
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button className="p-2 hover:bg-white/80 rounded-lg transition-all duration-200">
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                  <circle cx="12" cy="12" r="3" />
+                                </svg>
+                              </button>
+                              <button className="p-2 hover:bg-white/80 rounded-lg transition-all duration-200">
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                  <polyline points="7 10 12 15 17 10" />
+                                  <line x1="12" y1="15" x2="12" y2="3" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {/* Documents Section */}
-                {activeCaseSection === "documents" && (
-                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                    <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6 mr-2 text-[#E38B52]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                      Documents
-                    </h2>
-                    <div className="p-6 bg-white/50 rounded-2xl">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-white/70 rounded-xl">
-                          <div className="flex items-center gap-3">
-                            <svg
-                              width="24"
-                              height="24"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="#E38B52"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                              <polyline points="14 2 14 8 20 8" />
-                              <line x1="16" y1="13" x2="8" y2="13" />
-                              <line x1="16" y1="17" x2="8" y2="17" />
-                              <line x1="10" y1="9" x2="8" y2="9" />
-                            </svg>
-                            <div>
-                              <p className="font-medium text-[#170F49]">
-                                Medical Assessment Report
-                              </p>
-                              <p className="text-sm text-[#6F6C90]">
-                                Updated on: 10 Jan 2024
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button className="p-2 hover:bg-white/80 rounded-lg transition-all duration-200">
-                              <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                <circle cx="12" cy="12" r="3" />
-                              </svg>
-                            </button>
-                            <button className="p-2 hover:bg-white/80 rounded-lg transition-all duration-200">
-                              <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="7 10 12 15 17 10" />
-                                <line x1="12" y1="15" x2="12" y2="3" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-white/70 rounded-xl">
-                          <div className="flex items-center gap-3">
-                            <svg
-                              width="24"
-                              height="24"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="#E38B52"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                              <polyline points="14 2 14 8 20 8" />
-                              <line x1="16" y1="13" x2="8" y2="13" />
-                              <line x1="16" y1="17" x2="8" y2="17" />
-                              <line x1="10" y1="9" x2="8" y2="9" />
-                            </svg>
-                            <div>
-                              <p className="font-medium text-[#170F49]">
-                                Disability Certificate
-                              </p>
-                              <p className="text-sm text-[#6F6C90]">
-                                Updated on: 5 Dec 2023
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button className="p-2 hover:bg-white/80 rounded-lg transition-all duration-200">
-                              <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                <circle cx="12" cy="12" r="3" />
-                              </svg>
-                            </button>
-                            <button className="p-2 hover:bg-white/80 rounded-lg transition-all duration-200">
-                              <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="7 10 12 15 17 10" />
-                                <line x1="12" y1="15" x2="12" y2="3" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                  )}
                 </div>
               </div>
             </div>
@@ -13764,7 +13959,7 @@ const addCellToColumn = (columnKey) => {
                 </svg>
               </button>
             </div>
-            
+
             <form onSubmit={handleEditTherapyReportSave} className="space-y-4">
               <div>
                 <label className="block text-[#170F49] font-medium mb-1">
@@ -13860,7 +14055,7 @@ const addCellToColumn = (columnKey) => {
                           {goalData.label || goalKey.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
                         </label>
                       </div>
-                      
+
                       <div className="mt-2 space-y-2">
                         <div>
                           <label className="block text-[11px] font-semibold text-[#170F49] mb-0.5">Goal</label>

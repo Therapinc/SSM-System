@@ -35,8 +35,11 @@ class Settings(BaseSettings):
     # Google Generative AI (Gemini API) settings
     GEMINI_API_KEY: Optional[str] = None
     # Gemini model to use for translation and summarization
-    # Free tier models: gemini-1.5-flash (recommended), gemini-1.5-pro
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    # Use 'gemini-flash-latest' (free tier alias), or 'gemini-2.0-flash' / 'gemini-2.5-flash' with billing enabled
+    GEMINI_MODEL: str = "gemini-flash-latest"
+    GEMINI_MAX_DAILY_CALLS: int = 1400
+    WORKERS: int = 1
+    REDIS_URL: Optional[str] = None
 
     class Config:
         env_file = str(ENV_FILE)

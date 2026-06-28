@@ -355,7 +355,7 @@ const TherapistDashboard = () => {
       const match = data.find(
         (r) => (r.therapy_type || "").trim().toLowerCase() === normalizedType
       );
-      
+
       const defaultSections = getTherapySections(type);
       if (match && match.goals_achieved && typeof match.goals_achieved === "object") {
         // Pre-populate with previous goals (notes), but set response to ""
@@ -499,7 +499,7 @@ const TherapistDashboard = () => {
     try {
       localStorage.removeItem('token');
       delete axios.defaults.headers.common['Authorization'];
-    } catch (e) {}
+    } catch (e) { }
     navigate('/login');
   };
 
@@ -614,9 +614,8 @@ const TherapistDashboard = () => {
 
       {/* Floating Search Bar */}
       <div
-        className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${
-          isSearchFloating ? "translate-y-0" : "-translate-y-full"
-        }`}
+        className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${isSearchFloating ? "translate-y-0" : "-translate-y-full"
+          }`}
       >
         <div className="backdrop-blur-xl p-4">
           <div className="w-[90%] max-w-[1200px] mx-auto">
@@ -747,9 +746,8 @@ const TherapistDashboard = () => {
                   Filter Students
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className={`h-4 w-4 transition-transform ${
-                      showFilterDropdown ? "rotate-180" : ""
-                    }`}
+                    className={`h-4 w-4 transition-transform ${showFilterDropdown ? "rotate-180" : ""
+                      }`}
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
@@ -825,82 +823,82 @@ const TherapistDashboard = () => {
               </div>
             ) : (
               visibleStudents.map((student) => (
-                  <div
-                    key={student.id}
-                    onClick={() => handleStudentClick(student.id)}
-                    className="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] cursor-pointer"
-                  >
-                    <div className="flex items-center space-x-4 text-[#170F49]">
-                      <div className="w-16 h-16 rounded-lg overflow-hidden">
-                        <img
-                          src={
-                            student.photo_url ||
-                            `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(
-                              student.name || "S",
-                            )}&size=250&background=EFEFEF&color=170F49`
-                          }
-                          alt="Student"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.target.src =
-                              "https://placehold.co/64x64/EFEFEF/AAAAAA?text=Photo";
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-[#170F49]">
-                          {student.name}
-                        </h3>
-                        <div className="space-y-1">
-                          <p className="text-sm text-[#6F6C8F]">
-                            <span className="font-medium">Class:</span>{" "}
-                            {student.class_name || student.className || "-"}
-                          </p>
-                          <p className="text-sm text-[#6F6C8F]">
-                            <span className="font-medium">Division:</span>{" "}
-                            {student.division || "-"}
-                          </p>
-                          <p className="text-sm text-[#6F6C8F]">
-                            <span className="font-medium">Roll No:</span>{" "}
-                            {student.roll_no || student.rollNo || "-"}
-                          </p>
-                        </div>
-                      </div>
-                      {/* Enter Report button */}
-                      <button
-                        className="px-4 py-2 bg-[#E38B52] text-white rounded-lg shadow-md hover:bg-[#E38B52]/90 transition-transform hover:scale-105"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedStudent(student);
-                          setShowReportDialog(true);
-                          setReportDate(new Date().toISOString().slice(0, 10));
-                          const initialType = specialization || "Speech Therapy";
-                          setTherapyType(initialType);
-                          setProgressLevel("Excellent");
-                          loadPreviousGoals(student.id, initialType);
+                <div
+                  key={student.id}
+                  onClick={() => handleStudentClick(student.id)}
+                  className="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] cursor-pointer"
+                >
+                  <div className="flex items-center space-x-4 text-[#170F49]">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden">
+                      <img
+                        src={
+                          student.photo_url ||
+                          `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(
+                            student.name || "S",
+                          )}&size=250&background=EFEFEF&color=170F49`
+                        }
+                        alt="Student"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src =
+                            "https://placehold.co/64x64/EFEFEF/AAAAAA?text=Photo";
                         }}
-                      >
-                        Enter Report
-                      </button>
-                      <button className="text-[#E38B52] hover:text-[#4f46e5] transition-colors">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-6 w-6"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                      </button>
+                      />
                     </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-[#170F49]">
+                        {student.name}
+                      </h3>
+                      <div className="space-y-1">
+                        <p className="text-sm text-[#6F6C8F]">
+                          <span className="font-medium">Class:</span>{" "}
+                          {student.class_name || student.className || "-"}
+                        </p>
+                        <p className="text-sm text-[#6F6C8F]">
+                          <span className="font-medium">Division:</span>{" "}
+                          {student.division || "-"}
+                        </p>
+                        <p className="text-sm text-[#6F6C8F]">
+                          <span className="font-medium">Roll No:</span>{" "}
+                          {student.roll_no || student.rollNo || "-"}
+                        </p>
+                      </div>
+                    </div>
+                    {/* Enter Report button */}
+                    <button
+                      className="px-4 py-2 bg-[#E38B52] text-white rounded-lg shadow-md hover:bg-[#E38B52]/90 transition-transform hover:scale-105"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedStudent(student);
+                        setShowReportDialog(true);
+                        setReportDate(new Date().toISOString().slice(0, 10));
+                        const initialType = specialization || "Speech Therapy";
+                        setTherapyType(initialType);
+                        setProgressLevel("Excellent");
+                        loadPreviousGoals(student.id, initialType);
+                      }}
+                    >
+                      Enter Report
+                    </button>
+                    <button className="text-[#E38B52] hover:text-[#4f46e5] transition-colors">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-6 w-6"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
                   </div>
-                ))
+                </div>
+              ))
             )}
           </div>
 

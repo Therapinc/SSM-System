@@ -38,6 +38,20 @@ app.add_middleware(
 # Include API router with the v1 prefix
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+@app.on_event("startup")
+def verify_single_worker_compliance():
+    import logging
+    logger = logging.getLogger(__name__)
+    web_concurrency = int(os.environ.get("WEB_CONCURRENCY", 0))
+    worker_count = max(settings.WORKERS, web_concurrency)
+    
+    if worker_count > 1 and not settings.REDIS_URL:
+        raise RuntimeError(
+            f"Configuration Error: Running with {worker_count} workers is not permitted without a Redis URL. "
+            "Process-local rate limiting and daily request tracking will fail to enforce global API limits. "
+            "Set WORKERS/WEB_CONCURRENCY=1 or configure REDIS_URL to continue."
+        )
+
 @app.get("/")
 @app.head("/")
 async def root():
