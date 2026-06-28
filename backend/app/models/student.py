@@ -199,3 +199,24 @@ class Student(Base):
     iep_data = Column(JSONB, nullable=True)
     special_education_tables = Column(JSONB, nullable=True)
     iep_program_records = Column(JSONB, nullable=True)
+
+    student_documents = relationship("StudentDocument", back_populates="student", cascade="all, delete-orphan")
+
+
+from sqlalchemy import ForeignKey, DateTime
+from sqlalchemy.sql import func
+
+class StudentDocument(Base):
+    __tablename__ = "student_documents"
+
+    id = Column(String, primary_key=True, index=True)  # UUID string
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    document_type = Column(String, nullable=True)
+    document_label = Column(String, nullable=True)
+    content_type = Column(String, nullable=False, default="application/pdf")
+    file_data = Column(Text, nullable=False)  # Stores base64 string
+    upload_date = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    file_size = Column(Integer, nullable=False)
+
+    student = relationship("Student", back_populates="student_documents")

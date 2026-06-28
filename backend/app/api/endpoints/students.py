@@ -28,6 +28,24 @@ from app.models.user import UserRole
 
 router = APIRouter()
 
+
+def _get_student_documents_metadata(db: Session, student_id: int) -> List[Dict[str, Any]]:
+    from app.models.student import StudentDocument
+    docs = db.query(StudentDocument).filter(StudentDocument.student_id == student_id).all()
+    return [
+        {
+            "id": doc.id,
+            "name": doc.name,
+            "documentType": doc.document_type,
+            "documentLabel": doc.document_label,
+            "content_type": doc.content_type,
+            "file_url": f"/api/v1/students/{student_id}/documents/{doc.id}",
+            "upload_date": doc.upload_date.isoformat() if doc.upload_date else None,
+            "file_size": doc.file_size
+        }
+        for doc in docs
+    ]
+
 # --------------------------------------------------------------------
 # ▼▼▼ THIS IS THE FULLY MODIFIED FUNCTION ▼▼▼
 # --------------------------------------------------------------------
@@ -123,11 +141,7 @@ def get_my_student_data(
     student_data.pop('photo', None)
     
     # Strip file_data from documents to keep payload small
-    if student_data.get('documents'):
-        student_data['documents'] = [
-            {k: v for k, v in doc.items() if k != 'file_data'}
-            for doc in student_data['documents']
-        ]
+    student_data['documents'] = _get_student_documents_metadata(db, student.id)
     
     return student_data
 
@@ -192,11 +206,7 @@ def read_student(
         student_data['photo_url'] = None
     student_data.pop('photo', None)
     # Strip file_data from documents to keep payload small
-    if student_data.get('documents'):
-        student_data['documents'] = [
-            {k: v for k, v in doc.items() if k != 'file_data'}
-            for doc in student_data['documents']
-        ]
+    student_data['documents'] = _get_student_documents_metadata(db, student_id)
 
     return student_data
 
@@ -239,11 +249,7 @@ def upload_student_photo(
         student_data['photo_url'] = None
     student_data.pop('photo', None)
     # Strip file_data from documents
-    if student_data.get('documents'):
-        student_data['documents'] = [
-            {k: v for k, v in doc.items() if k != 'file_data'}
-            for doc in student_data['documents']
-        ]
+    student_data['documents'] = _get_student_documents_metadata(db, student_id)
     return student_data
 
 @router.delete("/{student_id}/photo")
@@ -266,11 +272,7 @@ def delete_student_photo(
     student_data['photo_url'] = None
     student_data.pop('photo', None)
     # Strip file_data from documents
-    if student_data.get('documents'):
-        student_data['documents'] = [
-            {k: v for k, v in doc.items() if k != 'file_data'}
-            for doc in student_data['documents']
-        ]
+    student_data['documents'] = _get_student_documents_metadata(db, student_id)
     return student_data
 
 
@@ -306,11 +308,7 @@ def update_student(
         student_data['photo_url'] = None
     student_data.pop('photo', None)
     # Strip file_data from documents
-    if student_data.get('documents'):
-        student_data['documents'] = [
-            {k: v for k, v in doc.items() if k != 'file_data'}
-            for doc in student_data['documents']
-        ]
+    student_data['documents'] = _get_student_documents_metadata(db, student_id)
     return student_data
 
 @router.delete("/{student_id}")
@@ -379,35 +377,21 @@ def upload_student_document(
     
     # Create document entry with unique ID
     document_id = str(uuid.uuid4())
-    document_entry = {
-        "id": document_id,
-        "name": file_name,
-        "documentType": resolved_document_type,
-        "documentLabel": resolved_document_label,
-        "content_type": file_content_type,
-        "file_url": f"/api/v1/students/{student_id}/documents/{document_id}",
-        "file_data": b64_content,
-        "upload_date": datetime.now().isoformat(),
-        "file_size": file_size
-    }
     
-    # Get existing documents or initialize empty list
-    existing_docs = db_student.documents if db_student.documents else []
-    if not isinstance(existing_docs, list):
-        existing_docs = []
-    
-    # Make a copy to avoid mutating the original
-    import copy
-    docs_copy = copy.deepcopy(existing_docs)
-    docs_copy.append(document_entry)
-    
-    # Update student with new documents list
     try:
-        # Use direct SQLAlchemy update to avoid ORM issues
-        from sqlalchemy import update as sa_update
-        from app.models.student import Student
-        stmt = sa_update(Student).where(Student.id == student_id).values(documents=docs_copy)
-        db.execute(stmt)
+        from app.models.student import StudentDocument
+        db_doc = StudentDocument(
+            id=document_id,
+            student_id=student_id,
+            name=file_name,
+            document_type=resolved_document_type,
+            document_label=resolved_document_label,
+            content_type=file_content_type,
+            file_data=b64_content,
+            upload_date=datetime.now(),
+            file_size=file_size
+        )
+        db.add(db_doc)
         db.commit()
     except Exception as e:
         db.rollback()
@@ -417,7 +401,7 @@ def upload_student_document(
         "message": "Document uploaded successfully",
         "document_name": file.filename,
         "file_size": file_size,
-        "total_documents": len(docs_copy)
+        "document_id": document_id
     }
 
 @router.get("/{student_id}/documents")
@@ -433,21 +417,7 @@ def get_student_documents(
     if not db_student:
         raise HTTPException(status_code=404, detail="Student not found")
     
-    documents = db_student.documents if db_student.documents else []
-    
-    # Return documents without the large base64 data for listing
-    documents_list = []
-    for doc in documents:
-        documents_list.append({
-            "id": doc.get("id"),
-            "name": doc.get("name"),
-            "documentType": doc.get("documentType"),
-            "documentLabel": doc.get("documentLabel"),
-            "content_type": doc.get("content_type") or "application/pdf",
-            "file_url": doc.get("file_url") or f"/api/v1/students/{student_id}/documents/{doc.get('id')}",
-            "upload_date": doc.get("upload_date"),
-            "file_size": doc.get("file_size")
-        })
+    documents_list = _get_student_documents_metadata(db, student_id)
     
     return {
         "documents": documents_list,
@@ -468,28 +438,25 @@ def download_student_document(
     if not db_student:
         raise HTTPException(status_code=404, detail="Student not found")
     
-    documents = db_student.documents if db_student.documents else []
-    
-    # Find document by ID
-    document = None
-    for doc in documents:
-        if doc.get("id") == document_id:
-            document = doc
-            break
+    from app.models.student import StudentDocument
+    document = db.query(StudentDocument).filter(
+        StudentDocument.id == document_id,
+        StudentDocument.student_id == student_id
+    ).first()
     
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     
     return {
-        "id": document.get("id"),
-        "name": document.get("name"),
-        "documentType": document.get("documentType"),
-        "documentLabel": document.get("documentLabel"),
-        "content_type": document.get("content_type") or "application/pdf",
-        "file_url": document.get("file_url") or f"/api/v1/students/{student_id}/documents/{document.get('id')}",
-        "file_data": f"data:{document.get('content_type') or 'application/pdf'};base64,{document.get('file_data')}",
-        "upload_date": document.get("upload_date"),
-        "file_size": document.get("file_size")
+        "id": document.id,
+        "name": document.name,
+        "documentType": document.document_type,
+        "documentLabel": document.document_label,
+        "content_type": document.content_type,
+        "file_url": f"/api/v1/students/{student_id}/documents/{document.id}",
+        "file_data": f"data:{document.content_type};base64,{document.file_data}",
+        "upload_date": document.upload_date.isoformat() if document.upload_date else None,
+        "file_size": document.file_size
     }
 
 @router.delete("/{student_id}/documents/{document_id}")
@@ -506,28 +473,18 @@ def delete_student_document(
     if not db_student:
         raise HTTPException(status_code=404, detail="Student not found")
     
-    documents = db_student.documents if db_student.documents else []
+    from app.models.student import StudentDocument
+    doc = db.query(StudentDocument).filter(
+        StudentDocument.id == document_id,
+        StudentDocument.student_id == student_id
+    ).first()
     
-    # Find and remove document by ID
-    document_found = False
-    deleted_doc_name = None
-    updated_documents = []
-    for doc in documents:
-        if doc.get("id") == document_id:
-            document_found = True
-            deleted_doc_name = doc.get("name")
-            continue  # Skip this document (delete it)
-        updated_documents.append(doc)
-    
-    if not document_found:
+    if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     
-    # Update student with new documents list
+    deleted_doc_name = doc.name
     try:
-        from sqlalchemy import update as sa_update
-        from app.models.student import Student
-        stmt = sa_update(Student).where(Student.id == student_id).values(documents=updated_documents)
-        db.execute(stmt)
+        db.delete(doc)
         db.commit()
     except Exception as e:
         db.rollback()
