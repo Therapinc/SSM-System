@@ -1,24 +1,77 @@
+import urllib.request
+import json
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from app.core.config import settings
 
+def send_via_brevo_api(to_email: str, username: str, otp_code: str) -> bool:
+    """Send OTP code using Brevo's HTTPS REST API (bypassing blocked SMTP ports)."""
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": settings.BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+    
+    sender_email = settings.EMAILS_FROM_EMAIL or "noreply@therapinc.com"
+    
+    payload = {
+        "sender": {"name": settings.PROJECT_NAME, "email": sender_email},
+        "to": [{"email": to_email, "name": username}],
+        "subject": "Special School System - Password Reset Code",
+        "htmlContent": f"""
+        <html>
+          <body>
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e0d6cd; border-radius: 12px; background: #faf8f5;">
+              <h2 style="color: #B3541E; text-align: center;">Reset Your Password</h2>
+              <p>Hello <strong>{username}</strong>,</p>
+              <p>You requested to reset your password. Use the verification code below to proceed:</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <span style="font-size: 28px; font-weight: bold; letter-spacing: 4px; color: #170F49; background: #f4f1ee; padding: 10px 24px; border-radius: 8px; border: 1px solid #B6A89B; display: inline-block;">
+                  {otp_code}
+                </span>
+              </div>
+              <p style="color: #666; font-size: 12px; text-align: center; margin-top: 40px;">
+                This code is valid for 5 minutes. If you did not make this request, please ignore this message.
+              </p>
+            </div>
+          </body>
+        </html>
+        """,
+        "textContent": f"Hello {username},\n\nYour 6-digit verification code to reset your password is: {otp_code}\n\nThis code will expire in 5 minutes.\n\nIf you did not request this, please ignore this email."
+    }
+    
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as response:
+            res_body = response.read().decode("utf-8")
+            print(f"[BREVO API SUCCESS] OTP sent successfully to {to_email}. Response: {res_body}")
+            return True
+    except Exception as e:
+        print(f"[BREVO API ERROR] Failed to send email via Brevo REST API: {e}")
+        return False
+
 def send_otp_email(to_email: str, username: str, otp_code: str) -> bool:
-    """Send OTP code to the user's email address using SMTP."""
-    # Check if SMTP configuration is provided
+    """Send OTP code to the user's email address using either Brevo HTTPS API or SMTP."""
+    # 1. Try Brevo HTTPS REST API first if configured
+    if settings.BREVO_API_KEY:
+        print(f"[EMAIL DEBUG] Sending OTP via Brevo REST API to: {to_email}")
+        return send_via_brevo_api(to_email, username, otp_code)
+        
+    # 2. Fallback to standard SMTP
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
         print("[EMAIL WARNING] SMTP credentials not set. Could not send email.")
         return False
 
     sender_email = settings.EMAILS_FROM_EMAIL or settings.SMTP_USER
-    # Strip spaces from app password (Google App Passwords sometimes have spaces)
     smtp_password = settings.SMTP_PASSWORD.replace(" ", "")
 
-    print(f"[EMAIL DEBUG] Sending OTP to: {to_email}")
+    print(f"[EMAIL DEBUG] Sending OTP via SMTP to: {to_email}")
     print(f"[EMAIL DEBUG] SMTP Host: {settings.SMTP_HOST}:{settings.SMTP_PORT}")
     print(f"[EMAIL DEBUG] SMTP User: {settings.SMTP_USER}")
 
-    # Create email headers and content
     message = MIMEMultipart("alternative")
     message["Subject"] = "Special School System - Password Reset Code"
     message["From"] = f"{settings.PROJECT_NAME} <{sender_email}>"
@@ -50,7 +103,6 @@ def send_otp_email(to_email: str, username: str, otp_code: str) -> bool:
     message.attach(MIMEText(html_content, "html"))
 
     try:
-        # Establish connection with 15s timeout to avoid hanging on blocked ports
         server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15)
         server.ehlo()
         if settings.SMTP_TLS:
@@ -62,12 +114,12 @@ def send_otp_email(to_email: str, username: str, otp_code: str) -> bool:
         print(f"[EMAIL SUCCESS] OTP sent successfully to {to_email}")
         return True
     except smtplib.SMTPAuthenticationError as e:
-        print(f"[EMAIL ERROR] Authentication failed — check SMTP_USER and SMTP_PASSWORD in .env: {e}")
+        print(f"[EMAIL ERROR] Authentication failed — check SMTP_USER and SMTP_PASSWORD: {e}")
         return False
     except smtplib.SMTPConnectError as e:
-        print(f"[EMAIL ERROR] Could not connect to SMTP server {settings.SMTP_HOST}:{settings.SMTP_PORT}: {e}")
+        print(f"[EMAIL ERROR] Could not connect to SMTP server: {e}")
         return False
     except Exception as e:
-        print(f"[EMAIL ERROR] Failed to send email to {to_email}: {type(e).__name__}: {e}")
+        print(f"[EMAIL ERROR] Failed to send email via SMTP: {type(e).__name__}: {e}")
         return False
 

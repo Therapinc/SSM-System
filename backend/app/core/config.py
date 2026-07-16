@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     EMAILS_FROM_EMAIL: Optional[str] = None
+    BREVO_API_KEY: Optional[str] = None
     
     # Google Generative AI (Gemini API) settings
     GEMINI_API_KEY: Optional[str] = None
