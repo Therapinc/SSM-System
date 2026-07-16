@@ -1,3 +1,4 @@
+import os
 import urllib.request
 import json
 import smtplib
@@ -55,20 +56,25 @@ def send_via_brevo_api(to_email: str, username: str, otp_code: str) -> bool:
 
 def send_otp_email(to_email: str, username: str, otp_code: str) -> bool:
     """Send OTP code to the user's email address using either Brevo HTTPS API or SMTP."""
-    # 1. Try Brevo HTTPS REST API first if configured
-    if settings.BREVO_API_KEY:
-        print(f"[EMAIL DEBUG] Sending OTP via Brevo REST API to: {to_email}", flush=True)
+    is_running_on_render = os.environ.get("RENDER") == "true"
+    
+    # 1. On Render, prioritize Brevo HTTPS REST API to bypass port blocks
+    if is_running_on_render and settings.BREVO_API_KEY:
+        print(f"[EMAIL DEBUG] Running on Render. Sending OTP via Brevo REST API to: {to_email}", flush=True)
         return send_via_brevo_api(to_email, username, otp_code)
         
-    # 2. Fallback to standard SMTP
+    # 2. On Localhost, always use Gmail SMTP (since ports are not blocked locally)
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
         print("[EMAIL WARNING] SMTP credentials not set. Could not send email.", flush=True)
+        # Fallback to Brevo if SMTP is not configured even locally
+        if settings.BREVO_API_KEY:
+            return send_via_brevo_api(to_email, username, otp_code)
         return False
 
     sender_email = settings.EMAILS_FROM_EMAIL or settings.SMTP_USER
     smtp_password = settings.SMTP_PASSWORD.replace(" ", "")
 
-    print(f"[EMAIL DEBUG] Sending OTP via SMTP to: {to_email}", flush=True)
+    print(f"[EMAIL DEBUG] Running locally. Sending OTP via SMTP to: {to_email}", flush=True)
     print(f"[EMAIL DEBUG] SMTP Host: {settings.SMTP_HOST}:{settings.SMTP_PORT}", flush=True)
     print(f"[EMAIL DEBUG] SMTP User: {settings.SMTP_USER}", flush=True)
 
