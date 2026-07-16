@@ -253,7 +253,10 @@ const LoginPage = () => {
                     Enter Verification Code
                   </h2>
                   <p className="text-xs font-medium text-green-600 bg-green-50 p-2.5 rounded-xl border border-green-100 text-center mb-2">
-                    ✅ Verification code sent! Check your email inbox (or spam).
+                    ✅ Verification code sent! Check your email inbox.
+                  </p>
+                  <p className="text-xs font-medium text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-center mb-2">
+                    📧 <strong>Can't find it?</strong> Check your <strong>Spam / Junk</strong> folder — it may have landed there.
                   </p>
 
                   {/* Countdown Timer */}

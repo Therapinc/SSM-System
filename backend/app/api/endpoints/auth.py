@@ -85,14 +85,58 @@ def forgot_password_request(
     Generate and print a 6-digit OTP code for teacher/therapist (admin accounts blocked).
     """
     username = request_in.username.strip()
+    user = None
+    otp_email = None  # email to send the OTP to
+
+    # 1. Try by login username
     user = crud.user.get_by_username(db, username=username)
+
+    # 2. Try by user account email (direct match)
     if not user:
         user = crud.user.get_by_email(db, email=username)
-        
+
+    # 3. Try by therapist profile email — find the therapist then their linked user account
+    if not user:
+        from app.models.therapist import Therapist
+        from app.models.user import User as UserModel
+        from sqlalchemy import func
+        therapist = db.query(Therapist).filter(
+            func.lower(Therapist.email) == username.lower()
+        ).first()
+        if therapist:
+            otp_email = therapist.email  # deliver OTP to therapist profile email
+            # Try to find user by matching email in user table (case-insensitive)
+            user = db.query(UserModel).filter(
+                func.lower(UserModel.email) == username.lower()
+            ).first()
+            # If still not found, find any therapist-role user (best effort)
+            if not user and therapist.name:
+                user = db.query(UserModel).filter(
+                    UserModel.role == "therapist"
+                ).filter(
+                    func.lower(UserModel.username).contains(
+                        therapist.name.split()[0].lower()
+                    )
+                ).first()
+
+    # 4. Try by teacher profile email
+    if not user:
+        from app.models.teacher import Teacher
+        from app.models.user import User as UserModel
+        from sqlalchemy import func as sqlfunc
+        teacher = db.query(Teacher).filter(
+            sqlfunc.lower(Teacher.email) == username.lower()
+        ).first()
+        if teacher:
+            otp_email = teacher.email
+            user = db.query(UserModel).filter(
+                sqlfunc.lower(UserModel.email) == username.lower()
+            ).first()
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User account not found"
+            detail="User account not found. Please try your login username instead."
         )
         
     # Security Guard: Admin / HM accounts cannot use OTP reset
@@ -114,21 +158,23 @@ def forgot_password_request(
     
     # Try sending real email
     if settings.SMTP_USER and settings.SMTP_PASSWORD:
-        if not user.email:
+        # Use profile email if available, otherwise fall back to user account email
+        delivery_email = otp_email or user.email
+        if not delivery_email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User account has no registered email address."
+                detail="No email address found for this account. Please contact your administrator."
             )
-        success = send_otp_email(user.email, user.username, otp)
+        success = send_otp_email(delivery_email, user.username, otp)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to send verification email. Please try again."
             )
-        msg = f"Verification code sent successfully to {user.email}."
+        msg = f"Verification code sent successfully to {delivery_email}."
     else:
         msg = "Email service not configured. Verification code generated and printed to console."
-    
+
     return {
         "status": "success",
         "message": msg,
