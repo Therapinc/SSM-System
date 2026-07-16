@@ -86,6 +86,7 @@ def forgot_password_request(
     Generate and print a 6-digit OTP code for teacher/therapist (admin accounts blocked).
     """
     username = request_in.username.strip()
+    print(f"[FORGOT PASSWORD] Request received for input: '{username}'", flush=True)
     user = None
     otp_email = None  # email to send the OTP to
 
