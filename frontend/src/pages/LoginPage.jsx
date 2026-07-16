@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -11,6 +11,33 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      const verifyAndRedirect = async () => {
+        try {
+          axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+          const res = await axios.get(`${API_BASE_URL}/api/v1/auth/me`);
+          const rawRole = res.data.role || "hm";
+          const role = String(rawRole).toLowerCase();
+          if (role === "hm" || role === "admin" || role === "headmaster") {
+            navigate("/headmaster");
+          } else if (role === "teacher") {
+            navigate("/teacher");
+          } else if (role === "therapist") {
+            navigate("/therapist");
+          } else if (role === "student" || role === "parent") {
+            navigate("/student-view");
+          }
+        } catch (e) {
+          localStorage.removeItem("token");
+          delete axios.defaults.headers.common["Authorization"];
+        }
+      };
+      verifyAndRedirect();
+    }
+  }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

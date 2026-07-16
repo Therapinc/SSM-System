@@ -115,6 +115,7 @@ const HeadMaster = () => {
   const [therapistTotalPages, setTherapistTotalPages] = useState(1);
   const therapistLimit = 50;
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [assignmentTherapist, setAssignmentTherapist] = useState(null);
   const studentSearchContainerRef = useRef(null);
 
@@ -313,11 +314,7 @@ const HeadMaster = () => {
   }, [debouncedTherapistSearch]);
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
-    } catch (e) {}
-    navigate('/login');
+    setShowLogoutModal(true);
   };
 
   const handleAddStudent = () => { navigate("/add-student"); };
@@ -436,7 +433,7 @@ const HeadMaster = () => {
           className="px-6 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B52]/90 transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
           </svg>
           Logout
         </button>
@@ -1004,6 +1001,48 @@ const HeadMaster = () => {
       )}
 
       <ScrollToTopButton />
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-gray-100 transform scale-100 transition-all duration-300">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-[#170F49] mb-2">
+                Confirm Logout
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Are you sure you want to log out of your session? Unsaved changes may be lost.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className="px-4 py-2 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-medium transition-colors text-sm w-full"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowLogoutModal(false);
+                    try {
+                      localStorage.removeItem('token');
+                      delete axios.defaults.headers.common['Authorization'];
+                    } catch (e) {}
+                    navigate('/login');
+                  }}
+                  className="px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 font-medium transition-colors text-sm w-full"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
