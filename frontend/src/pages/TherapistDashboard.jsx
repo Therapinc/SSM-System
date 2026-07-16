@@ -190,133 +190,10 @@ const TherapistDashboard = () => {
   const [therapyType, setTherapyType] = useState("Occupational Therapy");
   const [specialization, setSpecialization] = useState("");
 
-  // Define goals for each therapy type
-  const getGoalsForTherapyType = (therapy) => {
-    const goalsMap = {
-      "Behavioral Therapy": {
-        behavioral_management: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Behavioral Management",
-        },
-        emotional_regulation: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Emotional Regulation",
-        },
-        social_skills: { checked: false, notes: "", response: "", label: "Social Skills" },
-        coping_strategies: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Coping Strategies",
-        },
-      },
-      "Occupational Therapy": {
-        daily_living_adl: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Activities of Daily Living (ADL)",
-        },
-        sensory_integration_modulation: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Sensory Integration and Modulation",
-        },
-        neuro_cognitive_rehabilitation: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Neuro-Cognitive Rehabilitation",
-        },
-        fine_motor_hand_function: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Fine Motor and Hand Function",
-        },
-        gross_motor_coordination_balance: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Gross Motor Coordination and Balance",
-        },
-        psychosocial_behavioral_regulation: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Psychosocial and Behavioral Regulation",
-        },
-        handwriting_pre_academics: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Handwriting and Pre-Academics",
-        },
-      },
-      "Physiotherapy": {
-        strength_endurance: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Strength & Endurance",
-        },
-        flexibility_range: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Flexibility & Range of Motion",
-        },
-        balance_coordination: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Balance & Coordination",
-        },
-        mobility_gait: { checked: false, notes: "", response: "", label: "Mobility & Gait" },
-      },
-      "Speech Therapy": {
-        receptive_language: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Receptive Language Skills (Comprehension)",
-        },
-        expressive_language: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Expressive Language Skills",
-        },
-        oral_motor_opt: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Oral Motor & Oral Placement Therapy (OPT) Goals",
-        },
-        pragmatic_language: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Pragmatic Language Skills (Social Communication)",
-        },
-        narrative_skills: {
-          checked: false,
-          notes: "",
-          response: "",
-          label: "Narrative Skills",
-        },
-      },
-    };
-    return goalsMap[therapy] || goalsMap["Speech Therapy"];
-  };
+
 
   const [goalsAchieved, setGoalsAchieved] = useState(
-    getGoalsForTherapyType("Occupational Therapy"),
+    getTherapySections("Occupational Therapy"),
   );
   const [progressLevel, setProgressLevel] = useState("Excellent");
 
@@ -350,9 +227,20 @@ const TherapistDashboard = () => {
       const { data } = await axios.get(`${API_BASE_URL}/api/v1/therapy-reports/student/${studentId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      // Sort reports descending by report_date and fallback to id to ensure the latest is first
+      const reports = Array.isArray(data) ? [...data] : [];
+      reports.sort((a, b) => {
+        const dateA = a.report_date || "";
+        const dateB = b.report_date || "";
+        if (dateA !== dateB) {
+          return dateB.localeCompare(dateA);
+        }
+        return (b.id || 0) - (a.id || 0);
+      });
+
       // Find the most recent report matching the therapy type
       const normalizedType = (type || "").trim().toLowerCase();
-      const match = data.find(
+      const match = reports.find(
         (r) => (r.therapy_type || "").trim().toLowerCase() === normalizedType
       );
 

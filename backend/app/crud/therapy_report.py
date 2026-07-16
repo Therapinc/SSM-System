@@ -31,4 +31,4 @@ def create(db: Session, *, obj_in: TherapyReportCreate) -> TherapyReport:
 
 
 def get_by_student(db: Session, student_id: int) -> List[TherapyReport]:
-    return db.query(TherapyReport).filter(TherapyReport.student_id == student_id).order_by(TherapyReport.report_date.desc()).all()
+    return db.query(TherapyReport).filter(TherapyReport.student_id == student_id).order_by(TherapyReport.report_date.desc(), TherapyReport.id.desc()).all()
