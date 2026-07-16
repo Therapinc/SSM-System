@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
-# Load environment variables from local config files
+# Load environment variables from local configuration files
 load_dotenv()
 
 from app.api.api import api_router

@@ -158,7 +158,7 @@ def forgot_password_request(
     print(f"==================================================\n")
     
     # Try sending real email in background (non-blocking)
-    print(f"[EMAIL CONFIG] SMTP_USER set: {bool(settings.SMTP_USER)} | SMTP_PASSWORD set: {bool(settings.SMTP_PASSWORD)}")
+    print(f"[EMAIL CONFIG] SMTP_USER set: {bool(settings.SMTP_USER)} | SMTP_PASSWORD set: {bool(settings.SMTP_PASSWORD)} | BREVO_API_KEY set: {bool(settings.BREVO_API_KEY)}")
     if settings.SMTP_USER and settings.SMTP_PASSWORD:
         # Use profile email if available, otherwise fall back to user account email
         delivery_email = otp_email or user.email
