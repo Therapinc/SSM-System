@@ -43,3 +43,11 @@ class TokenPayload(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str
+
+class ForgotPasswordRequest(BaseModel):
+    username: str
+
+class ForgotPasswordReset(BaseModel):
+    username: str
+    otp: str
+    new_password: str

@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     # API settings
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Special School Management System"
+
+    # SMTP Email Configuration
+    SMTP_TLS: bool = True
+    SMTP_PORT: int = 587
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    EMAILS_FROM_EMAIL: Optional[str] = None
     
     # Google Generative AI (Gemini API) settings
     GEMINI_API_KEY: Optional[str] = None

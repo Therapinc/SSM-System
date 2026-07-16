@@ -7,6 +7,9 @@ from app import crud, schemas
 from app.api import deps
 from app.core import security
 from app.core.config import settings
+from app.models.user import UserRole
+from app.utils import otp_store
+from app.utils.email import send_otp_email
 
 router = APIRouter()
 
@@ -71,3 +74,94 @@ def read_current_user(
         if therapist:
             current_user.specialization = therapist.specialization
     return current_user
+
+
+@router.post("/forgot-password/request")
+def forgot_password_request(
+    request_in: schemas.ForgotPasswordRequest,
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    """
+    Generate and print a 6-digit OTP code for teacher/therapist (admin accounts blocked).
+    """
+    username = request_in.username.strip()
+    user = crud.user.get_by_username(db, username=username)
+    if not user:
+        user = crud.user.get_by_email(db, email=username)
+        
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User account not found"
+        )
+        
+    # Security Guard: Admin / HM accounts cannot use OTP reset
+    is_admin = (
+        user.is_superuser
+        or str(user.role).lower() in {"admin", "hm", "headmaster", UserRole.ADMIN.value}
+    )
+    if is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin passwords cannot be reset via OTP."
+        )
+        
+    # Generate OTP
+    otp = otp_store.generate_otp(user.username)
+    print(f"\n==================================================")
+    print(f"[OTP SERVICE] Reset code for '{user.username}' is: {otp}")
+    print(f"==================================================\n")
+    
+    # Try sending real email
+    if settings.SMTP_USER and settings.SMTP_PASSWORD:
+        if not user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User account has no registered email address."
+            )
+        success = send_otp_email(user.email, user.username, otp)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send verification email. Please try again."
+            )
+        msg = f"Verification code sent successfully to {user.email}."
+    else:
+        msg = "Email service not configured. Verification code generated and printed to console."
+    
+    return {
+        "status": "success",
+        "message": msg,
+        "username": user.username
+    }
+
+
+@router.post("/forgot-password/reset")
+def forgot_password_reset(
+    reset_in: schemas.ForgotPasswordReset,
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    """
+    Verify OTP code and reset the password.
+    """
+    username = reset_in.username.strip()
+    user = crud.user.get_by_username(db, username=username)
+    if not user:
+        user = crud.user.get_by_email(db, email=username)
+        
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User account not found"
+        )
+        
+    # Verification
+    is_valid = otp_store.verify_otp(user.username, reset_in.otp)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification code."
+        )
+        
+    crud.user.update(db, db_obj=user, obj_in={"password": reset_in.new_password})
+    return {"status": "success", "message": "Password reset successfully"}

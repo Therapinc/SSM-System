@@ -12,6 +12,42 @@ const LoginPage = () => {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  // Forgot password & OTP states
+  const [showForgotFlow, setShowForgotFlow] = useState(false);
+  const [forgotStep, setForgotStep] = useState(1);
+  const [forgotUsername, setForgotUsername] = useState("");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotError, setForgotError] = useState("");
+  const [forgotSuccess, setForgotSuccess] = useState("");
+  const [isForgotSubmitting, setIsForgotSubmitting] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(0);
+
+  // OTP countdown timer
+  useEffect(() => {
+    if (otpCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setOtpCountdown((prev) => {
+        if (prev <= 1) { clearInterval(timer); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [otpCountdown]);
+
+  const formatCountdown = (secs) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, "0");
+    const s = (secs % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
+
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 4000);
+  };
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
@@ -87,6 +123,66 @@ const LoginPage = () => {
     }
   };
 
+  const handleForgotRequest = async (e) => {
+    e.preventDefault();
+    if (!forgotUsername.trim()) {
+      setForgotError("Please enter your username or email.");
+      return;
+    }
+    setForgotError("");
+    setForgotSuccess("");
+    setIsForgotSubmitting(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/v1/auth/forgot-password/request`, {
+        username: forgotUsername,
+      });
+      if (response.data.username) {
+        setForgotUsername(response.data.username);
+      }
+      setForgotSuccess("OTP generated successfully! Check backend console.");
+      showToast("OTP generated successfully!", "success");
+      setOtpCountdown(300);
+      setForgotStep(2);
+    } catch (err) {
+      setForgotError(
+        err.response?.data?.detail || "Failed to generate OTP. Please try again."
+      );
+      showToast(err.response?.data?.detail || "Failed to generate OTP.", "error");
+    } finally {
+      setIsForgotSubmitting(false);
+    }
+  };
+
+  const handleForgotReset = async (e) => {
+    e.preventDefault();
+    if (!forgotOtp.trim() || !forgotNewPassword.trim()) {
+      setForgotError("Please fill out all fields.");
+      return;
+    }
+    setForgotError("");
+    setForgotSuccess("");
+    setIsForgotSubmitting(true);
+    try {
+      await axios.post(`${API_BASE_URL}/api/v1/auth/forgot-password/reset`, {
+        username: forgotUsername,
+        otp: forgotOtp,
+        new_password: forgotNewPassword,
+      });
+      showToast("Password reset successfully! Log in now.", "success");
+      setShowForgotFlow(false);
+      setForgotStep(1);
+      setUsername(forgotUsername);
+      setPassword("");
+    } catch (err) {
+      setForgotError(
+        err.response?.data?.detail || "Failed to reset password. Please try again."
+      );
+      showToast(err.response?.data?.detail || "Failed to reset password.", "error");
+    } finally {
+      setIsForgotSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f7f7f7] relative overflow-hidden py-20">
       {/* Animated background blobs */}
@@ -96,134 +192,307 @@ const LoginPage = () => {
       <div className="absolute top-0 -left-40 w-[500px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float animation-delay-7000" />
 
       <div className="w-[90%] max-w-[1200px] mx-4 flex-1 flex flex-col justify-center">
-        <h1 className="text-3xl font-bold text-[#B3541E] mb-8 text-center font-baskervville">
-          Sign in to your account
-        </h1>
+        {showForgotFlow ? (
+          <div>
+            <h1 className="text-3xl font-bold text-[#B3541E] mb-8 text-center font-baskervville">
+              Reset Password
+            </h1>
 
-        {/* Login container */}
-        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20 max-w-[450px] mx-auto w-full">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+            <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20 max-w-[450px] mx-auto w-full">
+              {forgotStep === 1 ? (
+                <form onSubmit={handleForgotRequest} className="space-y-6">
+                  <h2 className="text-lg font-semibold text-[#5E534C] text-center mb-2">
+                    Request Verification Code
+                  </h2>
+                  <p className="text-xs text-[#5E534C]/80 text-center mb-4">
+                    Enter your username or email to request a 6-digit OTP code.
+                  </p>
 
-            {/* Username field */}
-            <div className="space-y-2 w-full">
-              <label
-                htmlFor="username"
-                className="block text-sm font-medium text-[#5E534C] ml-4"
-              >
-                Username
-              </label>
-              <input
-                id="username"
-                type="text"
-                placeholder="Enter username here."
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-4 rounded-2xl border border-[#B6A89B] bg-white shadow-lg shadow-[#B6A89B]/30 focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#B6A89B]"
-              />
-            </div>
+                  {forgotError && <p className="text-red-500 text-sm mb-4">{forgotError}</p>}
+                  {forgotSuccess && <p className="text-green-500 text-sm mb-4">{forgotSuccess}</p>}
 
-            {/* Password field */}
-            <div className="space-y-2 w-full">
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-[#5E534C] ml-4"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter password here."
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-4 rounded-2xl border border-[#B6A89B] bg-white shadow-lg shadow-[#B6A89B]/30 focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#B6A89B] pr-12"
-                />
-                {password && (
+                  <div className="space-y-2 w-full">
+                    <label htmlFor="forgotUsername" className="block text-sm font-medium text-[#5E534C] ml-4">
+                      Username or Email
+                    </label>
+                    <input
+                      id="forgotUsername"
+                      type="text"
+                      placeholder="Enter username or email here."
+                      value={forgotUsername}
+                      onChange={(e) => setForgotUsername(e.target.value)}
+                      className="w-full px-4 py-4 rounded-2xl border border-[#B6A89B] bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#B6A89B]"
+                      required
+                    />
+                  </div>
+
                   <button
-                    type="button"
-                    aria-label={
-                      showPassword ? "Hide password" : "Show password"
-                    }
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    tabIndex={0}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-1 focus:outline-none"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
+                    type="submit"
+                    disabled={isForgotSubmitting}
+                    className="w-full bg-[#E38B52] text-white py-4 rounded-2xl hover:bg-[#C8742F] hover:-translate-y-1 transition-all duration-200 font-medium shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)] disabled:opacity-50"
                   >
-                    {showPassword ? (
-                      // Eye-off SVG
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          stroke="#9A8D80"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M17.94 17.94A10.06 10.06 0 0 1 12 20c-5 0-9.27-3.11-11-8 1.06-2.81 2.97-5.06 5.41-6.41m3.13-1.08A9.93 9.93 0 0 1 12 4c5 0 9.27 3.11 11 8a11.05 11.05 0 0 1-2.06 3.34M1 1l22 22"
-                        />
-                        <circle
-                          cx="12"
-                          cy="12"
-                          r="3"
-                          stroke="#9A8D80"
-                          strokeWidth="2"
-                        />
-                      </svg>
-                    ) : (
-                      // Eye SVG
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          stroke="#9A8D80"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M1 12C2.73 7.11 7 4 12 4s9.27 3.11 11 8c-1.73 4.89-6 8-11 8S2.73 16.89 1 12Z"
-                        />
-                        <circle
-                          cx="12"
-                          cy="12"
-                          r="3"
-                          stroke="#9A8D80"
-                          strokeWidth="2"
-                        />
-                      </svg>
-                    )}
+                    {isForgotSubmitting ? "Requesting..." : "Get Verification Code"}
                   </button>
-                )}
+
+                  <div className="text-center mt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotFlow(false);
+                        setForgotStep(1);
+                      }}
+                      className="text-sm font-medium text-[#B3541E] hover:underline"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleForgotReset} className="space-y-6">
+                  <h2 className="text-lg font-semibold text-[#5E534C] text-center mb-2">
+                    Enter Verification Code
+                  </h2>
+                  <p className="text-xs font-medium text-green-600 bg-green-50 p-2.5 rounded-xl border border-green-100 text-center mb-2">
+                    ✅ Verification code sent! Check your email inbox (or spam).
+                  </p>
+
+                  {/* Countdown Timer */}
+                  {otpCountdown > 0 ? (
+                    <div className="mb-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs text-[#5E534C]">Code expires in:</span>
+                        <span className={`text-sm font-bold tabular-nums ${otpCountdown <= 60 ? "text-red-500" : "text-[#B3541E]"}`}>
+                          {formatCountdown(otpCountdown)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-1000 ${otpCountdown <= 60 ? "bg-red-500" : otpCountdown <= 120 ? "bg-orange-400" : "bg-green-500"}`}
+                          style={{ width: `${(otpCountdown / 300) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs font-medium text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-100 text-center mb-2">
+                      ⚠️ Code has expired. Please go back to Step 1 and request a new code.
+                    </p>
+                  )}
+
+                  {forgotError && <p className="text-red-500 text-sm mb-4">{forgotError}</p>}
+                  {forgotSuccess && <p className="text-green-500 text-sm mb-4">{forgotSuccess}</p>}
+
+                  <div className="space-y-2 w-full">
+                    <label htmlFor="forgotOtp" className="block text-sm font-medium text-[#5E534C] ml-4">
+                      Verification Code (OTP)
+                    </label>
+                    <input
+                      id="forgotOtp"
+                      type="text"
+                      maxLength="6"
+                      placeholder="Enter 6-digit code"
+                      value={forgotOtp}
+                      onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      className="w-full px-4 py-4 rounded-2xl border border-[#B6A89B] bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#B6A89B] text-center font-bold tracking-widest text-lg"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2 w-full">
+                    <label htmlFor="forgotNewPassword" className="block text-sm font-medium text-[#5E534C] ml-4">
+                      New Password
+                    </label>
+                    <input
+                      id="forgotNewPassword"
+                      type="password"
+                      placeholder="Enter new password"
+                      value={forgotNewPassword}
+                      onChange={(e) => setForgotNewPassword(e.target.value)}
+                      className="w-full px-4 py-4 rounded-2xl border border-[#B6A89B] bg-white shadow-lg focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#B6A89B]"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isForgotSubmitting}
+                    className="w-full bg-[#E38B52] text-white py-4 rounded-2xl hover:bg-[#C8742F] hover:-translate-y-1 transition-all duration-200 font-medium shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)] disabled:opacity-50"
+                  >
+                    {isForgotSubmitting ? "Resetting..." : "Reset Password"}
+                  </button>
+
+                  <div className="flex justify-between items-center mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setForgotStep(1)}
+                      className="text-xs font-medium text-[#5E534C] hover:underline"
+                    >
+                      Back to Step 1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotFlow(false);
+                        setForgotStep(1);
+                      }}
+                      className="text-xs font-medium text-[#B3541E] hover:underline"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-3xl font-bold text-[#B3541E] mb-8 text-center font-baskervville">
+              Sign in to your account
+            </h1>
+
+            {/* Login container */}
+            <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20 max-w-[450px] mx-auto w-full">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
+                {/* Username field */}
+                <div className="space-y-2 w-full">
+                  <label
+                    htmlFor="username"
+                    className="block text-sm font-medium text-[#5E534C] ml-4"
+                  >
+                    Username
+                  </label>
+                  <input
+                    id="username"
+                    type="text"
+                    placeholder="Enter username here."
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full px-4 py-4 rounded-2xl border border-[#B6A89B] bg-white shadow-lg shadow-[#B6A89B]/30 focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#B6A89B]"
+                  />
+                </div>
+
+                {/* Password field */}
+                <div className="space-y-2 w-full">
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-medium text-[#5E534C] ml-4"
+                  >
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter password here."
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-4 rounded-2xl border border-[#B6A89B] bg-white shadow-lg shadow-[#B6A89B]/30 focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#B6A89B] pr-12"
+                    />
+                    {password && (
+                      <button
+                        type="button"
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        tabIndex={0}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1 focus:outline-none"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {showPassword ? (
+                          // Eye-off SVG
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              stroke="#9A8D80"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M17.94 17.94A10.06 10.06 0 0 1 12 20c-5 0-9.27-3.11-11-8 1.06-2.81 2.97-5.06 5.41-6.41m3.13-1.08A9.93 9.93 0 0 1 12 4c5 0 9.27 3.11 11 8a11.05 11.05 0 0 1-2.06 3.34M1 1l22 22"
+                            />
+                            <circle
+                              cx="12"
+                              cy="12"
+                              r="3"
+                              stroke="#9A8D80"
+                              strokeWidth="2"
+                            />
+                          </svg>
+                        ) : (
+                          // Eye SVG
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              stroke="#9A8D80"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M1 12C2.73 7.11 7 4 12 4s9.27 3.11 11 8c-1.73 4.89-6 8-11 8S2.73 16.89 1 12Z"
+                            />
+                            <circle
+                              cx="12"
+                              cy="12"
+                              r="3"
+                              stroke="#9A8D80"
+                              strokeWidth="2"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  className="w-full bg-[#E38B52] text-white py-4 rounded-2xl hover:bg-[#C8742F] hover:-translate-y-1 transition-all duration-200 font-medium 
+                  shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
+                >
+                  Sign in
+                </button>
+              </form>
+
+              {/* Info text */}
+              <p className="text-[#5E534C] text-xs text-center mt-6">
+                No account? Contact administrator to manage access.
+              </p>
+
+              <div className="text-center mt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotFlow(true);
+                    setForgotStep(1);
+                    setForgotUsername("");
+                    setForgotOtp("");
+                    setForgotNewPassword("");
+                    setForgotError("");
+                    setForgotSuccess("");
+                  }}
+                  className="text-sm font-medium text-[#B3541E] hover:underline hover:text-[#B3541E]/80 transition-colors"
+                >
+                  Forgot password?
+                </button>
               </div>
             </div>
-
-            {/* Submit button */}
-            <button
-              type="submit"
-              className="w-full bg-[#E38B52] text-white py-4 rounded-2xl hover:bg-[#C8742F] hover:-translate-y-1 transition-all duration-200 font-medium 
-              shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
-            >
-              Sign in
-            </button>
-          </form>
-
-          {/* Info text */}
-          <p className="text-[#5E534C] text-xs text-center mt-6">
-            No account? Contact administrator to manage access.
-          </p>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Global styles for animations and input fields */}
@@ -316,6 +585,54 @@ const LoginPage = () => {
           transition: background-color 5000s ease-in-out 0s;
         }
       `}</style>
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed top-8 right-8 z-[9999] animate-slide-in-right ${
+            toast.type === "success"
+              ? "bg-green-500"
+              : toast.type === "error"
+              ? "bg-red-500"
+              : "bg-blue-500"
+          } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md`}
+        >
+          <style>{`
+            @keyframes slideInRight {
+              from {
+                transform: translateX(100%);
+                opacity: 0;
+              }
+              to {
+                transform: translateX(0);
+                opacity: 1;
+              }
+            }
+            .animate-slide-in-right {
+              animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
+          <div className="flex-shrink-0">
+            {toast.type === "success" ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l-2-2m2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-grow font-semibold text-sm tracking-wide">
+            {toast.message}
+          </div>
+          <button
+            onClick={() => setToast({ show: false, message: "", type: "" })}
+            className="flex-shrink-0 text-xl font-bold hover:text-white/80 transition-colors cursor-pointer"
+          >
+            &times;
+          </button>
+        </div>
+      )}
     </div>
   );
 };
