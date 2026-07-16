@@ -29,6 +29,13 @@ const AddTeacher = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [defaultPassword, setDefaultPassword] = useState('');
 
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 4000);
+  };
+
   const [classAssignment, setClassAssignment] = useState({
     class: "",
     year: new Date().getFullYear().toString(),
@@ -70,27 +77,27 @@ const AddTeacher = () => {
       setIsSubmitting(true);
       // Name and email are mandatory.
       if (!teacherData.name || !teacherData.name.trim()) {
-        alert('Name is required.');
+        showToast('Name is required.', 'error');
         setIsSubmitting(false);
         return;
       }
 
       if (!teacherData.email || !teacherData.email.includes('@')) {
-        alert('A valid email is required.');
+        showToast('A valid email is required.', 'error');
         setIsSubmitting(false);
         return;
       }
 
       // If Aadhaar has been entered, block submit while inline validation is failing.
       if (aadharError) {
-        alert(aadharError);
+        showToast(aadharError, 'error');
         setIsSubmitting(false);
         return;
       }
 
       // Validate class/division: if a class is selected, division must be selected too
       if (classAssignment.class && !classAssignment.division) {
-        alert('Please select Division for the assigned class.');
+        showToast('Please select Division for the assigned class.', 'error');
         setIsSubmitting(false);
         return;
       }
@@ -98,7 +105,7 @@ const AddTeacher = () => {
       // Aadhaar must be provided
       const cleanedAadhaar = teacherData.aadhar_number ? String(cleanAadhaar(teacherData.aadhar_number)) : '';
       if (!cleanedAadhaar) {
-        alert('Aadhaar is required.');
+        showToast('Aadhaar is required.', 'error');
         setIsSubmitting(false);
         return;
       }
@@ -123,7 +130,9 @@ const AddTeacher = () => {
       };
 
       // Create teacher
-      const teacherResponse = await axios.post(`${API_BASE_URL}/api/v1/teachers/`, teacherDataWithAssignments);
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      const teacherResponse = await axios.post(`${API_BASE_URL}/api/v1/teachers/`, teacherDataWithAssignments, config);
       const teacherId = teacherResponse.data.id;
 
       // Generate default password: Teacher + last 4 digits of effective Aadhaar
@@ -160,7 +169,7 @@ const AddTeacher = () => {
     } catch (error) {
       console.error('Error adding teacher:', error);
       setIsSubmitting(false);
-      alert(error?.response?.data?.detail || 'Error adding teacher. Please try again.');
+      showToast(error?.response?.data?.detail || 'Error adding teacher. Please try again.', 'error');
     }
   };
 
@@ -652,6 +661,55 @@ const AddTeacher = () => {
           animation-delay: -15s;
         }
       `}</style>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed top-8 right-8 z-[9999] animate-slide-in-right ${
+            toast.type === "success"
+              ? "bg-green-500"
+              : toast.type === "error"
+              ? "bg-red-500"
+              : "bg-blue-500"
+          } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md`}
+        >
+          <style>{`
+            @keyframes slideInRight {
+              from {
+                transform: translateX(100%);
+                opacity: 0;
+              }
+              to {
+                transform: translateX(0);
+                opacity: 1;
+              }
+            }
+            .animate-slide-in-right {
+              animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
+          <div className="flex-shrink-0">
+            {toast.type === "success" ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-grow font-semibold text-sm tracking-wide">
+            {toast.message}
+          </div>
+          <button
+            onClick={() => setToast({ show: false, message: "", type: "" })}
+            className="flex-shrink-0 text-xl font-bold hover:text-white/80 transition-colors cursor-pointer"
+          >
+            &times;
+          </button>
+        </div>
+      )}
     </div>
   );
 };

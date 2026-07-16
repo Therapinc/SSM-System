@@ -356,7 +356,8 @@ const HeadMaster = () => {
       }
     } catch (error) {
       console.error("Error deleting teacher:", error);
-      alert("Failed to delete teacher. Please try again.");
+      setNotification({ message: "Failed to delete teacher. Please try again.", type: "error" });
+      setTimeout(() => setNotification({ message: "", type: "" }), 3000);
     } finally {
       setShowDeleteConfirm(false);
       setTeacherToDelete(null);
@@ -393,7 +394,8 @@ const HeadMaster = () => {
       }
     } catch (error) {
       console.error("Error deleting therapist:", error);
-      alert("Failed to delete therapist. Please try again.");
+      setNotification({ message: "Failed to delete therapist. Please try again.", type: "error" });
+      setTimeout(() => setNotification({ message: "", type: "" }), 3000);
     } finally {
       setShowTherapistDeleteConfirm(false);
       setTherapistToDelete(null);

@@ -30,6 +30,13 @@ const AddTherapist = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [defaultPassword, setDefaultPassword] = useState('');
 
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 4000);
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     // Special handling for Aadhaar: allow typing with spaces, keep only digits, format in groups of 4
@@ -62,28 +69,28 @@ const AddTherapist = () => {
 
       // Require Name and Aadhaar. Aadhaar must be valid per inline validation.
       if (!therapistData.name || !therapistData.name.trim()) {
-        alert('Name is required.');
+        showToast('Name is required.', 'error');
         setIsSubmitting(false);
         return;
       }
 
       // Email is mandatory for therapist
       if (!therapistData.email || !therapistData.email.includes('@')) {
-        alert('A valid email is required.');
+        showToast('A valid email is required.', 'error');
         setIsSubmitting(false);
         return;
       }
 
       const cleanedAadhaar = therapistData.aadhar_number ? String(cleanAadhaar(therapistData.aadhar_number)) : '';
       if (!cleanedAadhaar) {
-        alert('Aadhaar is required.');
+        showToast('Aadhaar is required.', 'error');
         setIsSubmitting(false);
         return;
       }
 
       // If inline Aadhaar validation flagged an error, block submit.
       if (aadharError) {
-        alert(aadharError);
+        showToast(aadharError, 'error');
         setIsSubmitting(false);
         return;
       }
@@ -109,7 +116,9 @@ const AddTherapist = () => {
       };
 
       // Create therapist
-      await axios.post(`${API_BASE_URL}/api/v1/therapists/`, finalData);
+      const token = localStorage.getItem('token');
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      await axios.post(`${API_BASE_URL}/api/v1/therapists/`, finalData, config);
 
       // Generate default password: Therapist + last 4 digits of effective Aadhaar
       const effectiveAadhaar = finalData.aadhar_number;
@@ -145,7 +154,7 @@ const AddTherapist = () => {
     } catch (error) {
       console.error('Error adding therapist:', error);
       setIsSubmitting(false);
-      alert(error?.response?.data?.detail || 'Error adding therapist. Please try again.');
+      showToast(error?.response?.data?.detail || 'Error adding therapist. Please try again.', 'error');
     }
   };
 
@@ -586,6 +595,55 @@ const AddTherapist = () => {
           animation-delay: -15s;
         }
       `}</style>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed top-8 right-8 z-[9999] animate-slide-in-right ${
+            toast.type === "success"
+              ? "bg-green-500"
+              : toast.type === "error"
+              ? "bg-red-500"
+              : "bg-blue-500"
+          } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md`}
+        >
+          <style>{`
+            @keyframes slideInRight {
+              from {
+                transform: translateX(100%);
+                opacity: 0;
+              }
+              to {
+                transform: translateX(0);
+                opacity: 1;
+              }
+            }
+            .animate-slide-in-right {
+              animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
+          <div className="flex-shrink-0">
+            {toast.type === "success" ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-grow font-semibold text-sm tracking-wide">
+            {toast.message}
+          </div>
+          <button
+            onClick={() => setToast({ show: false, message: "", type: "" })}
+            className="flex-shrink-0 text-xl font-bold hover:text-white/80 transition-colors cursor-pointer"
+          >
+            &times;
+          </button>
+        </div>
+      )}
     </div>
   );
 };

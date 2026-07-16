@@ -138,6 +138,13 @@ const AddStudent = () => {
   const [showPopup, setShowPopup] = useState(false);
   const [aadharError, setAadharError] = useState("");
   const [errors, setErrors] = useState({});
+
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 4000);
+  };
   const [documents, setDocuments] = useState({
     aadhar: null,
     birth_certificate: null,
@@ -313,7 +320,7 @@ const AddStudent = () => {
               "Failed to fetch student for editing. Status:",
               response.status,
             );
-            alert("Could not load student data. Please try again later.");
+            showToast("Could not load student data. Please try again later.", "error");
             return;
           }
 
@@ -341,8 +348,9 @@ const AddStudent = () => {
             "Network error while fetching student for edit:",
             error,
           );
-          alert(
+          showToast(
             "Network error: could not contact server. Check your connection and try again.",
+            "error"
           );
         }
       };
@@ -408,7 +416,7 @@ const AddStudent = () => {
     if (file) {
       const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
       if (!allowedTypes.includes((file.type || '').toLowerCase())) {
-        alert('Please upload only PDF, PNG, JPG, or JPEG files.');
+        showToast('Please upload only PDF, PNG, JPG, or JPEG files.', 'error');
         e.target.value = ''; // Reset the input
         return;
       }
@@ -545,7 +553,7 @@ const AddStudent = () => {
           setPreviewDocument((current) => current ? ({ ...current, url: sourceUrl }) : current);
         })
         .catch(() => {
-          alert('Failed to load document preview.');
+          showToast('Failed to load document preview.', 'error');
           setPreviewDocument(null);
         });
     }
@@ -587,7 +595,7 @@ const AddStudent = () => {
     };
 
     deletePersistedDocument().catch((error) => {
-      alert(error.message || 'Failed to delete document');
+      showToast(error.message || 'Failed to delete document', 'error');
     });
   };
 
@@ -643,7 +651,7 @@ const AddStudent = () => {
       } catch (err) {
         // ignore
       }
-      alert("Please fix validation errors: " + firstMsg);
+      showToast("Please fix validation errors: " + firstMsg, "error");
       throw new Error("Validation failed");
     }
 
@@ -876,7 +884,7 @@ const AddStudent = () => {
         throw new Error("Could not get student ID after saving.");
       }
     } catch (e) {
-      alert(e.message || "An error occurred during the save process.");
+      showToast(e.message || "An error occurred during the save process.", "error");
     } finally {
       setIsSaving(false);
     }
@@ -4104,7 +4112,54 @@ const AddStudent = () => {
         }
       `}</style>
 
-      {/* ++ ADD THIS LINE HERE ++ */}
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed top-8 right-8 z-[9999] animate-slide-in-right ${
+            toast.type === "success"
+              ? "bg-green-500"
+              : toast.type === "error"
+              ? "bg-red-500"
+              : "bg-blue-500"
+          } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md`}
+        >
+          <style>{`
+            @keyframes slideInRight {
+              from {
+                transform: translateX(100%);
+                opacity: 0;
+              }
+              to {
+                transform: translateX(0);
+                opacity: 1;
+              }
+            }
+            .animate-slide-in-right {
+              animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
+          <div className="flex-shrink-0">
+            {toast.type === "success" ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-grow font-semibold text-sm tracking-wide">
+            {toast.message}
+          </div>
+          <button
+            onClick={() => setToast({ show: false, message: "", type: "" })}
+            className="flex-shrink-0 text-xl font-bold hover:text-white/80 transition-colors cursor-pointer"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       <DynamicScrollButtons />
     </div>

@@ -19,6 +19,7 @@ const TherapistStudentAssignmentModal = ({
   const [teacherScopeStudents, setTeacherScopeStudents] = useState([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
   const [initialStudentIds, setInitialStudentIds] = useState(new Set());
+  const [studentDetailsMap, setStudentDetailsMap] = useState({});
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -46,6 +47,7 @@ const TherapistStudentAssignmentModal = ({
     setTeacherScopeStudents([]);
     setSelectedStudentIds(new Set());
     setInitialStudentIds(new Set());
+    setStudentDetailsMap({});
     setShowConfirmClose(false);
   }, [open, therapist?.id]);
 
@@ -66,9 +68,17 @@ const TherapistStudentAssignmentModal = ({
           return;
         }
 
-        const ids = new Set((response.data || []).map((student) => student.id));
+        const assignedList = response.data || [];
+        const ids = new Set(assignedList.map((student) => student.id));
         setSelectedStudentIds(ids);
         setInitialStudentIds(ids);
+        setStudentDetailsMap((prev) => {
+          const next = { ...prev };
+          assignedList.forEach((student) => {
+            next[student.id] = student;
+          });
+          return next;
+        });
       } catch (requestError) {
         if (!cancelled) {
           console.error("Error loading therapist assignments:", requestError);
@@ -110,6 +120,13 @@ const TherapistStudentAssignmentModal = ({
               .slice()
               .sort((left, right) => (left.name || "").localeCompare(right.name || "")),
           );
+          setStudentDetailsMap((prev) => {
+            const next = { ...prev };
+            teacherStudents.forEach((student) => {
+              next[student.id] = student;
+            });
+            return next;
+          });
         }
       } catch (requestError) {
         if (!cancelled) {
@@ -179,6 +196,13 @@ const TherapistStudentAssignmentModal = ({
             .slice()
             .sort((left, right) => (left.name || "").localeCompare(right.name || "")),
         );
+        setStudentDetailsMap((prev) => {
+          const next = { ...prev };
+          items.forEach((student) => {
+            next[student.id] = student;
+          });
+          return next;
+        });
         setBrowseTotal(response.data?.total ?? items.length);
         setBrowseTotalPages(
           response.data?.total_pages ??
@@ -267,10 +291,16 @@ const TherapistStudentAssignmentModal = ({
     });
     return Array.from(divisions).sort();
   }, [browseListStudents]);
-  const selectedStudents = useMemo(
-    () => browseListStudents.filter((student) => selectedStudentIds.has(student.id)),
-    [browseListStudents, selectedStudentIds],
-  );
+  const selectedStudents = useMemo(() => {
+    const list = [];
+    selectedStudentIds.forEach((id) => {
+      const student = studentDetailsMap[id];
+      if (student) {
+        list.push(student);
+      }
+    });
+    return list.sort((left, right) => (left.name || "").localeCompare(right.name || ""));
+  }, [selectedStudentIds, studentDetailsMap]);
   const unselectedStudents = useMemo(
     () => browseListStudents.filter((student) => !selectedStudentIds.has(student.id)),
     [browseListStudents, selectedStudentIds],

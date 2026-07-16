@@ -1288,7 +1288,7 @@ const StudentPage = () => {
       setTimeout(() => setSentToParent(false), 4000);
     } catch (err) {
       console.error("Send to parent error:", err);
-      alert(err.message || "Failed to send report to parent");
+      showToast(err.message || "Failed to send report to parent", "error");
     } finally {
       setSendingToParent(false);
     }
@@ -1338,7 +1338,7 @@ const StudentPage = () => {
       const data = await res.json();
       setTranslatedSummary(data.translated_text);
     } catch (e) {
-      alert(`Translation failed: ${e.message}`);
+      showToast(`Translation failed: ${e.message}`, "error");
       setTranslatedSummary(null);
     } finally {
       setTranslating(false);
@@ -2430,7 +2430,7 @@ const StudentPage = () => {
 
   const handleDownloadRawReports = (reportsToDownload) => {
     if (!reportsToDownload || reportsToDownload.length === 0) {
-      alert("No reports available to download");
+      showToast("No reports available to download", "warning");
       return;
     }
 
@@ -2927,7 +2927,7 @@ const StudentPage = () => {
   // PDF generation for AI Analysis Report
   const generateAIAnalysisPDF = () => {
     if (!aiAnalysis || !student) {
-      alert("No AI analysis data available to export");
+      showToast("No AI analysis data available to export", "warning");
       return;
     }
 
@@ -3510,7 +3510,7 @@ const StudentPage = () => {
     try {
       // Prevent saving when Aadhaar validation failed
       if (aadharEditError) {
-        alert(aadharEditError || "Invalid Aadhaar number");
+        showToast(aadharEditError || "Invalid Aadhaar number", "error");
         return;
       }
       const baseUrl =
@@ -3758,7 +3758,7 @@ const StudentPage = () => {
       setEditMode(false);
     } catch (e) {
       console.error("Failed to save changes:", e);
-      alert("Could not save changes. Please try again.");
+      showToast("Could not save changes. Please try again.", "error");
     }
   };
 
@@ -3850,7 +3850,7 @@ const StudentPage = () => {
 
   const handlePhotoUpload = async () => {
     if (!photoFile) {
-      alert("Please select a photo first.");
+      showToast("Please select a photo first.", "warning");
       return;
     }
 
@@ -3898,7 +3898,7 @@ const StudentPage = () => {
           "Photo uploaded but server did not return photo_url/photoUrl:",
           returned,
         );
-        alert("Photo uploaded but URL not returned. Please refresh the page.");
+        showToast("Photo uploaded but URL not returned. Please refresh the page.", "warning");
       }
 
       // Clear the file input element
@@ -4002,7 +4002,7 @@ const StudentPage = () => {
 
   const handleDocumentUpload = async () => {
     if (!documentFile) {
-      alert("Please select a PDF document first.");
+      showToast("Please select a PDF document first.", "warning");
       return;
     }
 
@@ -4652,7 +4652,7 @@ const StudentPage = () => {
       return;
     }
     if (!reportDate) {
-      alert("Please select a report date before creating the table.");
+      showToast("Please select a report date before creating the table.", "warning");
       return;
     }
 
@@ -6180,7 +6180,7 @@ const StudentPage = () => {
   // Generate and download therapy summary report
   const handleGenerateSummaryReport = () => {
     if (!student) {
-      alert("Student information not available. Please try again.");
+      showToast("Student information not available. Please try again.", "error");
       return;
     }
 
@@ -6190,8 +6190,9 @@ const StudentPage = () => {
 
     // Validate date range
     if (fromDate && toDate && new Date(fromDate) > new Date(toDate)) {
-      alert(
+      showToast(
         "Start date cannot be later than end date. Please check your date selection.",
+        "error"
       );
       return;
     }
@@ -6227,8 +6228,9 @@ const StudentPage = () => {
           ? ` matching the selected criteria (${filterDescription.join(", ")})`
           : "";
 
-      alert(
+      showToast(
         `No therapy reports found${filterText}. Please adjust your filters or ensure therapy reports exist for this student.`,
+        "warning"
       );
       setGeneratingReport(false);
       return;
@@ -6399,7 +6401,7 @@ const StudentPage = () => {
       setGeneratingReport(false);
     } catch (error) {
       console.error("Error generating therapy summary report:", error);
-      alert("An error occurred while generating the report. Please try again.");
+      showToast("An error occurred while generating the report. Please try again.", "error");
       setGeneratingReport(false);
     }
   };

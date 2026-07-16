@@ -21,6 +21,13 @@ const TherapistPage = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [photoError, setPhotoError] = useState(null);
 
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 4000);
+  };
+
   useEffect(() => {
     const fetchTherapist = async () => {
       try {
@@ -152,7 +159,7 @@ const TherapistPage = () => {
       }
       setPhotoPreview(null);
       setUploadProgress(0);
-      alert("Photo uploaded successfully.");
+      showToast("Photo uploaded successfully.");
     } catch (err) {
       console.error("Photo upload failed", err, err.response?.data || "");
       setPhotoError(err.message || "Upload failed. Please try again.");
@@ -207,13 +214,17 @@ const TherapistPage = () => {
         aadhar_number: editFormData.aadhar_number
           ? String(editFormData.aadhar_number).replace(/\s+/g, "")
           : undefined,
-        date_of_birth: editFormData.date_of_birth,
-        rci_renewal_date: editFormData.rci_renewal_date,
+        date_of_birth: editFormData.date_of_birth || null,
+        rci_renewal_date: editFormData.rci_renewal_date || null,
       };
+
+      const token = localStorage.getItem("token");
+      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 
       const response = await axios.put(
         `${API_BASE_URL}/api/v1/therapists/${id}`,
         payload,
+        config
       );
 
       if (response.status === 200) {
@@ -255,11 +266,11 @@ const TherapistPage = () => {
         }));
 
         setIsEditing(false);
-        alert("Therapist details updated successfully!");
+        showToast("Therapist details updated successfully!");
       }
     } catch (error) {
       console.error("Error updating therapist:", error);
-      alert("Failed to update therapist details. Please try again.");
+      showToast("Failed to update therapist details. Please try again.", "error");
     }
   };
 
@@ -799,6 +810,55 @@ const TherapistPage = () => {
           animation-delay: -15s;
         }
       `}</style>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed top-8 right-8 z-[9999] animate-slide-in-right ${
+            toast.type === "success"
+              ? "bg-green-500"
+              : toast.type === "error"
+              ? "bg-red-500"
+              : "bg-blue-500"
+          } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md`}
+        >
+          <style>{`
+            @keyframes slideInRight {
+              from {
+                transform: translateX(100%);
+                opacity: 0;
+              }
+              to {
+                transform: translateX(0);
+                opacity: 1;
+              }
+            }
+            .animate-slide-in-right {
+              animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
+          <div className="flex-shrink-0">
+            {toast.type === "success" ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-grow font-semibold text-sm tracking-wide">
+            {toast.message}
+          </div>
+          <button
+            onClick={() => setToast({ show: false, message: "", type: "" })}
+            className="flex-shrink-0 text-xl font-bold hover:text-white/80 transition-colors cursor-pointer"
+          >
+            &times;
+          </button>
+        </div>
+      )}
     </div>
   );
 };
