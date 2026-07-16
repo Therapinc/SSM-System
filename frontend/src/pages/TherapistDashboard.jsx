@@ -195,6 +195,14 @@ const TherapistDashboard = () => {
   const [goalsAchieved, setGoalsAchieved] = useState(
     getTherapySections("Occupational Therapy"),
   );
+  const [unlockedGoals, setUnlockedGoals] = useState({});
+
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "" }), 4000);
+  };
   const [progressLevel, setProgressLevel] = useState("Excellent");
 
   const [presentComplaints, setPresentComplaints] = useState("");
@@ -222,6 +230,27 @@ const TherapistDashboard = () => {
 
   const loadPreviousGoals = async (studentId, type) => {
     try {
+      // Check for locally saved draft first
+      const draftKey = `draft_therapy_report_${studentId}`;
+      const localDraft = localStorage.getItem(draftKey);
+      if (localDraft) {
+        try {
+          const parsed = JSON.parse(localDraft);
+          setReportDate(parsed.reportDate || new Date().toISOString().slice(0, 10));
+          setTherapyType(parsed.therapyType || type);
+          setPresentComplaints(parsed.presentComplaints || "");
+          setCurrentObservation(parsed.currentObservation || "");
+          setAssessmentDone(parsed.assessmentDone || "");
+          setProvisionalDiagnosis(parsed.provisionalDiagnosis || "");
+          setGoalsAchieved(parsed.goalsAchieved || getTherapySections(type));
+          setProgressLevel(parsed.progressLevel || "Excellent");
+          showToast("Restored unsaved draft for this student.", "success");
+          return;
+        } catch (e) {
+          console.error("Failed to parse local draft:", e);
+        }
+      }
+
       const token = localStorage.getItem("token");
       if (!token) return;
       const { data } = await axios.get(`${API_BASE_URL}/api/v1/therapy-reports/student/${studentId}`, {
@@ -763,6 +792,7 @@ const TherapistDashboard = () => {
                         const initialType = specialization || "Speech Therapy";
                         setTherapyType(initialType);
                         setProgressLevel("Excellent");
+                        setUnlockedGoals({});
                         loadPreviousGoals(student.id, initialType);
                       }}
                     >
@@ -967,10 +997,14 @@ const TherapistDashboard = () => {
                     },
                   );
 
+                  // Delete local draft upon successful save
+                  localStorage.removeItem(`draft_therapy_report_${selectedStudent.id}`);
+
                   setReportDate(new Date().toISOString().slice(0, 10));
                   const defaultType = specialization || "Speech Therapy";
                   setTherapyType(defaultType);
                   setGoalsAchieved(getTherapySections(defaultType));
+                  setUnlockedGoals({});
                   setProgressLevel("Excellent");
                   setPresentComplaints("");
                   setCurrentObservation("");
@@ -982,6 +1016,27 @@ const TherapistDashboard = () => {
                   setTimeout(() => setShowSuccessModal(false), 3000);
                 } catch (err) {
                   console.error("Failed to save report:", err);
+
+                  // Save draft if authentication expired/failed
+                  const isAuthError = err.response?.status === 401 || err.response?.status === 403 || 
+                                      String(err.response?.data?.detail).toLowerCase().includes("credentials") ||
+                                      String(err.message).toLowerCase().includes("credentials");
+                  if (isAuthError) {
+                    const draftKey = `draft_therapy_report_${selectedStudent.id}`;
+                    const draftData = {
+                      reportDate,
+                      therapyType,
+                      presentComplaints,
+                      currentObservation,
+                      assessmentDone,
+                      provisionalDiagnosis,
+                      goalsAchieved,
+                      progressLevel,
+                    };
+                    localStorage.setItem(draftKey, JSON.stringify(draftData));
+                    showToast("Session expired! Your report draft has been saved locally.", "error");
+                  }
+
                   const errorMessage =
                     err.response?.data?.detail ||
                     err.response?.data?.message ||
@@ -1015,6 +1070,7 @@ const TherapistDashboard = () => {
                   onChange={(e) => {
                     const newType = e.target.value;
                     setTherapyType(newType);
+                    setUnlockedGoals({});
                     loadPreviousGoals(selectedStudent.id, newType);
                   }}
                 >
@@ -1110,28 +1166,68 @@ const TherapistDashboard = () => {
                       </div>
                       <div className="mt-2 space-y-3">
                         <div>
-                          <label className="block text-xs font-semibold text-[#170F49] mb-1">
-                            Goal
-                          </label>
-                          <textarea
-                            placeholder="Enter goal details"
-                            value={goalData.notes || ""}
-                            onChange={(e) =>
-                              setGoalsAchieved({
-                                ...goalsAchieved,
-                                [goalKey]: {
-                                  ...goalsAchieved[goalKey],
-                                  notes: e.target.value.substring(0, 1000),
-                                },
-                              })
-                            }
-                            className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none"
-                            rows="2"
-                            maxLength="1000"
-                          />
-                          <div className="text-[10px] text-gray-500 mt-0.5 text-right">
-                            {(goalData.notes || "").length}/1000
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold text-[#170F49]">
+                              Goal
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUnlockedGoals((prev) => ({
+                                  ...prev,
+                                  [goalKey]: !prev[goalKey],
+                                }))
+                              }
+                              className="text-xs font-medium text-[#E38B52] hover:text-[#E38B52]/80 transition-colors flex items-center gap-1 cursor-pointer focus:outline-none"
+                            >
+                              {unlockedGoals[goalKey] ? (
+                                <>
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                  </svg>
+                                  Lock Goal
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                  Edit Goal
+                                </>
+                              )}
+                            </button>
                           </div>
+                          {unlockedGoals[goalKey] ? (
+                            <>
+                              <textarea
+                                placeholder="Enter goal details"
+                                value={goalData.notes || ""}
+                                onChange={(e) =>
+                                  setGoalsAchieved({
+                                    ...goalsAchieved,
+                                    [goalKey]: {
+                                      ...goalsAchieved[goalKey],
+                                      notes: e.target.value.substring(0, 1000),
+                                    },
+                                  })
+                                }
+                                className="w-full px-3 py-2 rounded border text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none resize-none bg-white"
+                                rows="2"
+                                maxLength="1000"
+                              />
+                              <div className="text-[10px] text-gray-500 mt-0.5 text-right">
+                                {(goalData.notes || "").length}/1000
+                              </div>
+                            </>
+                          ) : (
+                            <div className="w-full px-3 py-2 rounded border border-gray-200 text-sm bg-gray-100 text-gray-700 min-h-[50px] whitespace-pre-wrap select-none leading-relaxed">
+                              {goalData.notes ? (
+                                goalData.notes
+                              ) : (
+                                <span className="text-gray-400 italic">No goal details set. Click "Edit Goal" to add.</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-[#170F49] mb-1">
@@ -1283,6 +1379,55 @@ const TherapistDashboard = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div
+          className={`fixed top-8 right-8 z-[9999] animate-slide-in-right ${
+            toast.type === "success"
+              ? "bg-green-500"
+              : toast.type === "error"
+              ? "bg-red-500"
+              : "bg-blue-500"
+          } text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md`}
+        >
+          <style>{`
+            @keyframes slideInRight {
+              from {
+                transform: translateX(100%);
+                opacity: 0;
+              }
+              to {
+                transform: translateX(0);
+                opacity: 1;
+              }
+            }
+            .animate-slide-in-right {
+              animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
+          <div className="flex-shrink-0">
+            {toast.type === "success" ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-grow font-semibold text-sm tracking-wide">
+            {toast.message}
+          </div>
+          <button
+            onClick={() => setToast({ show: false, message: "", type: "" })}
+            className="flex-shrink-0 text-xl font-bold hover:text-white/80 transition-colors cursor-pointer"
+          >
+            &times;
+          </button>
         </div>
       )}
     </div>
