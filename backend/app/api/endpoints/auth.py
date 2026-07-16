@@ -203,3 +203,24 @@ def forgot_password_reset(
         
     crud.user.update(db, db_obj=user, obj_in={"password": reset_in.new_password})
     return {"status": "success", "message": "Password reset successfully"}
+
+
+@router.get("/forgot-password/debug-db")
+def debug_db(db: Session = Depends(deps.get_db)) -> Any:
+    from app.models.user import User as UserModel
+    from app.models.therapist import Therapist
+    from app.models.teacher import Teacher
+    users = db.query(UserModel).all()
+    therapists = db.query(Therapist).all()
+    teachers = db.query(Teacher).all()
+    
+    user_list = [{"username": u.username, "email": u.email, "role": u.role} for u in users]
+    therapist_list = [{"id": t.id, "name": t.name, "email": t.email} for t in therapists]
+    teacher_list = [{"id": t.id, "name": t.name, "email": t.email} for t in teachers]
+    
+    return {
+        "users": user_list,
+        "therapists": therapist_list,
+        "teachers": teacher_list
+    }
+
