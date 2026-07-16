@@ -158,6 +158,7 @@ def forgot_password_request(
     print(f"==================================================\n")
     
     # Try sending real email in background (non-blocking)
+    print(f"[EMAIL CONFIG] SMTP_USER set: {bool(settings.SMTP_USER)} | SMTP_PASSWORD set: {bool(settings.SMTP_PASSWORD)}")
     if settings.SMTP_USER and settings.SMTP_PASSWORD:
         # Use profile email if available, otherwise fall back to user account email
         delivery_email = otp_email or user.email
@@ -166,10 +167,12 @@ def forgot_password_request(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No email address found for this account. Please contact your administrator."
             )
+        print(f"[EMAIL CONFIG] Queuing email to: {delivery_email}")
         # Queue email in background — API returns immediately without waiting for SMTP
         background_tasks.add_task(send_otp_email, delivery_email, user.username, otp)
         msg = f"Verification code sent to {delivery_email}. Check your inbox and spam folder."
     else:
+        print("[EMAIL CONFIG] SMTP not configured — skipping email, OTP only in console.")
         msg = "Email service not configured. Verification code generated and printed to console."
 
     return {
