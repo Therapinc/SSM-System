@@ -50,8 +50,8 @@ def send_otp_email(to_email: str, username: str, otp_code: str) -> bool:
     message.attach(MIMEText(html_content, "html"))
 
     try:
-        # Establish connection
-        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+        # Establish connection with 15s timeout to avoid hanging on blocked ports
+        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15)
         server.ehlo()
         if settings.SMTP_TLS:
             server.starttls()

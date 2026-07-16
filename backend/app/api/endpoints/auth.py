@@ -1,6 +1,6 @@
 from datetime import timedelta
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app import crud, schemas
@@ -79,6 +79,7 @@ def read_current_user(
 @router.post("/forgot-password/request")
 def forgot_password_request(
     request_in: schemas.ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """
@@ -156,7 +157,7 @@ def forgot_password_request(
     print(f"[OTP SERVICE] Reset code for '{user.username}' is: {otp}")
     print(f"==================================================\n")
     
-    # Try sending real email
+    # Try sending real email in background (non-blocking)
     if settings.SMTP_USER and settings.SMTP_PASSWORD:
         # Use profile email if available, otherwise fall back to user account email
         delivery_email = otp_email or user.email
@@ -165,13 +166,9 @@ def forgot_password_request(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No email address found for this account. Please contact your administrator."
             )
-        success = send_otp_email(delivery_email, user.username, otp)
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send verification email. Please try again."
-            )
-        msg = f"Verification code sent successfully to {delivery_email}."
+        # Queue email in background — API returns immediately without waiting for SMTP
+        background_tasks.add_task(send_otp_email, delivery_email, user.username, otp)
+        msg = f"Verification code sent to {delivery_email}. Check your inbox and spam folder."
     else:
         msg = "Email service not configured. Verification code generated and printed to console."
 
