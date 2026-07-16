@@ -106,19 +106,10 @@ def forgot_password_request(
         ).first()
         if therapist:
             otp_email = therapist.email  # deliver OTP to therapist profile email
-            # Try to find user by matching email in user table (case-insensitive)
+            # Find the user account strictly by matching the email
             user = db.query(UserModel).filter(
-                func.lower(UserModel.email) == username.lower()
+                func.lower(UserModel.email) == therapist.email.lower()
             ).first()
-            # If still not found, find any therapist-role user (best effort)
-            if not user and therapist.name:
-                user = db.query(UserModel).filter(
-                    UserModel.role == "therapist"
-                ).filter(
-                    func.lower(UserModel.username).contains(
-                        therapist.name.split()[0].lower()
-                    )
-                ).first()
 
     # 4. Try by teacher profile email
     if not user:
