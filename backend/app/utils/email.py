@@ -15,7 +15,9 @@ def send_via_brevo_api(to_email: str, username: str, otp_code: str) -> bool:
         "content-type": "application/json"
     }
     
-    sender_email = settings.EMAILS_FROM_EMAIL or "noreply@therapinc.com"
+    sender_email = settings.EMAILS_FROM_EMAIL or "noreply@therapinc.in"
+    if "@gmail.com" in sender_email.lower():
+        sender_email = "noreply@therapinc.in"
     
     payload = {
         "sender": {"name": settings.PROJECT_NAME, "email": sender_email},
