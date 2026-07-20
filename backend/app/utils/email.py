@@ -122,15 +122,23 @@ def send_smtp_email(to_email: str, username: str, otp_code: str) -> bool:
 
 
 def send_otp_email(to_email: str, username: str, otp_code: str) -> bool:
-    """Send OTP code to user email. Tries Direct Gmail SMTP (Port 465 SSL) first for instant inbox delivery, with Brevo HTTPS API as fallback."""
-    # 1. Try Direct Gmail SMTP (Port 465 SSL works on Cloud & Local, delivers instantly to Inbox)
+    """Send OTP code to user email. Bypasses blocked socket ports on cloud hosts like Render for instant sub-second Brevo REST API delivery."""
+    is_cloud_environment = os.environ.get("RENDER") == "true" or os.environ.get("PORT") is not None
+    
+    # 1. On Cloud hosts (Render), all raw SMTP socket ports (465/587) are blocked by host network policy.
+    # Use Brevo HTTPS REST API (Port 443) directly for instant sub-second delivery!
+    if is_cloud_environment and settings.BREVO_API_KEY:
+        print(f"[EMAIL DEBUG] Cloud host detected. Dispatching via Brevo REST API to: {to_email}", flush=True)
+        return send_via_brevo_api(to_email, username, otp_code)
+
+    # 2. On Localhost, try Direct Gmail SMTP first
     if settings.SMTP_USER and settings.SMTP_PASSWORD:
         success = send_smtp_email(to_email, username, otp_code)
         if success:
             return True
         print("[EMAIL WARNING] Direct Gmail SMTP failed, switching to Brevo HTTPS REST API fallback...", flush=True)
 
-    # 2. Fallback to Brevo HTTPS REST API
+    # 3. Fallback to Brevo HTTPS REST API
     if settings.BREVO_API_KEY:
         print(f"[EMAIL DEBUG] Sending OTP via Brevo REST API fallback to: {to_email}", flush=True)
         return send_via_brevo_api(to_email, username, otp_code)
