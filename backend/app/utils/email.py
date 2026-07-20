@@ -129,6 +129,7 @@ def send_via_resend_api(to_email: str, username: str, otp_code: str) -> bool:
     url = "https://api.resend.com/emails"
     headers = {
         "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Content-Type": "application/json"
     }
 
