@@ -54,27 +54,15 @@ def send_via_brevo_api(to_email: str, username: str, otp_code: str) -> bool:
         print(f"[BREVO API ERROR] Failed to send email via Brevo REST API: {e}", flush=True)
         return False
 
-def send_otp_email(to_email: str, username: str, otp_code: str) -> bool:
-    """Send OTP code to the user's email address using either Brevo HTTPS API or SMTP."""
-    # 1. Try Brevo HTTPS REST API first if API key is provided (works reliably everywhere without port blocks)
-    if settings.BREVO_API_KEY:
-        print(f"[EMAIL DEBUG] Sending OTP via Brevo REST API to: {to_email}", flush=True)
-        success = send_via_brevo_api(to_email, username, otp_code)
-        if success:
-            return True
-        print("[EMAIL WARNING] Brevo REST API failed, attempting SMTP fallback...", flush=True)
-        
-    # 2. SMTP fallback
+def send_smtp_email(to_email: str, username: str, otp_code: str) -> bool:
+    """Send OTP code using Gmail SMTP directly (guarantees instant inbox delivery)."""
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        print("[EMAIL WARNING] SMTP credentials not set. Could not send email via SMTP.", flush=True)
         return False
 
     sender_email = settings.EMAILS_FROM_EMAIL or settings.SMTP_USER
     smtp_password = settings.SMTP_PASSWORD.replace(" ", "")
 
-    print(f"[EMAIL DEBUG] Running locally. Sending OTP via SMTP to: {to_email}", flush=True)
-    print(f"[EMAIL DEBUG] SMTP Host: {settings.SMTP_HOST}:{settings.SMTP_PORT}", flush=True)
-    print(f"[EMAIL DEBUG] SMTP User: {settings.SMTP_USER}", flush=True)
+    print(f"[EMAIL DEBUG] Sending OTP via Direct SMTP to: {to_email}", flush=True)
 
     message = MIMEMultipart("alternative")
     message["Subject"] = "Special School System - Password Reset Code"
@@ -107,7 +95,7 @@ def send_otp_email(to_email: str, username: str, otp_code: str) -> bool:
     message.attach(MIMEText(html_content, "html"))
 
     try:
-        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15)
+        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
         server.ehlo()
         if settings.SMTP_TLS:
             server.starttls()
@@ -115,15 +103,27 @@ def send_otp_email(to_email: str, username: str, otp_code: str) -> bool:
         server.login(settings.SMTP_USER, smtp_password)
         server.sendmail(sender_email, to_email, message.as_string())
         server.quit()
-        print(f"[EMAIL SUCCESS] OTP sent successfully to {to_email}")
+        print(f"[EMAIL SUCCESS] Direct SMTP OTP delivered successfully to {to_email}", flush=True)
         return True
-    except smtplib.SMTPAuthenticationError as e:
-        print(f"[EMAIL ERROR] Authentication failed — check SMTP_USER and SMTP_PASSWORD: {e}")
-        return False
-    except smtplib.SMTPConnectError as e:
-        print(f"[EMAIL ERROR] Could not connect to SMTP server: {e}")
-        return False
     except Exception as e:
-        print(f"[EMAIL ERROR] Failed to send email via SMTP: {type(e).__name__}: {e}")
+        print(f"[EMAIL ERROR] Direct SMTP failed ({type(e).__name__}: {e})", flush=True)
         return False
+
+
+def send_otp_email(to_email: str, username: str, otp_code: str) -> bool:
+    """Send OTP code to user email. Tries Direct SMTP first for instant inbox delivery, with Brevo HTTPS API as fallback."""
+    # 1. Try Direct SMTP first (delivers directly from Google's servers to Gmail inbox in seconds without DMARC flags)
+    if settings.SMTP_USER and settings.SMTP_PASSWORD:
+        success = send_smtp_email(to_email, username, otp_code)
+        if success:
+            return True
+        print("[EMAIL WARNING] SMTP delivery failed or port blocked, switching to Brevo HTTPS REST API fallback...", flush=True)
+        
+    # 2. Fallback to Brevo HTTPS REST API (useful when cloud host blocks SMTP ports)
+    if settings.BREVO_API_KEY:
+        print(f"[EMAIL DEBUG] Sending OTP via Brevo REST API fallback to: {to_email}", flush=True)
+        return send_via_brevo_api(to_email, username, otp_code)
+
+    print("[EMAIL WARNING] Neither SMTP nor Brevo API configured. Email not sent.", flush=True)
+    return False
 
