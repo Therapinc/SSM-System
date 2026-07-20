@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     EMAILS_FROM_EMAIL: Optional[str] = None
     BREVO_API_KEY: Optional[str] = None
+    RESEND_API_KEY: Optional[str] = None
+    RESEND_FROM_EMAIL: Optional[str] = "Special School System <onboarding@resend.dev>"
     
     # Google Generative AI (Gemini API) settings
     GEMINI_API_KEY: Optional[str] = None
