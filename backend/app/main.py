@@ -20,15 +20,18 @@ if settings.CORS_ORIGINS and settings.CORS_ORIGINS.strip():
     origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 else:
     origins = [
-        "http://localhost:3000",  # React frontend
+        "http://localhost:3000",
         "http://localhost:5173",
-        "https://therapinc.stmarthasspecialschool.com"  # Vite frontend (if using Vite)
+        "https://therapinc.in",
+        "https://api.therapinc.in",
+        "https://www.therapinc.in",
+        "https://therapinc.stmarthasspecialschool.com"
     ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
+    allow_origins=origins if (settings.CORS_ORIGINS or settings.CORS_ORIGIN_REGEX) else ["*"],
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX or r"^https://.*$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
