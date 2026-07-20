@@ -81,7 +81,7 @@ def _find_user_by_identifier(db: Session, input_str: str):
     if not clean_input:
         return None, None
 
-    from app.models.user import User as UserModel
+    from app.models.user import User as UserModel, UserRole
     from app.models.therapist import Therapist
     from app.models.teacher import Teacher
     from sqlalchemy import func, or_
@@ -130,6 +130,17 @@ def _find_user_by_identifier(db: Session, input_str: str):
                 )
             ).first()
 
+            # Fallback: search therapist users by name substring matching
+            if not user:
+                therapist_users = db.query(UserModel).filter(
+                    or_(UserModel.role == "therapist", UserModel.role == UserRole.THERAPIST)
+                ).all()
+                for u in therapist_users:
+                    u_uname = (u.username or "").lower()
+                    if u_uname and (u_uname in t_name or t_name in u_uname or u_uname in t_prefix or t_prefix in u_uname):
+                        user = u
+                        break
+
     # 4. Teacher profile search (by email or name)
     if not user:
         teacher = db.query(Teacher).filter(
@@ -156,11 +167,27 @@ def _find_user_by_identifier(db: Session, input_str: str):
                 )
             ).first()
 
+            # Fallback: search teacher users by name substring matching
+            if not user:
+                teacher_users = db.query(UserModel).filter(
+                    or_(UserModel.role == "teacher", UserModel.role == UserRole.TEACHER)
+                ).all()
+                for u in teacher_users:
+                    u_uname = (u.username or "").lower()
+                    if u_uname and (u_uname in t_name or t_name in u_uname or u_uname in t_prefix or t_prefix in u_uname):
+                        user = u
+                        break
+
     # 5. Fallback search: match username containing email prefix
     if not user and email_prefix:
         user = db.query(UserModel).filter(
             func.lower(UserModel.username).like(f"%{email_prefix}%")
         ).first()
+
+    # Sync User account email with profile email if mismatched
+    if user and otp_email and user.email != otp_email:
+        user.email = otp_email
+        db.commit()
 
     return user, otp_email
 
@@ -214,8 +241,8 @@ def forgot_password_request(
                 detail="No email address found for this account. Please contact your administrator."
             )
         
-        # If user.email in DB was NULL or empty, auto-populate it now
-        if not user.email and delivery_email:
+        # Keep user.email in DB updated if it was empty or changed
+        if delivery_email and user.email != delivery_email:
             user.email = delivery_email
             db.commit()
 

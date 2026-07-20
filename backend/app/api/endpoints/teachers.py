@@ -84,7 +84,26 @@ def update_teacher(
     db_teacher = teacher.get(db, id=teacher_id)
     if db_teacher is None:
         raise HTTPException(status_code=404, detail="Teacher not found")
-    return teacher.update(db=db, db_obj=db_teacher, obj_in=teacher_in)
+    
+    old_email = db_teacher.email
+    updated_teacher = teacher.update(db=db, db_obj=db_teacher, obj_in=teacher_in)
+
+    if teacher_in.email and teacher_in.email != old_email:
+        from app.models.user import User as UserModel
+        from sqlalchemy import func, or_
+        user_account = db.query(UserModel).filter(
+            or_(
+                func.lower(UserModel.email) == (old_email or "").lower(),
+                func.lower(UserModel.username) == (old_email or "").lower(),
+                func.lower(UserModel.username) == (db_teacher.name or "").lower(),
+                func.lower(UserModel.username) == (teacher_in.email or "").split('@')[0].lower()
+            )
+        ).first()
+        if user_account:
+            user_account.email = teacher_in.email
+            db.commit()
+
+    return updated_teacher
 
 
 @router.delete("/{teacher_id}")

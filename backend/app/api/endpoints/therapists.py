@@ -70,10 +70,29 @@ def update_therapist(
     db: Session = Depends(deps.get_db),
     current_user=Depends(deps.get_current_admin_user),
 ):
-    db_therapist = crud_therapist.update_therapist(db, therapist_id=therapist_id, therapist=therapist)
+    db_therapist = crud_therapist.get_therapist(db, therapist_id=therapist_id)
     if db_therapist is None:
         raise HTTPException(status_code=404, detail="Therapist not found")
-    return db_therapist
+
+    old_email = db_therapist.email
+    updated_therapist = crud_therapist.update_therapist(db, therapist_id=therapist_id, therapist=therapist)
+
+    if therapist.email and therapist.email != old_email:
+        from app.models.user import User as UserModel
+        from sqlalchemy import func, or_
+        user_account = db.query(UserModel).filter(
+            or_(
+                func.lower(UserModel.email) == (old_email or "").lower(),
+                func.lower(UserModel.username) == (old_email or "").lower(),
+                func.lower(UserModel.username) == (db_therapist.name or "").lower(),
+                func.lower(UserModel.username) == (therapist.email or "").split('@')[0].lower()
+            )
+        ).first()
+        if user_account:
+            user_account.email = therapist.email
+            db.commit()
+
+    return updated_therapist
 
 
 @router.delete("/{therapist_id}")
