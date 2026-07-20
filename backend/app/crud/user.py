@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional, Union
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.core.security import get_password_hash, verify_password
 from app.crud.base import CRUDBase
@@ -7,10 +8,14 @@ from app.schemas.user import UserCreate, UserUpdate
 
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     def get_by_email(self, db: Session, *, email: str) -> Optional[User]:
-        return db.query(User).filter(User.email == email).first()
+        if not email:
+            return None
+        return db.query(User).filter(func.lower(User.email) == email.strip().lower()).first()
     
     def get_by_username(self, db: Session, *, username: str) -> Optional[User]:
-        return db.query(User).filter(User.username == username).first()
+        if not username:
+            return None
+        return db.query(User).filter(func.lower(User.username) == username.strip().lower()).first()
 
     def create(self, db: Session, *, obj_in: UserCreate) -> User:
         db_obj = User(
@@ -41,6 +46,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
     def authenticate(self, db: Session, *, username: str, password: str) -> Optional[User]:
         user = self.get_by_username(db, username=username)
+        if not user:
+            user = self.get_by_email(db, email=username)
         if not user:
             return None
         if not verify_password(password, user.hashed_password):

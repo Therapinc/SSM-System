@@ -1,4 +1,4 @@
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 from typing import List, Optional, Tuple
 from app.models.teacher import Teacher
@@ -13,7 +13,9 @@ class CRUDTeacher(CRUDBase[Teacher, TeacherCreate, TeacherUpdate]):
         return db.query(Teacher).filter(Teacher.rci_number == rci_number).first()
     
     def get_by_email(self, db: Session, *, email: str) -> Optional[Teacher]:
-        return db.query(Teacher).filter(Teacher.email == email).first()
+        if not email:
+            return None
+        return db.query(Teacher).filter(func.lower(Teacher.email) == email.strip().lower()).first()
 
     def list_paginated(
         self,

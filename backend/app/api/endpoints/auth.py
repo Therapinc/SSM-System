@@ -85,45 +85,83 @@ def forgot_password_request(
     """
     Generate and print a 6-digit OTP code for teacher/therapist (admin accounts blocked).
     """
-    username = request_in.username.strip()
-    print(f"[FORGOT PASSWORD] Request received for input: '{username}'", flush=True)
+    input_str = request_in.username.strip()
+    print(f"[FORGOT PASSWORD] Request received for input: '{input_str}'", flush=True)
     user = None
     otp_email = None  # email to send the OTP to
 
-    # 1. Try by login username
-    user = crud.user.get_by_username(db, username=username)
+    from app.models.user import User as UserModel
+    from app.models.therapist import Therapist
+    from app.models.teacher import Teacher
+    from sqlalchemy import func, or_
 
-    # 2. Try by user account email (direct match)
-    if not user:
-        user = crud.user.get_by_email(db, email=username)
+    clean_input = input_str.lower()
 
-    # 3. Try by therapist profile email — find the therapist then their linked user account
+    # 1. Try by username or email directly on User table (case-insensitive)
+    user = db.query(UserModel).filter(
+        or_(
+            func.lower(UserModel.username) == clean_input,
+            func.lower(UserModel.email) == clean_input
+        )
+    ).first()
+
+    # 2. Try by therapist profile email
     if not user:
-        from app.models.therapist import Therapist
-        from app.models.user import User as UserModel
-        from sqlalchemy import func
         therapist = db.query(Therapist).filter(
-            func.lower(Therapist.email) == username.lower()
+            func.lower(Therapist.email) == clean_input
         ).first()
         if therapist:
-            otp_email = therapist.email  # deliver OTP to therapist profile email
-            # Find the user account strictly by matching the email
+            otp_email = therapist.email
             user = db.query(UserModel).filter(
-                func.lower(UserModel.email) == therapist.email.lower()
+                or_(
+                    func.lower(UserModel.email) == therapist.email.lower(),
+                    func.lower(UserModel.username) == therapist.email.lower(),
+                    func.lower(UserModel.username) == therapist.name.lower()
+                )
             ).first()
 
-    # 4. Try by teacher profile email
+    # 3. Try by teacher profile email
     if not user:
-        from app.models.teacher import Teacher
-        from app.models.user import User as UserModel
-        from sqlalchemy import func as sqlfunc
         teacher = db.query(Teacher).filter(
-            sqlfunc.lower(Teacher.email) == username.lower()
+            func.lower(Teacher.email) == clean_input
         ).first()
         if teacher:
             otp_email = teacher.email
             user = db.query(UserModel).filter(
-                sqlfunc.lower(UserModel.email) == username.lower()
+                or_(
+                    func.lower(UserModel.email) == teacher.email.lower(),
+                    func.lower(UserModel.username) == teacher.email.lower(),
+                    func.lower(UserModel.username) == teacher.name.lower()
+                )
+            ).first()
+
+    # 4. Try matching teacher or therapist by profile name
+    if not user:
+        teacher = db.query(Teacher).filter(
+            func.lower(Teacher.name) == clean_input
+        ).first()
+        if teacher:
+            otp_email = teacher.email
+            user = db.query(UserModel).filter(
+                or_(
+                    func.lower(UserModel.email) == teacher.email.lower(),
+                    func.lower(UserModel.username) == teacher.email.lower(),
+                    func.lower(UserModel.username) == teacher.name.lower()
+                )
+            ).first()
+
+    if not user:
+        therapist = db.query(Therapist).filter(
+            func.lower(Therapist.name) == clean_input
+        ).first()
+        if therapist:
+            otp_email = therapist.email
+            user = db.query(UserModel).filter(
+                or_(
+                    func.lower(UserModel.email) == therapist.email.lower(),
+                    func.lower(UserModel.username) == therapist.email.lower(),
+                    func.lower(UserModel.username) == therapist.name.lower()
+                )
             ).first()
 
     if not user:
@@ -150,8 +188,9 @@ def forgot_password_request(
     print(f"==================================================\n")
     
     # Try sending real email in background (non-blocking)
+    has_email_service = bool(settings.BREVO_API_KEY) or bool(settings.SMTP_USER and settings.SMTP_PASSWORD)
     print(f"[EMAIL CONFIG] SMTP_USER set: {bool(settings.SMTP_USER)} | SMTP_PASSWORD set: {bool(settings.SMTP_PASSWORD)} | BREVO_API_KEY set: {bool(settings.BREVO_API_KEY)}")
-    if settings.SMTP_USER and settings.SMTP_PASSWORD:
+    if has_email_service:
         # Use profile email if available, otherwise fall back to user account email
         delivery_email = otp_email or user.email
         if not delivery_email:
@@ -160,11 +199,11 @@ def forgot_password_request(
                 detail="No email address found for this account. Please contact your administrator."
             )
         print(f"[EMAIL CONFIG] Queuing email to: {delivery_email}")
-        # Queue email in background — API returns immediately without waiting for SMTP
+        # Queue email in background — API returns immediately without waiting
         background_tasks.add_task(send_otp_email, delivery_email, user.username, otp)
         msg = f"Verification code sent to {delivery_email}. Check your inbox and spam folder."
     else:
-        print("[EMAIL CONFIG] SMTP not configured — skipping email, OTP only in console.")
+        print("[EMAIL CONFIG] Email service not configured — skipping email, OTP only in console.")
         msg = "Email service not configured. Verification code generated and printed to console."
 
     return {
@@ -182,10 +221,42 @@ def forgot_password_reset(
     """
     Verify OTP code and reset the password.
     """
-    username = reset_in.username.strip()
-    user = crud.user.get_by_username(db, username=username)
+    input_str = reset_in.username.strip()
+    clean_input = input_str.lower()
+    
+    from app.models.user import User as UserModel
+    from app.models.therapist import Therapist
+    from app.models.teacher import Teacher
+    from sqlalchemy import func, or_
+    
+    user = db.query(UserModel).filter(
+        or_(
+            func.lower(UserModel.username) == clean_input,
+            func.lower(UserModel.email) == clean_input
+        )
+    ).first()
+
     if not user:
-        user = crud.user.get_by_email(db, email=username)
+        therapist = db.query(Therapist).filter(func.lower(Therapist.email) == clean_input).first()
+        if therapist:
+            user = db.query(UserModel).filter(
+                or_(
+                    func.lower(UserModel.email) == therapist.email.lower(),
+                    func.lower(UserModel.username) == therapist.email.lower(),
+                    func.lower(UserModel.username) == therapist.name.lower()
+                )
+            ).first()
+
+    if not user:
+        teacher = db.query(Teacher).filter(func.lower(Teacher.email) == clean_input).first()
+        if teacher:
+            user = db.query(UserModel).filter(
+                or_(
+                    func.lower(UserModel.email) == teacher.email.lower(),
+                    func.lower(UserModel.username) == teacher.email.lower(),
+                    func.lower(UserModel.username) == teacher.name.lower()
+                )
+            ).first()
         
     if not user:
         raise HTTPException(
