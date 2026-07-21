@@ -28,6 +28,7 @@ const AddTeacher = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [defaultPassword, setDefaultPassword] = useState('');
+  const [actualUsername, setActualUsername] = useState('');
 
   // Toast notification state
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
@@ -140,10 +141,11 @@ const AddTeacher = () => {
       const lastFourAadhaar = effectiveAadhaar.slice(-4);
       const generatedPassword = `Teacher${lastFourAadhaar}`;
       // Create user account only when a valid email is provided.
+      let resolvedUsername = teacherData.email.split('@')[0];
       if (teacherData.email && teacherData.email.includes('@')) {
         try {
           const token = localStorage.getItem('token');
-          await axios.post(`${API_BASE_URL}/api/v1/users/`, {
+          const userRes = await axios.post(`${API_BASE_URL}/api/v1/users/`, {
             username: teacherData.email.split('@')[0],
             email: teacherData.email,
             password: generatedPassword,
@@ -153,12 +155,18 @@ const AddTeacher = () => {
           }, {
             headers: token ? { Authorization: `Bearer ${token}` } : {}
           });
+          // Capture the actual username the backend assigned
+          // (may be "john_teacher" if "john" was already taken by another role)
+          if (userRes.data?.username) {
+            resolvedUsername = userRes.data.username;
+          }
         } catch (userError) {
           console.warn('User creation warning:', userError);
-          // Continue anyway - teacher was created
+          // Continue anyway - teacher profile was created
         }
       }
 
+      setActualUsername(resolvedUsername);
       setDefaultPassword(generatedPassword);
       setShowSuccessModal(true);
       
@@ -603,17 +611,26 @@ const AddTeacher = () => {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-[#170F49] mb-3">Teacher Added Successfully!</h3>
-              <p className="text-gray-600 mb-4">A user account has been created for the teacher to login.</p>
+              <p className="text-gray-600 mb-4">A login account has been created for the teacher.</p>
               
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-left">
-                <p className="text-sm font-medium text-[#170F49] mb-2">Login Credentials:</p>
+                <p className="text-sm font-medium text-[#170F49] mb-2">🔑 Teacher Login Credentials:</p>
                 <p className="text-sm text-gray-700 mb-1">
-                  <span className="font-medium">Username:</span> {teacherData.email.split('@')[0]}
+                  <span className="font-medium">Username:</span>{' '}
+                  <code className="bg-white px-2 py-1 rounded border border-gray-300 font-mono">
+                    {actualUsername || teacherData.email.split('@')[0]}
+                  </code>
                 </p>
                 <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-medium">Password:</span> <code className="bg-white px-2 py-1 rounded border border-gray-300 font-mono">{defaultPassword}</code>
+                  <span className="font-medium">Password:</span>{' '}
+                  <code className="bg-white px-2 py-1 rounded border border-gray-300 font-mono">{defaultPassword}</code>
                 </p>
                 <p className="text-xs text-gray-500">The teacher can change this password after login.</p>
+                {actualUsername && actualUsername !== teacherData.email.split('@')[0] && (
+                  <p className="text-xs text-amber-600 mt-2">
+                    ℹ️ The email prefix was already used by another account, so a unique username was assigned.
+                  </p>
+                )}
               </div>
 
               <p className="text-sm text-gray-500 mb-4">Redirecting to HeadMaster in 60 seconds...</p>

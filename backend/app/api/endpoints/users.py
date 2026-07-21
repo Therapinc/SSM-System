@@ -17,14 +17,82 @@ def _can_manage_user_accounts(current_user: models.User) -> bool:
 
 
 def _create_or_update_user(db: Session, user_in: schemas.UserCreate):
-    existing_user = crud.user.get_by_username(db, username=user_in.username)
-    if existing_user is None:
-        existing_user = crud.user.get_by_email(db, email=user_in.email)
+    """
+    Create or update a user account for the given role.
 
-    if existing_user:
-        return crud.user.update(db, db_obj=existing_user, obj_in=user_in)
+    Each role (teacher, therapist) gets its OWN separate User row so both
+    logins work independently.  We look for an existing account that matches
+    BOTH the role AND the email — only update that one.  If the email already
+    exists under a different role, we create a brand-new account with a
+    short role-suffixed username (e.g. "john_th" for therapist) so there is no clash.
+    """
+    from app.models.user import User as UserModel
+    from sqlalchemy import func, or_
 
-    return crud.user.create(db, obj_in=user_in)
+    requested_role = str(user_in.role).lower().strip()
+
+    # Short abbreviations to keep usernames compact
+    ROLE_SUFFIX = {
+        "teacher": "tr",
+        "therapist": "th",
+        "admin": "ad",
+        "hm": "hm",
+        "headmaster": "hm",
+    }
+    role_abbr = ROLE_SUFFIX.get(requested_role, requested_role[:2])
+
+    # 1. Check if there is already an account with this EXACT username
+    existing_by_username = crud.user.get_by_username(db, username=user_in.username)
+    if existing_by_username:
+        existing_role = str(existing_by_username.role).lower().strip()
+        if existing_role == requested_role:
+            # Same username, same role — just update (e.g. re-sync password)
+            return crud.user.update(db, db_obj=existing_by_username, obj_in=user_in)
+        # Same username, different role — fall through to create a role-suffixed account
+
+    # 2. Look for an existing same-role account for this email
+    same_role_user = db.query(UserModel).filter(
+        func.lower(UserModel.email) == user_in.email.lower(),
+        or_(UserModel.role == requested_role, UserModel.role == user_in.role)
+    ).first()
+
+    if same_role_user:
+        # Already have a same-role account — update it
+        return crud.user.update(db, db_obj=same_role_user, obj_in=user_in)
+
+    # 3. No same-role account exists yet.  Build a unique username.
+    #    Default: email prefix.  If that username is taken (by a different role),
+    #    suffix with the short role abbreviation (e.g. john_th, john_tr).
+    base_username = user_in.username  # already set to email_prefix by caller
+    candidate_username = base_username
+
+    taken = crud.user.get_by_username(db, username=candidate_username)
+    if taken and str(taken.role).lower().strip() != requested_role:
+        # Username is taken by a different role — use short role-suffixed variant
+        candidate_username = f"{base_username}_{role_abbr}"
+
+    # If the suffixed username is also taken, append a counter to be safe
+    counter = 2
+    while True:
+        conflict = crud.user.get_by_username(db, username=candidate_username)
+        if not conflict:
+            break
+        if str(conflict.role).lower().strip() == requested_role:
+            # Same role — just update this account
+            return crud.user.update(db, db_obj=conflict, obj_in=user_in)
+        candidate_username = f"{base_username}_{role_abbr}{counter}"
+        counter += 1
+
+    # Create a new user with the resolved username
+    new_user_in = schemas.UserCreate(
+        username=candidate_username,
+        email=user_in.email,
+        password=user_in.password,
+        role=user_in.role,
+        is_active=user_in.is_active,
+        is_superuser=user_in.is_superuser,
+    )
+    return crud.user.create(db, obj_in=new_user_in)
 
 @router.post("/", response_model=schemas.User)
 def create_user(

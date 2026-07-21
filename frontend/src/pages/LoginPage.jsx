@@ -55,8 +55,7 @@ const LoginPage = () => {
         try {
           axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
           const res = await axios.get(`${API_BASE_URL}/api/v1/auth/me`);
-          const rawRole = res.data.role || "hm";
-          const role = String(rawRole).toLowerCase();
+          const role = String(res.data.role || "").toLowerCase();
           if (role === "hm" || role === "admin" || role === "headmaster") {
             navigate("/headmaster");
           } else if (role === "teacher") {
@@ -65,6 +64,10 @@ const LoginPage = () => {
             navigate("/therapist");
           } else if (role === "student" || role === "parent") {
             navigate("/student-view");
+          } else {
+            // Unknown or missing role — treat token as invalid, stay on login
+            localStorage.removeItem("token");
+            delete axios.defaults.headers.common["Authorization"];
           }
         } catch (e) {
           localStorage.removeItem("token");
@@ -103,9 +106,8 @@ const LoginPage = () => {
           window.dispatchEvent(new Event('authChanged'));
         } catch (e) {}
 
-        // Redirect based on user role (normalize casing and type)
-        const rawRole = response.data.role || "hm"; // Default to hm if not provided
-        const role = String(rawRole).toLowerCase();
+        // Redirect based on user role (normalize casing)
+        const role = String(response.data.role || "").toLowerCase();
         if (role === "hm" || role === "admin" || role === "headmaster") {
           navigate("/headmaster");
         } else if (role === "teacher") {
@@ -115,7 +117,10 @@ const LoginPage = () => {
         } else if (role === "student") {
           navigate("/student-view");
         } else {
-          navigate("/"); // fallback, or you can show an error
+          // Role is missing or unrecognised — do NOT silently go to admin
+          setError("Login succeeded but your account role is not set correctly. Please contact the administrator.");
+          localStorage.removeItem("token");
+          delete axios.defaults.headers.common["Authorization"];
         }
       }
     } catch (err) {
