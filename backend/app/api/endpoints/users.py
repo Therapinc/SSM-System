@@ -29,7 +29,9 @@ def _create_or_update_user(db: Session, user_in: schemas.UserCreate):
     from app.models.user import User as UserModel
     from sqlalchemy import func, or_
 
-    requested_role = str(user_in.role).lower().strip()
+    # Use .value to get plain string from enum (e.g. "therapist" not "UserRole.therapist")
+    raw_role = user_in.role
+    requested_role = (raw_role.value if hasattr(raw_role, 'value') else str(raw_role)).lower().strip()
 
     # Short abbreviations to keep usernames compact
     ROLE_SUFFIX = {
