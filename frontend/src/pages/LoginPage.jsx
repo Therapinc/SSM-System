@@ -230,7 +230,7 @@ const LoginPage = () => {
                       required
                     />
                     <p className="text-xs text-[#9B8E87] mt-1.5 ml-1">
-                      Single role? Enter your <span className="font-medium">email</span>. &nbsp;Two roles? Enter your <span className="font-medium">username</span> — teacher accounts end in <span className="font-medium">_tr</span>, therapist in <span className="font-medium">_th</span>.
+                      Single role? Enter your <span className="font-medium">email</span>. &nbsp;Two roles? Enter your <span className="font-medium">username</span> — one is your email prefix, the other ends in <span className="font-medium">_tr</span> or <span className="font-medium">_th</span>.
                     </p>
                   </div>
 
@@ -382,7 +382,7 @@ const LoginPage = () => {
                     className="w-full px-4 py-4 rounded-2xl border border-[#B6A89B] bg-white shadow-lg shadow-[#B6A89B]/30 focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all placeholder:text-[#B6A89B]"
                   />
                   <p className="text-xs text-[#9B8E87] mt-1.5 ml-1">
-                    If you have two roles, your teacher username ends in <span className="font-medium">_tr</span> or therapist in <span className="font-medium">_th</span>.
+                    Two roles? One username is your email prefix, the other ends in <span className="font-medium">_tr</span> (teacher) or <span className="font-medium">_th</span> (therapist).
                   </p>
                 </div>
 
