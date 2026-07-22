@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 fix_dual_role_users.py
 ======================
@@ -118,7 +119,7 @@ def fix_dual_roles(dry_run: bool = False):
     dual_role_people = cur.fetchall()
 
     if not dual_role_people:
-        print("\n✓ No people found in both teachers AND therapists tables.")
+        print("\n[OK] No people found in both teachers AND therapists tables.")
     else:
         print(f"\nFound {len(dual_role_people)} person(s) with dual roles (teacher + therapist):\n")
         for email, name in dual_role_people:
@@ -142,12 +143,12 @@ def fix_dual_roles(dry_run: bool = False):
     orphan_therapists = cur.fetchall()
 
     if orphan_therapists:
-        print(f"\n⚠  {len(orphan_therapists)} therapist profile(s) with NO 'therapist' login:")
+        print(f"\n[WARN] {len(orphan_therapists)} therapist profile(s) with NO 'therapist' login:")
         for email, name in orphan_therapists:
             c = _create_account_from_profile(cur, email, name, "therapist", dry_run)
             changes_made += c
     else:
-        print("\n✓ All therapist profiles already have a 'therapist' login account.")
+        print("\n[OK] All therapist profiles already have a 'therapist' login account.")
 
     # ------------------------------------------------------------------
     # 3. Teacher profiles with NO 'teacher' user account
@@ -166,25 +167,25 @@ def fix_dual_roles(dry_run: bool = False):
     orphan_teachers = cur.fetchall()
 
     if orphan_teachers:
-        print(f"\n⚠  {len(orphan_teachers)} teacher profile(s) with NO 'teacher' login:")
+        print(f"\n[WARN] {len(orphan_teachers)} teacher profile(s) with NO 'teacher' login:")
         for email, name in orphan_teachers:
             c = _create_account_from_profile(cur, email, name, "teacher", dry_run)
             changes_made += c
     else:
-        print("\n✓ All teacher profiles already have a 'teacher' login account.")
+        print("\n[OK] All teacher profiles already have a 'teacher' login account.")
 
     # ------------------------------------------------------------------
     # Finish
     # ------------------------------------------------------------------
-    print(f"\n{'─' * 60}")
+    print(f"\n{'-' * 60}")
     if changes_made == 0:
-        print("✓ No changes needed — all user accounts are already correct!")
+        print("[OK] No changes needed -- all user accounts are already correct!")
     elif dry_run:
         print(f"[DRY RUN] {changes_made} account(s) would be created.")
         print("Re-run WITHOUT --dry-run to apply the changes.")
     else:
         conn.commit()
-        print(f"✅ Done! {changes_made} account(s) created and committed to Neon DB.")
+        print(f"[DONE] {changes_made} account(s) created and committed to Neon DB.")
 
     cur.close()
     conn.close()
@@ -212,7 +213,7 @@ def _ensure_both_role_accounts(cur, email: str, name: str, dry_run: bool) -> int
     for target_role in ("teacher", "therapist"):
         if target_role in existing_roles:
             u = existing_roles[target_role]
-            print(f"    ✓ '{target_role}' account exists: username='{u[1]}'")
+            print(f"    [OK] '{target_role}' account exists: username='{u[1]}'")
         else:
             # Pick source account to copy password from
             source = existing_users[0] if existing_users else None
@@ -220,8 +221,8 @@ def _ensure_both_role_accounts(cur, email: str, name: str, dry_run: bool) -> int
             is_active = source[4] if source else True
 
             username = find_or_build_username(cur, base_username, target_role)
-            print(f"    ➕ Creating '{target_role}' account: username='{username}'"
-                  + (" (password copied)" if hashed_pw else " (⚠ no password — set manually!)"))
+            print(f"    [CREATE] '{target_role}' account: username='{username}'"
+                  + (" (password copied)" if hashed_pw else " [WARN: no password - set manually!]"))
 
             if not dry_run:
                 cur.execute("""
@@ -250,8 +251,8 @@ def _create_account_from_profile(cur, email: str, name: str, role: str, dry_run:
     hashed_pw = existing[2] if existing else None
     is_active = existing[3] if existing else True
 
-    pw_note = "(password copied from other account)" if existing and hashed_pw else "(⚠ NO PASSWORD — admin must set it via app)"
-    print(f"    ➕ {name} <{email}>: creating '{role}' account '{username}' {pw_note}")
+    pw_note = "(password copied from other account)" if existing and hashed_pw else "[WARN: NO PASSWORD - admin must set it via app]"
+    print(f"    [CREATE] {name} <{email}>: creating '{role}' account '{username}' {pw_note}")
 
     if not dry_run:
         cur.execute("""
