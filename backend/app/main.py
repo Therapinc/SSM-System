@@ -55,6 +55,18 @@ def verify_single_worker_compliance():
             "Set WORKERS/WEB_CONCURRENCY=1 or configure REDIS_URL to continue."
         )
 
+    # Automatically sync user accounts for teachers and therapists
+    try:
+        from app.db.session import SessionLocal
+        from app.db.auto_sync_users import sync_users_from_profiles
+        db = SessionLocal()
+        try:
+            sync_users_from_profiles(db, dry_run=False)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to auto-sync user accounts on startup: {e}")
+
 @app.get("/")
 @app.head("/")
 async def root():

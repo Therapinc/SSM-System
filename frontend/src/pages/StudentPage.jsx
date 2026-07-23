@@ -4524,12 +4524,15 @@ const StudentPage = () => {
       const iepKey = `iep_data_student_${id}_by_month`;
       const localIepRaw = localStorage.getItem(iepKey);
       let finalIepData = dbIepData;
-      if (!finalIepData && localIepRaw) {
+      const hasDbIepData = dbIepData && Object.keys(dbIepData).length > 0;
+      if (!hasDbIepData && localIepRaw) {
         try {
           finalIepData = JSON.parse(localIepRaw);
         } catch (e) {
           console.error("Failed to parse local IEP data", e);
         }
+      } else if (hasDbIepData) {
+        localStorage.setItem(iepKey, JSON.stringify(dbIepData));
       }
       setSavedIepByMonth(finalIepData || {});
 
@@ -4538,12 +4541,15 @@ const StudentPage = () => {
       const specKey = `special-education-tables:${id}`;
       const localSpecRaw = localStorage.getItem(specKey);
       let finalSpecTables = dbSpecTables;
-      if (!finalSpecTables && localSpecRaw) {
+      const hasDbSpecTables = Array.isArray(dbSpecTables) && dbSpecTables.length > 0;
+      if (!hasDbSpecTables && localSpecRaw) {
         try {
           finalSpecTables = JSON.parse(localSpecRaw);
         } catch (e) {
           console.error("Failed to parse local SpecEd tables", e);
         }
+      } else if (hasDbSpecTables) {
+        localStorage.setItem(specKey, JSON.stringify(dbSpecTables));
       }
       if (Array.isArray(finalSpecTables)) {
         const normalized = finalSpecTables.map((t) => ({
@@ -4565,12 +4571,15 @@ const StudentPage = () => {
       const iepProgramKey = `iep_program_student_${id}`;
       const localIepProgramRaw = localStorage.getItem(iepProgramKey);
       let finalIepProgram = dbIepProgram;
-      if (!finalIepProgram && localIepProgramRaw) {
+      const hasDbIepProgram = Array.isArray(dbIepProgram) && dbIepProgram.length > 0;
+      if (!hasDbIepProgram && localIepProgramRaw) {
         try {
           finalIepProgram = JSON.parse(localIepProgramRaw);
         } catch (e) {
           console.error("Failed to parse local IEP Program records", e);
         }
+      } else if (hasDbIepProgram) {
+        localStorage.setItem(iepProgramKey, JSON.stringify(dbIepProgram));
       }
       const programList = Array.isArray(finalIepProgram) ? finalIepProgram.map(normalizeIepRecord) : [];
       setIepFormRecords(programList);
