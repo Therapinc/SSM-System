@@ -86,7 +86,21 @@ const AddUser = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f7f7f7] relative overflow-hidden py-20">
+    <div className="min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col items-center justify-center bg-[#f7f7f7] relative overflow-hidden py-20 max-lg:py-0 max-lg:pb-[calc(40px+env(safe-area-inset-bottom))] max-lg:pt-0 max-lg:overflow-x-hidden">
+
+      {/* Mobile Sticky Header */}
+      <div className="hidden max-lg:flex sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 py-3 items-center shadow-sm">
+        <button
+          onClick={() => window.history.back()}
+          className="flex items-center gap-2 text-[#6F6C90] hover:text-[#170F49] transition-colors bg-transparent p-0 m-0 border-none shadow-none"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span className="font-medium text-sm">Back</span>
+        </button>
+      </div>
+
       {/* Animated background blobs */}
       <div className="absolute top-0 -left-40 w-[600px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float" />
       <div className="absolute -bottom-32 right-40 w-[600px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000" />
@@ -97,7 +111,7 @@ const AddUser = () => {
       <div className="absolute top-6 left-6 z-50">
         <button
           onClick={() => navigate('/headmaster')}
-          className="px-6 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#C8742F] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2"
+          className="px-6 max-md:px-4 py-3  bg-[#E38B52] max-md:truncate text-white rounded-xl hover:bg-[#C8742F] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -115,14 +129,14 @@ const AddUser = () => {
         </button>
       </div>
       
-      <div className="w-[90%] max-w-[1200px] mx-4 flex-1 flex flex-col justify-center">
-        <h1 className="text-3xl font-bold text-[#170F49] mb-8 text-center font-baskervville">
+      <div className="w-[90%] max-w-[1200px] mx-4 flex-1 flex flex-col justify-center max-lg:w-[95%] max-lg:mx-auto max-lg:mt-4">
+        <h1 className="text-3xl font-bold text-[#170F49] mb-8 max-md:mb-5 text-center font-baskervville">
           Add Teacher User
         </h1>
         
         {/* Form container */}
-        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20 max-w-[450px] mx-auto w-full">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-3 border border-white/20 max-w-[450px] mx-auto w-full">
+          <form onSubmit={handleSubmit} className="space-y-6 max-md:space-y-4">
             {error && (
               <p className="text-red-500 text-sm mb-4">{error}</p>
             )}

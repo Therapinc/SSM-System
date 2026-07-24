@@ -353,7 +353,7 @@ const StudentViewPage = () => {
         </h1>
 
         {/* Tabs */}
-        <div className="flex justify-center mb-8">
+        <div className="w-full max-w-[100vw] overflow-x-auto pb-4 px-4 flex justify-start md:justify-center mb-8 hidden-scrollbar custom-scrollbar">
           <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative">
             {/* Active Tab Background */}
             <div
@@ -872,7 +872,7 @@ const StudentViewPage = () => {
                       {/* Household Composition */}
                       <div className="p-6 bg-white/50 rounded-2xl">
                         <h3 className="text-lg font-semibold text-[#170F49] mb-4">Household Composition</h3>
-                        <div className="overflow-x-auto">
+                        <div className="hidden md:block overflow-x-auto">
                           <table className="w-full border-collapse rounded-xl overflow-hidden">
                             <thead className="bg-[#E38B52]/10">
                               <tr>
@@ -908,6 +908,42 @@ const StudentViewPage = () => {
                             </tbody>
                           </table>
                         </div>
+
+                            {/* Mobile View */}
+                            <div className="md:hidden space-y-4 mt-4">
+                              {student?.household && student.household.length > 0 ? (
+                                student.household.map((member, index) => (
+                                  <div key={index} className="bg-white/70 border border-[#E38B52]/20 rounded-xl p-4 shadow-sm">
+                                    <h4 className="font-semibold text-[#170F49] mb-3 flex items-center gap-2">
+                                      <span className="bg-[#E38B52] text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">{index + 1}</span>
+                                      {member.name || "N/A"} {member.age ? `(${member.age})` : ''}
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                      <div>
+                                        <span className="text-[#6F6C90] block text-xs mb-0.5">Education</span>
+                                        <span className="text-[#170F49] font-medium">{member.education || "N/A"}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-[#6F6C90] block text-xs mb-0.5">Occupation</span>
+                                        <span className="text-[#170F49] font-medium">{member.occupation || "N/A"}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-[#6F6C90] block text-xs mb-0.5">Health</span>
+                                        <span className="text-[#170F49] font-medium">{member.health || "N/A"}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-[#6F6C90] block text-xs mb-0.5">Income</span>
+                                        <span className="text-[#170F49] font-medium">{member.income || "N/A"}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="p-4 text-sm text-[#6F6C90] text-center bg-white/50 rounded-xl border border-dashed border-[#E38B52]/30">
+                                  No household composition data available
+                                </div>
+                              )}
+                            </div>
                       </div>
 
                       {/* Medical History */}

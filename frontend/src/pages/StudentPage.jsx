@@ -150,7 +150,7 @@ const DynamicScrollButtons = () => {
 
   return (
     <div
-      className={`fixed z-50 bottom-8 right-8 flex flex-col gap-3 transition-opacity duration-300 ${isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+      className={`fixed z-50 bottom-8 max-md:bottom-24 right-8 flex flex-col gap-3 transition-opacity duration-300 ${isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
     >
       {isScrollingUp ? (
@@ -2012,7 +2012,7 @@ const StudentPage = () => {
     const term = iepFormDraft?.[termKey];
     if (!term) return null;
     return (
-      <div className="mb-8 p-5 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-md">
+      <div className="mb-8 max-md:mb-5 p-5 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-md">
         <h3 className="text-lg font-bold text-[#170F49] mb-4">{label}</h3>
 
         <div className="mb-4">
@@ -2110,7 +2110,7 @@ const StudentPage = () => {
   const renderIepTermView = (term, label) => {
     if (!term) return null;
     return (
-      <div className="mb-8 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm">
+      <div className="mb-8 max-md:mb-5 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm">
         <h3 className="text-lg font-bold text-[#170F49] mb-4">{label}</h3>
 
         {term.shortTermGoal && (
@@ -4800,8 +4800,8 @@ const StudentPage = () => {
     const rowCount = Math.max(adlItems.length, academicItems.length, behaviouralItems.length);
 
     return (
-      <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-        <div className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-[#E38B52]/10 to-transparent rounded-t-xl -mx-6 -mt-6 mb-6">
+      <div className="mb-6 max-md:mb-4 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-4 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
+        <div className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-[#E38B52]/10 to-transparent rounded-t-xl -mx-6 -mt-6 mb-6 max-md:mb-4">
           <div className="text-left flex-1 text-base font-semibold text-[#170F49]">
             DRAFT REPORT FOR {monthYearKey.toUpperCase()}
           </div>
@@ -4815,7 +4815,7 @@ const StudentPage = () => {
           </div>
         </div>
 
-        <div className="px-0 py-0 border-t border-[#E38B52]/20 space-y-6 bg-white/50">
+        <div className="px-0 py-0 border-t border-[#E38B52]/20 space-y-6 max-md:space-y-4 bg-white/50">
           <div className="overflow-x-auto border border-gray-200 rounded-lg">
             <table className="w-full table-fixed border-collapse">
               <colgroup>
@@ -6417,7 +6417,7 @@ const StudentPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f7f7f7]">
+      <div className="min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col items-center justify-center bg-[#f7f7f7]">
         <div className="text-2xl text-[#E38B52]">
           Loading student information...
         </div>
@@ -6428,7 +6428,7 @@ const StudentPage = () => {
   return (
     <div
       id="profile-to-download"
-      className="min-h-screen w-full flex flex-col items-center bg-[#f7f7f7] relative overflow-hidden py-20"
+      className="min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col items-center bg-[#f7f7f7] relative overflow-hidden py-20"
     >
 
       {showDocumentDeleteConfirm && pendingDocumentDelete && (
@@ -6455,7 +6455,7 @@ const StudentPage = () => {
                 Delete Document
               </h3>
 
-              <p className="text-sm text-gray-600 mb-6">
+              <p className="text-sm text-gray-600 mb-6 max-md:mb-4">
                 Are you sure you want to delete{" "}
                 <span className="font-semibold text-[#170F49]">
                   {pendingDocumentDelete.documentName}
@@ -6513,7 +6513,7 @@ const StudentPage = () => {
                 Delete IEP Report
               </h3>
 
-              <p className="text-sm text-gray-600 mb-6">
+              <p className="text-sm text-gray-600 mb-6 max-md:mb-4">
                 Are you sure you want to delete{" "}
                 <span className="font-semibold text-[#170F49]">{deletePendingIepKey}</span>?
                 <br />
@@ -6568,7 +6568,7 @@ const StudentPage = () => {
                 Delete Table
               </h3>
 
-              <p className="text-sm text-gray-600 mb-6">
+              <p className="text-sm text-gray-600 mb-6 max-md:mb-4">
                 Are you sure you want to delete this table?
                 <br />
                 <span className="text-red-600 font-medium">
@@ -6687,7 +6687,7 @@ const StudentPage = () => {
       {/* Back button */}
       <button
         onClick={() => window.history.back()}
-        className="absolute top-8 left-8 bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl p-3 border border-white/20 hover:-translate-y-1 transition-all duration-200 flex items-center gap-2 z-10"
+        className="absolute top-8 left-8 max-lg:hidden bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl p-3 border border-white/20 hover:-translate-y-1 transition-all duration-200 flex items-center gap-2 z-10"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -6708,13 +6708,18 @@ const StudentPage = () => {
       <div className="absolute -bottom-32 right-40 w-[600px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000 z-0" />
       <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000 z-0" />
       <div className="absolute top-0 -left-40 w-[500px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float animation-delay-7000 z-0" />
-      <div className="w-[90%] max-w-[1200px] mx-4 flex-1 flex flex-col">
-        <h1 className="text-3xl font-bold text-[#170F49] mb-8 text-center font-baskervville">
-          Student Information
-        </h1>
+      <div className="w-[90%] max-md:w-full max-w-[1200px] mx-4 max-md:mx-0 flex-1 flex flex-col ">
+        <div className="flex items-center justify-center relative mb-8 max-md:mb-2 max-md:-mt-2">
+          <button onClick={() => window.history.back()} className="absolute left-0 lg:hidden text-[#170F49] p-2 -ml-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          </button>
+          <h1 className="text-3xl max-md:text-xl font-bold text-[#170F49] text-center font-baskervville">
+            Student Information
+          </h1>
+        </div>
 
         {/* Tabs */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-8 max-md:overflow-x-auto max-md:whitespace-nowrap max-md:w-screen max-md:-mx-4 max-md:px-4 hide-scrollbar max-md:justify-start max-md:snap-x max-md:snap-mandatory">
           <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative w-[1136px]">
             {/* Active Tab Background */}
             <div
@@ -6767,7 +6772,7 @@ const StudentPage = () => {
 
                 setActiveTab("student-details"); // or case-record / therapy-reports / iep / special-education
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "student-details"
+              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "student-details"
                 ? "text-white"
                 : "text-[#170F49] hover:text-[#E38B52]"
                 }`}
@@ -6785,7 +6790,7 @@ const StudentPage = () => {
                 }
                 setActiveTab("case-record");
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "case-record"
+              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "case-record"
                 ? "text-white"
                 : "text-[#170F49] hover:text-[#E38B52]"
                 }`}
@@ -6803,7 +6808,7 @@ const StudentPage = () => {
                 }
                 setActiveTab("therapy-reports");
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "therapy-reports"
+              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "therapy-reports"
                 ? "text-white"
                 : "text-[#170F49] hover:text-[#E38B52]"
                 }`}
@@ -6820,7 +6825,7 @@ const StudentPage = () => {
                 }
                 setActiveTab("iep");
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "iep"
+              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "iep"
                 ? "text-white"
                 : "text-[#170F49] hover:text-[#E38B52]"
                 }`}
@@ -6838,7 +6843,7 @@ const StudentPage = () => {
                 }
                 setActiveTab("iep-form");
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "iep-form"
+              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "iep-form"
                 ? "text-white"
                 : "text-[#170F49] hover:text-[#E38B52]"
                 }`}
@@ -6856,7 +6861,7 @@ const StudentPage = () => {
                 }
                 setActiveTab("special-education");
               }}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "special-education"
+              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "special-education"
                 ? "text-white"
                 : "text-[#170F49] hover:text-[#E38B52]"
                 }`}
@@ -6868,10 +6873,10 @@ const StudentPage = () => {
 
 
         {/* Main content container */}
-        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-0 max-md:shadow-none max-md:bg-transparent max-md:border-none border border-white/20">
           {activeTab === "therapy-reports" ? (
             <div className="w-full">
-              <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+              <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -6888,10 +6893,10 @@ const StudentPage = () => {
                 </svg>
                 Therapy Reports
               </h2>
-              <div className="flex flex-col lg:flex-row gap-6">
+              <div className="flex flex-col lg:flex-row gap-6 max-md:gap-2">
                 {/* Center: AI Analysis Expanded */}
                 <main className="w-full lg:w-4/6 flex-1 lg:px-4">
-                  <div className="mb-6 p-6 border-2 border-orange-200 rounded-2xl bg-gradient-to-br from-white via-amber-50/20 to-orange-50/10 shadow-lg relative overflow-hidden">
+                  <div className="mb-6 max-md:mb-4 p-6 border-2 border-orange-200 rounded-2xl bg-gradient-to-br from-white via-amber-50/20 to-orange-50/10 shadow-lg relative overflow-hidden">
                     {/* AI Header */}
                     <div className="flex items-center gap-2 mb-4 pb-2 border-b border-orange-100">
                       <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
@@ -6902,7 +6907,7 @@ const StudentPage = () => {
 
                     {/* Horizontal filter bar at the top */}
                     <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-4 w-full">
-                      <div className="flex flex-col sm:flex-row flex-wrap items-end gap-6 flex-1">
+                      <div className="flex flex-col sm:flex-row flex-wrap items-end gap-6 max-md:gap-2 flex-1">
                         <div className="flex flex-row items-center min-w-[200px] gap-2">
                           <span className="text-sm font-semibold text-gray-700">
                             Date Range
@@ -7169,7 +7174,7 @@ const StudentPage = () => {
                     {(aiSummarizing || aiAnalysis || aiSummary) && (
                       <div className="mt-4 space-y-4 animate-fadeIn">
                         <div className="relative bg-gradient-to-br from-white via-orange-50/40 to-orange-100/60 backdrop-blur-sm p-8 rounded-2xl border border-[#E38B52]/30 shadow-md shadow-orange-100/30 transition-all duration-300 hover:shadow-lg hover:shadow-orange-200/40">
-                          <h4 className="text-3xl font-extrabold text-[#C56930] mb-6 flex items-center gap-3 pb-3">
+                          <h4 className="text-3xl font-extrabold text-[#C56930] mb-6 max-md:mb-4 flex items-center gap-3 pb-3">
                             <svg className="w-7 h-7 text-[#E38B52]" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M9 4.5L10.5 8L14 9.5L10.5 11L9 14.5L7.5 11L4 9.5L7.5 8L9 4.5zm10 8.5l1 2.5l2.5 1l-2.5 1l-1 2.5l-1-2.5l-2.5-1l2.5-1l1-2.5zm-2-9l.75 1.75l1.75.75l-1.75.75l-.75 1.75l-.75-1.75l-1.75-.75l1.75-.75l.75-1.75z" />
                             </svg>
@@ -7478,7 +7483,7 @@ const StudentPage = () => {
                   </div>
 
                   {/* BOTTOM FILTERS */}
-                  <div className="mb-6 p-4 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
+                  <div className="mb-6 max-md:mb-4 p-4 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
                     <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
                       {/* Start Date */}
                       <div className="flex flex-col gap-1 w-full">
@@ -7882,8 +7887,8 @@ const StudentPage = () => {
               </div>
             </div>
           ) : activeTab === "student-details" ? (
-            <div className="max-w-6xl mx-auto p-6">
-              <div className="mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center justify-between">
+            <div className="max-w-6xl mx-auto p-6 max-md:px-4 max-md:py-2">
+              <div className="mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center justify-between">
                 {/* Main Header */}
                 <h2 className="text-2xl font-bold text-[#170F49] flex items-center">
                   <svg
@@ -7908,7 +7913,7 @@ const StudentPage = () => {
                   <button
                     type="button"
                     onClick={handleEditStart}
-                    className="p-2 rounded-full transition-all duration-200 bg-[#E38B52] text-white hover:bg-[#C8742F]"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 bg-transparent text-[#170F49] hover:bg-gray-100 border border-gray-200 text-sm font-medium"
                     title="Edit"
                   >
                     <svg
@@ -7930,7 +7935,7 @@ const StudentPage = () => {
                   <button
                     type="button"
                     onClick={handleEditSave}
-                    className="p-2 rounded-full transition-all duration-200 bg-green-600 text-white hover:bg-green-700"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 bg-green-600 text-white hover:bg-green-700 text-sm font-medium"
                     title="Save changes"
                   >
                     <svg
@@ -7952,8 +7957,8 @@ const StudentPage = () => {
               </div>
 
               {/* Personal Information Section */}
-              <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
+              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
+                <h3 className="text-lg font-semibold text-[#170F49] mb-6 max-md:mb-4 flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5 text-[#E38B52]"
@@ -7971,10 +7976,10 @@ const StudentPage = () => {
                   Personal Information
                 </h3>
 
-                <div className="flex flex-col md:flex-row gap-8">
+                <div className="flex flex-col md:flex-row gap-8 max-md:gap-2">
                   {/* Photo Section */}
                   <div className="flex flex-col items-center gap-4">
-                    <div className="w-48 h-48 rounded-2xl overflow-hidden border-4 border-white/50 shadow-xl">
+                    <div className="w-48 h-48 max-md:w-24 max-md:h-24 rounded-2xl overflow-hidden border-4 border-white/50 shadow-xl">
                       <img
                         src={
                           photoPreview ||
@@ -8096,7 +8101,7 @@ const StudentPage = () => {
                   </div>
 
                   {/* Details Grid */}
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex-1 grid grid-cols-2 max-md:grid-cols-2 gap-6 max-md:gap-5">
                     {[
                       { label: "Full Name", key: "name", type: "text" },
                       { label: "Age", key: "age", type: "number" },
@@ -8109,8 +8114,8 @@ const StudentPage = () => {
                       { label: "UD ID", key: "ud_id", type: "text" },
                       { label: "Aadhar Number", key: "aadharNumber", type: "text" },
                     ].map((field) => (
-                      <div key={field.key}>
-                        <p className="text-sm text-[#6F6C90] mb-2 font-semibold">{field.label}</p>
+                      <div key={field.key} className={!["age", "studentId", "dob", "gender", "religion", "caste", "category", "ud_id"].includes(field.key) ? "max-md:col-span-2" : ""}>
+                        <p className="text-sm max-md:text-[13px] text-[#6F6C90] max-md:text-gray-500 mb-2 max-md:mb-1 font-semibold max-md:font-medium">{field.label}</p>
                         {editMode ? (
                           field.options ? (
                             <select
@@ -8141,7 +8146,7 @@ const StudentPage = () => {
                             />
                           )
                         ) : (
-                          <p className="text-[#170F49] font-medium text-lg">
+                          <p className="text-[#170F49] font-medium text-lg max-md:text-[17px] max-md:font-semibold max-md:text-[#0A0535]">
                             {student?.[field.key] || "N/A"}
                           </p>
                         )}
@@ -8156,8 +8161,8 @@ const StudentPage = () => {
               </div>
 
               {/* Address Information Section */}
-              <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
+              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
+                <h3 className="text-lg font-semibold text-[#170F49] mb-6 max-md:mb-4 flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5 text-[#E38B52]"
@@ -8181,7 +8186,7 @@ const StudentPage = () => {
                   Address Information
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                   {[
                     { label: "Birth Place", key: "birthPlace" },
                     { label: "House Name", key: "houseName" },
@@ -8193,8 +8198,8 @@ const StudentPage = () => {
                     { label: "Pin Code", key: "pinCode" },
                     { label: "Revenue District", key: "revenueDistrict" },
                   ].map((field) => (
-                    <div key={field.key}>
-                      <p className="text-sm text-[#6F6C90] mb-2 font-semibold">{field.label}</p>
+                    <div key={field.key} className={!["age", "studentId", "dob", "gender", "religion", "caste", "category", "ud_id"].includes(field.key) ? "max-md:col-span-2" : ""}>
+                      <p className="text-sm max-md:text-[13px] text-[#6F6C90] max-md:text-gray-500 mb-2 max-md:mb-1 font-semibold max-md:font-medium">{field.label}</p>
                       {editMode ? (
                         <input
                           type="text"
@@ -8204,7 +8209,7 @@ const StudentPage = () => {
                           className="input-edit"
                         />
                       ) : (
-                        <p className="text-[#170F49] font-medium">{student?.[field.key] || "N/A"}</p>
+                        <p className="text-[#170F49] font-medium text-lg max-md:text-[17px] max-md:font-semibold max-md:text-[#0A0535]">{student?.[field.key] || "N/A"}</p>
                       )}
                     </div>
                   ))}
@@ -8212,8 +8217,8 @@ const StudentPage = () => {
               </div>
 
               {/* Contact Information Section */}
-              <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
+              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
+                <h3 className="text-lg font-semibold text-[#170F49] mb-6 max-md:mb-4 flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5 text-[#E38B52]"
@@ -8231,14 +8236,14 @@ const StudentPage = () => {
                   Contact Information
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                   {[
                     { label: "Phone Number", key: "phoneNumber" },
                     { label: "Email", key: "email" },
                     { label: "Address", key: "address" },
                   ].map((field) => (
-                    <div key={field.key}>
-                      <p className="text-sm text-[#6F6C90] mb-2 font-semibold">{field.label}</p>
+                    <div key={field.key} className={!["age", "studentId", "dob", "gender", "religion", "caste", "category", "ud_id"].includes(field.key) ? "max-md:col-span-2" : ""}>
+                      <p className="text-sm max-md:text-[13px] text-[#6F6C90] max-md:text-gray-500 mb-2 max-md:mb-1 font-semibold max-md:font-medium">{field.label}</p>
                       {editMode ? (
                         <input
                           type={field.key === "email" ? "email" : "text"}
@@ -8248,7 +8253,7 @@ const StudentPage = () => {
                           className="input-edit"
                         />
                       ) : (
-                        <p className="text-[#170F49] font-medium">{student?.[field.key] || "N/A"}</p>
+                        <p className="text-[#170F49] font-medium text-lg max-md:text-[17px] max-md:font-semibold max-md:text-[#0A0535]">{student?.[field.key] || "N/A"}</p>
                       )}
                     </div>
                   ))}
@@ -8256,8 +8261,8 @@ const StudentPage = () => {
               </div>
 
               {/* Family Information Section */}
-              <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
+              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
+                <h3 className="text-lg font-semibold text-[#170F49] mb-6 max-md:mb-4 flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5 text-[#E38B52]"
@@ -8275,13 +8280,13 @@ const StudentPage = () => {
                   Family Information
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                   {[
                     { label: "Father's Name", key: "fatherName" },
                     { label: "Mother's Name", key: "motherName" },
                   ].map((field) => (
-                    <div key={field.key}>
-                      <p className="text-sm text-[#6F6C90] mb-2 font-semibold">{field.label}</p>
+                    <div key={field.key} className={!["age", "studentId", "dob", "gender", "religion", "caste", "category", "ud_id"].includes(field.key) ? "max-md:col-span-2" : ""}>
+                      <p className="text-sm max-md:text-[13px] text-[#6F6C90] max-md:text-gray-500 mb-2 max-md:mb-1 font-semibold max-md:font-medium">{field.label}</p>
                       {editMode ? (
                         <input
                           type="text"
@@ -8291,7 +8296,7 @@ const StudentPage = () => {
                           className="input-edit"
                         />
                       ) : (
-                        <p className="text-[#170F49] font-medium">{student?.[field.key] || "N/A"}</p>
+                        <p className="text-[#170F49] font-medium text-lg max-md:text-[17px] max-md:font-semibold max-md:text-[#0A0535]">{student?.[field.key] || "N/A"}</p>
                       )}
                     </div>
                   ))}
@@ -8299,8 +8304,8 @@ const StudentPage = () => {
               </div>
 
               {/* Disability Details Section */}
-              <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
+              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
+                <h3 className="text-lg font-semibold text-[#170F49] mb-6 max-md:mb-4 flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5 text-[#E38B52]"
@@ -8318,13 +8323,13 @@ const StudentPage = () => {
                   Disability Details
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                   {[
                     { label: "Type of Disability", key: "disabilityType" },
                     { label: "Percentage of Disability", key: "disabilityPercentage", suffix: "%" },
                   ].map((field) => (
-                    <div key={field.key}>
-                      <p className="text-sm text-[#6F6C90] mb-2 font-semibold">{field.label}</p>
+                    <div key={field.key} className={!["age", "studentId", "dob", "gender", "religion", "caste", "category", "ud_id"].includes(field.key) ? "max-md:col-span-2" : ""}>
+                      <p className="text-sm max-md:text-[13px] text-[#6F6C90] max-md:text-gray-500 mb-2 max-md:mb-1 font-semibold max-md:font-medium">{field.label}</p>
                       {editMode ? (
                         <input
                           type={field.key === "disabilityPercentage" ? "number" : "text"}
@@ -8343,7 +8348,7 @@ const StudentPage = () => {
                 </div>
 
                 <div className="mt-6">
-                  <p className="text-sm text-[#6F6C90] mb-2 font-semibold">Identification Marks</p>
+                  <p className="text-sm max-md:text-[13px] text-[#6F6C90] max-md:text-gray-500 mb-2 max-md:mb-1 font-semibold max-md:font-medium">Identification Marks</p>
                   {editMode ? (
                     <textarea
                       name="identificationMarks"
@@ -8359,8 +8364,8 @@ const StudentPage = () => {
               </div>
 
               {/* Academic Information Section */}
-              <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
+              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
+                <h3 className="text-lg font-semibold text-[#170F49] mb-6 max-md:mb-4 flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5 text-[#E38B52]"
@@ -8378,7 +8383,7 @@ const StudentPage = () => {
                   Academic Information
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                   {[
                     { label: "Class", key: "class", options: CLASS_OPTIONS },
                     { label: "Division", key: "division", options: DIVISION_OPTIONS },
@@ -8387,8 +8392,8 @@ const StudentPage = () => {
                     { label: "Admission Number", key: "admissionNumber" },
                     { label: "Date of Admission", key: "admissionDate", type: "date" },
                   ].map((field) => (
-                    <div key={field.key}>
-                      <p className="text-sm text-[#6F6C90] mb-2 font-semibold">{field.label}</p>
+                    <div key={field.key} className={!["age", "studentId", "dob", "gender", "religion", "caste", "category", "ud_id"].includes(field.key) ? "max-md:col-span-2" : ""}>
+                      <p className="text-sm max-md:text-[13px] text-[#6F6C90] max-md:text-gray-500 mb-2 max-md:mb-1 font-semibold max-md:font-medium">{field.label}</p>
                       {editMode ? (
                         field.options ? (
                           <select
@@ -8430,8 +8435,8 @@ const StudentPage = () => {
               </div>
 
               {/* Bank Details Section */}
-              <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
+              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
+                <h3 className="text-lg font-semibold text-[#170F49] mb-6 max-md:mb-4 flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5 text-[#E38B52]"
@@ -8449,15 +8454,15 @@ const StudentPage = () => {
                   Bank Details
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                   {[
                     { label: "Account Number", key: "accountNumber" },
                     { label: "Bank Name", key: "bankName" },
                     { label: "Branch", key: "branch" },
                     { label: "IFSC Code", key: "ifscCode" },
                   ].map((field) => (
-                    <div key={field.key}>
-                      <p className="text-sm text-[#6F6C90] mb-2 font-semibold">{field.label}</p>
+                    <div key={field.key} className={!["age", "studentId", "dob", "gender", "religion", "caste", "category", "ud_id"].includes(field.key) ? "max-md:col-span-2" : ""}>
+                      <p className="text-sm max-md:text-[13px] text-[#6F6C90] max-md:text-gray-500 mb-2 max-md:mb-1 font-semibold max-md:font-medium">{field.label}</p>
                       {editMode ? (
                         <input
                           type="text"
@@ -8467,7 +8472,7 @@ const StudentPage = () => {
                           className="input-edit"
                         />
                       ) : (
-                        <p className="text-[#170F49] font-medium">{student?.[field.key] || "N/A"}</p>
+                        <p className="text-[#170F49] font-medium text-lg max-md:text-[17px] max-md:font-semibold max-md:text-[#0A0535]">{student?.[field.key] || "N/A"}</p>
                       )}
                     </div>
                   ))}
@@ -8476,7 +8481,7 @@ const StudentPage = () => {
 
               {/* Certificates & Documents Section */}
               <div className="p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-[#170F49] mb-6 max-md:mb-4 flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5 text-[#E38B52]"
@@ -8495,7 +8500,7 @@ const StudentPage = () => {
                 </h3>
 
                 {/* Document Types Upload Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 max-md:mb-4">
                   {[
                     { id: "aadhar", label: "Aadhar" },
                     { id: "birth_certificate", label: "Birth Certificate" },
@@ -8625,7 +8630,7 @@ const StudentPage = () => {
                       <p className="text-xs text-[#6F6C90] mt-2">Upload documents from the grid above</p>
                     </div>
                   ) : (
-                    <div className="space-y-6">
+                    <div className="space-y-6 max-md:space-y-4">
                       {Object.entries(documentsByCategory).map(([categoryLabel, docsInCategory]) => (
                         <div key={categoryLabel} className="space-y-3">
                           <h5 className="text-sm font-semibold text-[#170F49]">{categoryLabel}</h5>
@@ -8652,7 +8657,7 @@ const StudentPage = () => {
                                     </svg>
                                   </div>
 
-                                  <div className="flex-1 min-w-0">
+                                  <div className="flex-1 min-w-0 w-full">
                                     <p
                                       className="font-semibold text-[#170F49] text-sm truncate"
                                       title={`${getDocumentLabel(doc)} - ${doc.name}`}
@@ -8751,16 +8756,16 @@ const StudentPage = () => {
             </div>
           ) : activeTab === "iep" ? (
 
-            <div className="max-w-6xl mx-auto p-6">
+            <div className="max-w-6xl mx-auto p-6 max-md:px-4 max-md:py-2">
 
-              <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+              <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8m0-8l-3 3m3-3l3 3M4 6h16" />
                 </svg>
                 Term Report
               </h2>
 
-              <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
+              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-4 flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -8922,7 +8927,7 @@ const StudentPage = () => {
               {pendingNewIepMonth && editingIepMonth === pendingNewIepMonth && renderIepDraftCard()}
 
               {/* Saved IEP Reports List */}
-              <div className="mt-6 mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
+              <div className="mt-6 mb-6 max-md:mb-4 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
                 <h3 className="text-lg font-semibold text-[#170F49] mb-4 flex items-center gap-2">Saved Reports</h3>
                 {(() => {
                   const keys = Object.keys(savedIepByMonth || {});
@@ -9034,7 +9039,7 @@ const StudentPage = () => {
                         </div>
 
                         {isExpanded && (
-                          <div className="px-6 py-6 border-t border-[#E38B52]/20 space-y-6 bg-white/50">
+                          <div className="px-6 py-6 border-t border-[#E38B52]/20 space-y-6 max-md:space-y-4 bg-white/50">
                             {/* Table Section */}
                             {isEditing ? (
                               <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -9288,8 +9293,8 @@ const StudentPage = () => {
               </div>
             </div>
           ) : activeTab === "iep-form" ? (
-            <div className="max-w-6xl mx-auto p-6">
-              <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+            <div className="max-w-6xl mx-auto p-6 max-md:px-4 max-md:py-2">
+              <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
@@ -9299,7 +9304,7 @@ const StudentPage = () => {
               {/* ===================== LIST MODE ===================== */}
               {iepFormMode === "list" && (
                 <div>
-                  <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center justify-between mb-6 max-md:mb-4">
                     <h3 className="text-lg font-semibold text-[#170F49]">
                       IEP Records of: <span className="font-semibold">{student?.name}</span>
                     </h3>
@@ -9380,7 +9385,7 @@ const StudentPage = () => {
               {/* ===================== CREATE / EDIT MODE ===================== */}
               {(iepFormMode === "create" || iepFormMode === "edit") && iepFormDraft && (
                 <div>
-                  <div className="mb-6 p-5 border-2 border-[#E38B52]/30 rounded-2xl bg-white/60 shadow-md">
+                  <div className="mb-6 max-md:mb-4 p-5 border-2 border-[#E38B52]/30 rounded-2xl bg-white/60 shadow-md">
                     <h3 className="text-lg font-bold text-[#170F49] mb-3">
                       {iepFormMode === "create" ? "New IEP Record" : "Edit IEP Record"} for{" "}
                       <span>{student?.name}</span>
@@ -9424,7 +9429,7 @@ const StudentPage = () => {
                   {renderIepTermEditor("firstTerm", "FIRST TERM")}
                   {renderIepTermEditor("secondTerm", "SECOND TERM")}
 
-                  <div className="mb-8 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm grid md:grid-cols-2 gap-4">
+                  <div className="mb-8 max-md:mb-5 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[#170F49] mb-1">
                         Signature Of The Teacher
@@ -9473,7 +9478,7 @@ const StudentPage = () => {
               {/* ===================== VIEW MODE (read-only) ===================== */}
               {iepFormMode === "view" && iepFormViewRecord && (
                 <div>
-                  <div className="mb-6 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="mb-6 max-md:mb-4 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
                       <p className="text-[#170F49] font-semibold text-lg">{student?.name}</p>
                       {iepFormViewRecord.academicYear && (
@@ -9516,7 +9521,7 @@ const StudentPage = () => {
                   </div>
 
                   {iepFormViewRecord.annualGoal && (
-                    <div className="mb-6 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm">
+                    <div className="mb-6 max-md:mb-4 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm">
                       <div className="text-sm font-semibold text-[#170F49] mb-2">
                         Annual Goal
                       </div>
@@ -9559,7 +9564,7 @@ const StudentPage = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                   <div className="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4">
                     <h4 className="text-lg font-bold text-[#170F49] mb-2">Delete IEP Record</h4>
-                    <p className="text-sm text-gray-600 mb-6">
+                    <p className="text-sm text-gray-600 mb-6 max-md:mb-4">
                       Are you sure you want to delete this IEP record? This action cannot be undone.
                     </p>
                     <div className="flex justify-end gap-3">
@@ -9583,8 +9588,8 @@ const StudentPage = () => {
               )}
             </div>
           ) : activeTab === "special-education" ? (
-            <div className="max-w-6xl mx-auto p-6">
-              <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+            <div className="max-w-6xl mx-auto p-6 max-md:px-4 max-md:py-2">
+              <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -9602,8 +9607,8 @@ const StudentPage = () => {
                 Special Education Report
               </h2>
               {/* Report Setup - Cylinder Container */}
-              <div className="mb-6 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-6 flex items-center gap-2">
+              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
+                <h3 className="text-lg font-semibold text-[#170F49] mb-6 max-md:mb-4 flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-5 w-5 text-[#E38B52]"
@@ -9622,7 +9627,7 @@ const StudentPage = () => {
                   <span>{student.name}</span>
                 </h3>
 
-                <div className="flex flex-col md:flex-row gap-6 items-end">
+                <div className="flex flex-col md:flex-row gap-6 max-md:gap-2 items-end">
                   {/* Report Date */}
                   <div className="flex items-center gap-3">
                     <label className="block text-sm font-semibold text-[#170F49] whitespace-nowrap">
@@ -9675,7 +9680,7 @@ const StudentPage = () => {
 
               {/* Results Section */}
               {savedTables.length > 0 ? (
-                <div className="space-y-6">
+                <div className="space-y-6 max-md:space-y-4">
                   {/* Display Tables (all past + current, collapsible) */}
                   {[...savedTables]
                     .sort((a, b) => {
@@ -10858,8 +10863,8 @@ const StudentPage = () => {
 
             </div>
           ) : (
-            <div className="max-w-6xl mx-auto p-6">
-              <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+            <div className="max-w-6xl mx-auto p-6 max-md:px-4 max-md:py-2">
+              <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -10876,11 +10881,11 @@ const StudentPage = () => {
                 </svg>
                 Case Record
               </h2>
-              <div className="flex gap-6 items-start">
+              <div className="flex flex-col md:flex-row gap-6 max-md:gap-5 items-start">
                 {/* Left Sidebar Navigation */}
-                <aside className="w-64 flex-shrink-0 sticky top-5 self-start">
+                <aside className="w-64 flex-shrink-0 sticky top-5 self-start max-md:hidden">
                   <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-6 border border-white/20 w-64 z-30 max-h-[calc(100vh-40px)] overflow-y-auto">
-                    <div className="mb-6 pb-3 border-b border-[#E38B52]/20">
+                    <div className="mb-6 max-md:mb-4 pb-3 border-b border-[#E38B52]/20">
                       <h3 className="text-lg font-bold text-[#170F49] mb-3">
                         Case Record Sections
                       </h3>
@@ -11141,15 +11146,88 @@ const StudentPage = () => {
                   </div>
                 </aside>
 
+                {/* Mobile Section Navigation - horizontal scrollable pills */}
+                <div className="md:hidden w-full overflow-x-auto pb-2 hide-scrollbar" data-pills-container>
+                  <div className="flex gap-2 min-w-max px-1">
+                    {[
+                      { id: "identification", label: "Identification" },
+                      { id: "demographic", label: "Demographic" },
+                      { id: "contact", label: "Contact & Medical" },
+                      { id: "family", label: "Family History" },
+                      { id: "development", label: "Development" },
+                      { id: "education", label: "Special Ed." },
+                      { id: "medical", label: "Medical Info" },
+                      { id: "documents", label: "Documents" },
+                    ].map((section) => (
+                      <button
+                        key={section.id}
+                        data-pill-id={section.id}
+                        onClick={(e) => {
+                          setActiveCaseSection(section.id);
+                          // Scroll active pill to center
+                          const btn = e.currentTarget;
+                          const container = btn.closest('[data-pills-container]');
+                          if (container) {
+                            const btnLeft = btn.offsetLeft;
+                            const btnWidth = btn.offsetWidth;
+                            const containerWidth = container.offsetWidth;
+                            container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+                          }
+                        }}
+                        className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${activeCaseSection === section.id
+                          ? "bg-[#E38B52] text-white shadow-md"
+                          : "bg-white/70 text-[#170F49] border border-gray-200"
+                        }`}
+                      >
+                        {section.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mobile Edit/Download Buttons */}
+                <div className="md:hidden w-full flex gap-2 mb-3">
+                  {!editMode ? (
+                    <button
+                      onClick={handleEditStart}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-[#E38B52] rounded-xl border border-[#E38B52]/30 text-sm font-medium shadow-sm"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Edit
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleEditSave}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium shadow-sm"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Save Changes
+                    </button>
+                  )}
+                  <button
+                    onClick={handleDownloadCaseRecord}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#E38B52] to-[#F5A572] text-white rounded-xl text-sm font-medium shadow-sm"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download
+                  </button>
+                </div>
+
                 {/* Right Content Area */}
                 <div className="flex-1 min-w-0">
                   {/* Case Record Completion Progress Bar - always visible */}
-                  <div className="mb-8 bg-white/50 rounded-2xl p-6 shadow-lg border border-white/30">
+                  <div className="mb-8 max-md:mb-4 bg-white/50 rounded-2xl p-6 max-md:p-3 shadow-lg border border-white/30">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-semibold text-[#170F49]">
+                      <h3 className="text-lg font-semibold text-[#170F49] max-md:text-base">
                         Case Record Completion
                       </h3>
-                      <span className="text-xl font-bold text-[#E38B52]">
+                      <span className="text-xl font-bold text-[#E38B52] max-md:text-lg">
                         {caseRecordCompletion}%
                       </span>
                     </div>
@@ -11163,8 +11241,8 @@ const StudentPage = () => {
 
                   {/* Identification Data Section */}
                   {activeCaseSection === "identification" && (
-                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-0 max-md:shadow-none max-md:bg-transparent max-md:border-none border border-white/20 w-full">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -11181,8 +11259,8 @@ const StudentPage = () => {
                         </svg>
                         Identification Data
                       </h2>
-                      <div className="p-6 bg-white/50 rounded-2xl">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div className="p-6 max-md:p-3 bg-white/50 rounded-2xl w-full">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-md:gap-5">
                           <div className="md:col-span-2">
                             <p className="text-sm text-[#6F6C90]">Name</p>
                             {editMode ? (
@@ -11372,8 +11450,8 @@ const StudentPage = () => {
 
                   {/* Demographic Data Section */}
                   {activeCaseSection === "demographic" && (
-                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-0 max-md:shadow-none max-md:bg-transparent max-md:border-none border border-white/20 w-full">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -11390,9 +11468,9 @@ const StudentPage = () => {
                         </svg>
                         Demographic Data
                       </h2>
-                      <div className="space-y-6">
+                      <div className="space-y-6 max-md:space-y-4">
                         {/* Family Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-md:gap-2">
                           {/* Father's Card */}
                           <div className="bg-white/50 rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
                             <h3 className="text-lg font-semibold text-[#170F49] mb-4">
@@ -11579,7 +11657,7 @@ const StudentPage = () => {
 
                         {/* Additional Info Section */}
                         <div className="bg-white/50 rounded-2xl p-6 mt-6 shadow-sm">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                             <div>
                               <p className="text-sm text-[#6F6C90]">
                                 Total Family Income per Month
@@ -11615,8 +11693,8 @@ const StudentPage = () => {
 
                   {/* Contact & Medical Information */}
                   {activeCaseSection === "contact" && (
-                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-0 max-md:shadow-none max-md:bg-transparent max-md:border-none border border-white/20 w-full">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -11633,8 +11711,8 @@ const StudentPage = () => {
                         </svg>
                         Contact & Medical Information
                       </h2>
-                      <div className="p-8 bg-white/50 rounded-2xl mb-8 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6 border-b border-white/60">
+                      <div className="p-8 bg-white/50 rounded-2xl mb-8 max-md:mb-5 space-y-6 max-md:space-y-4">
+                        <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5 pb-6 border-b border-white/60">
                           <div>
                             <p className="text-sm text-[#6F6C90]">
                               Informant's Name
@@ -11730,8 +11808,8 @@ const StudentPage = () => {
 
                   {/* Family History */}
                   {activeCaseSection === "family" && (
-                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-0 max-md:shadow-none max-md:bg-transparent max-md:border-none border border-white/20 w-full">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -11748,14 +11826,15 @@ const StudentPage = () => {
                         </svg>
                         Family History
                       </h2>
-                      <div className="space-y-6">
+                      <div className="space-y-6 max-md:space-y-4">
                         {/* Household Composition */}
-                        <div className="p-6 bg-white/50 rounded-2xl">
+                        <div className="p-6 max-md:p-3 bg-white/50 rounded-2xl w-full">
                           <h3 className="text-lg font-semibold text-[#170F49] mb-4">
                             Household Composition
                           </h3>
                           {editMode ? (
-                            <div className="overflow-x-auto pb-2">
+                            <>
+                              <div className="hidden md:block overflow-x-auto pb-2">
                               <table className="min-w-[980px] w-full table-fixed border border-[#E38B52]/20 rounded-xl backdrop-blur-xl overflow-hidden">
                                 <colgroup>
                                   <col className="w-[6%]" />
@@ -11954,9 +12033,69 @@ const StudentPage = () => {
                               >
                                 Add Row
                               </button>
-                            </div>
+                              </div>
+                              {/* Mobile View - Edit Mode */}
+                              <div className="md:hidden space-y-4 mt-4">
+                                {householdRows.map((row, index) => (
+                                  <div key={row.id} className="bg-white/70 border border-[#E38B52]/20 rounded-xl p-4 shadow-sm relative">
+                                    <div className="absolute top-4 right-4">
+                                      <button
+                                        type="button"
+                                        onClick={() => removeHouseholdRow(row.id)}
+                                        disabled={householdRows.length === 1}
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 shadow-sm hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 013.878.512.75.75 0 11-.256 1.478l-.209-.035-1.005 13.07a3 3 0 01-2.991 2.77H8.084a3 3 0 01-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 01-.256-1.478A48.567 48.567 0 017.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 013.369 0c1.603.051 2.815 1.387 2.815 2.951zm-6.136-1.452a51.196 51.196 0 013.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 00-6 0v-.113c0-.794.609-1.428 1.364-1.452zm-.355 5.945a.75.75 0 10-1.5.058l.347 9a.75.75 0 101.499-.058l-.346-9zm5.48.058a.75.75 0 10-1.498-.058l-.347 9a.75.75 0 001.5.058l.345-9z" clipRule="evenodd" /></svg>
+                                      </button>
+                                    </div>
+                                    <h4 className="font-semibold text-[#170F49] mb-3 flex items-center gap-2 pr-10">
+                                      <span className="bg-[#E38B52] text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">{index + 1}</span>
+                                      Member Details
+                                    </h4>
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="text-xs text-[#6F6C90] ml-1 mb-1 block">Name</label>
+                                        <input type="text" value={row.name} onChange={(e) => updateHouseholdRow(row.id, "name", e.target.value)} className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-lg text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none" />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="text-xs text-[#6F6C90] ml-1 mb-1 block">Age</label>
+                                          <input type="text" inputMode="numeric" value={row.age} onChange={(e) => updateHouseholdRow(row.id, "age", e.target.value)} className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-lg text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none" />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-[#6F6C90] ml-1 mb-1 block">Education</label>
+                                          <input type="text" value={row.education} onChange={(e) => updateHouseholdRow(row.id, "education", e.target.value)} className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-lg text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none" />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-[#6F6C90] ml-1 mb-1 block">Occupation</label>
+                                          <input type="text" value={row.occupation} onChange={(e) => updateHouseholdRow(row.id, "occupation", e.target.value)} className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-lg text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none" />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-[#6F6C90] ml-1 mb-1 block">Health</label>
+                                          <input type="text" value={row.health} onChange={(e) => updateHouseholdRow(row.id, "health", e.target.value)} className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-lg text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none" />
+                                        </div>
+                                        <div className="col-span-2">
+                                          <label className="text-xs text-[#6F6C90] ml-1 mb-1 block">Income</label>
+                                          <input type="text" value={row.income} onChange={(e) => updateHouseholdRow(row.id, "income", e.target.value)} className="w-full px-3 py-2 bg-white/50 border border-[#E38B52]/20 rounded-lg text-sm focus:ring-2 focus:ring-[#E38B52] focus:outline-none" />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                                
+                                <button
+                                  type="button"
+                                  onClick={addHouseholdRow}
+                                  className="w-full flex items-center justify-center px-4 py-3 bg-white/60 border border-dashed border-[#E38B52]/40 rounded-xl text-sm font-medium text-[#E38B52] hover:bg-white/80 transition-all"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                                  Add Member
+                                </button>
+                              </div>
+                            </>
                           ) : (
-                            <div className="overflow-x-auto">
+                            <>
+                              <div className="hidden md:block overflow-x-auto">
                               <table className="w-full border-collapse rounded-xl overflow-hidden">
                                 <thead className="bg-[#E38B52]/10">
                                   <tr>
@@ -12025,16 +12164,52 @@ const StudentPage = () => {
                                   )}
                                 </tbody>
                               </table>
-                            </div>
+                              </div>
+                              {/* Mobile View */}
+                              <div className="md:hidden space-y-4 mt-4">
+                                {student?.household && student.household.length > 0 ? (
+                                  student.household.map((member, index) => (
+                                    <div key={index} className="bg-white/70 border border-[#E38B52]/20 rounded-xl p-4 shadow-sm">
+                                      <h4 className="font-semibold text-[#170F49] mb-3 flex items-center gap-2">
+                                        <span className="bg-[#E38B52] text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">{index + 1}</span>
+                                        {member.name || "N/A"} {member.age ? `(${member.age})` : ''}
+                                      </h4>
+                                      <div className="grid grid-cols-2 gap-3 text-sm">
+                                        <div>
+                                          <span className="text-[#6F6C90] block text-xs mb-0.5">Education</span>
+                                          <span className="text-[#170F49] font-medium">{member.education || "N/A"}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-[#6F6C90] block text-xs mb-0.5">Occupation</span>
+                                          <span className="text-[#170F49] font-medium">{member.occupation || "N/A"}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-[#6F6C90] block text-xs mb-0.5">Health</span>
+                                          <span className="text-[#170F49] font-medium">{member.health || "N/A"}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-[#6F6C90] block text-xs mb-0.5">Income</span>
+                                          <span className="text-[#170F49] font-medium">{member.income || "N/A"}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="p-4 text-sm text-[#6F6C90] text-center bg-white/50 rounded-xl border border-dashed border-[#E38B52]/30">
+                                    No household composition data available
+                                  </div>
+                                )}
+                              </div>
+                            </>
                           )}
                         </div>
 
                         {/* Medical History */}
-                        <div className="p-6 bg-white/50 rounded-2xl">
+                        <div className="p-6 max-md:p-3 bg-white/50 rounded-2xl w-full">
                           <h3 className="text-lg font-semibold text-[#170F49] mb-4">
                             Medical History
                           </h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                             <div>
                               <p className="text-sm text-[#6F6C90]">
                                 Family History of Mental Illness
@@ -12100,11 +12275,11 @@ const StudentPage = () => {
                         </div>
 
                         {/* Birth History */}
-                        <div className="p-6 bg-white/50 rounded-2xl">
+                        <div className="p-6 max-md:p-3 bg-white/50 rounded-2xl w-full">
                           <h3 className="text-lg font-semibold text-[#170F49] mb-4">
                             Birth History
                           </h3>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="grid grid-cols-1 md:grid-cols-3 max-md:grid-cols-1 gap-6 max-md:gap-5">
                             <div>
                               <p className="text-sm text-[#6F6C90]">
                                 Prenatal History
@@ -12167,8 +12342,8 @@ const StudentPage = () => {
 
                   {/* Developmental History */}
                   {activeCaseSection === "development" && (
-                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-0 max-md:shadow-none max-md:bg-transparent max-md:border-none border border-white/20 w-full">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -12266,7 +12441,7 @@ const StudentPage = () => {
                       </div>
                       {/* Additional Information Section */}
                       <div className="mt-6">
-                        <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                        <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
                             className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -12284,7 +12459,7 @@ const StudentPage = () => {
                           Additional Information
                         </h2>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                           <div className="bg-white/50 rounded-2xl p-6 shadow-sm min-h-[120px]">
                             <h3 className="text-md font-semibold text-[#170F49] mb-2 capitalize">
                               School History
@@ -12361,8 +12536,8 @@ const StudentPage = () => {
 
                   {/* Special Education Assessment Section */}
                   {activeCaseSection === "education" && (
-                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-0 max-md:shadow-none max-md:bg-transparent max-md:border-none border border-white/20 w-full">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -12381,8 +12556,8 @@ const StudentPage = () => {
                       </h2>
 
                       {/* Horizontal Navigation for Subsections */}
-                      <div className="mb-8 overflow-x-auto">
-                        <div className="flex gap-1 min-w-max pb-2">
+                      <div className="w-full overflow-x-auto pill-scroll mb-4 pb-2">
+                        <div className="flex gap-2 min-w-max">
                           {[
                             { id: "self-help", label: "Self Help" },
                             { id: "motor", label: "Motor" },
@@ -12395,13 +12570,20 @@ const StudentPage = () => {
                           ].map((subsection) => (
                             <button
                               key={subsection.id}
-                              onClick={() =>
-                                setActiveEducationSubsection(subsection.id)
-                              }
-                              className={`px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300 whitespace-nowrap ${activeEducationSubsection === subsection.id
-                                ? "bg-[#E38B52] text-white shadow-lg"
-                                : "bg-white/50 text-[#170F49] hover:bg-white/80"
-                                }`}
+                              onClick={(e) => {
+                                setActiveEducationSubsection(subsection.id);
+                                const btn = e.currentTarget;
+                                const scrollable = btn.parentElement?.parentElement;
+                                if (scrollable) {
+                                  const scrollLeft = btn.offsetLeft - (scrollable.clientWidth / 2) + (btn.offsetWidth / 2);
+                                  scrollable.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+                                }
+                              }}
+                              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 whitespace-nowrap ${
+                                activeEducationSubsection === subsection.id
+                                  ? "bg-[#E38B52] text-white shadow-md"
+                                  : "bg-white/70 text-[#170F49] border border-gray-200"
+                              }`}
                             >
                               {subsection.label}
                             </button>
@@ -12411,17 +12593,17 @@ const StudentPage = () => {
 
                       {/* Self Help */}
                       {activeEducationSubsection === "self-help" && (
-                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 max-md:p-3 space-y-8 max-md:space-y-3 mb-8 max-md:mb-5">
                           <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
                             Self Help
                           </h3>
 
                           {/* Food Habits */}
-                          <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
+                          <div className="bg-white rounded-xl p-6 max-md:p-3 space-y-6 max-md:space-y-3 shadow-lg">
                             <h4 className="text-md font-medium text-[#170F49]">
                               Food Habits
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                               <div>
                                 <label className="block text-sm font-medium text-[#170F49] mb-2">
                                   Eating
@@ -12471,7 +12653,7 @@ const StudentPage = () => {
                             </div>
                           </div>
 
-                          <div className="space-y-6">
+                          <div className="space-y-6 max-md:space-y-4">
                             <div>
                               <label className="block text-sm font-medium text-[#170F49] mb-2">
                                 Toilet Habits (Include mention hygenic where
@@ -12544,11 +12726,11 @@ const StudentPage = () => {
                           </div>
 
                           {/* Dressing */}
-                          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6">
+                          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6 max-md:space-y-4">
                             <h4 className="text-md font-medium text-[#170F49]">
                               Dressing
                             </h4>
-                            <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
+                            <div className="bg-white rounded-xl p-6 max-md:p-3 space-y-6 max-md:space-y-3 shadow-lg">
                               <div>
                                 <label className="block text-sm font-medium text-[#170F49] mb-2">
                                   Removing and wearing clothes
@@ -12649,11 +12831,11 @@ const StudentPage = () => {
 
                       {/* Motor */}
                       {activeEducationSubsection === "motor" && (
-                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 max-md:p-3 space-y-8 max-md:space-y-3 mb-8 max-md:mb-5">
                           <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
                             Motor
                           </h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white rounded-xl p-6 shadow-lg">
+                          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5 bg-white rounded-xl p-6 shadow-lg">
                             <div>
                               <label className="block text-sm font-medium text-[#170F49] mb-2">
                                 Gross Motor
@@ -12698,7 +12880,7 @@ const StudentPage = () => {
 
                       {/* Sensory */}
                       {activeEducationSubsection === "sensory" && (
-                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 max-md:p-3 space-y-8 max-md:space-y-3 mb-8 max-md:mb-5">
                           <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
                             Sensory
                           </h3>
@@ -12723,11 +12905,11 @@ const StudentPage = () => {
 
                       {/* Socialization */}
                       {activeEducationSubsection === "socialization" && (
-                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 max-md:p-3 space-y-8 max-md:space-y-3 mb-8 max-md:mb-5">
                           <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">
                             Socialization
                           </h3>
-                          <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
+                          <div className="bg-white rounded-xl p-6 max-md:p-3 space-y-6 max-md:space-y-3 shadow-lg">
                             <div>
                               <label className="block text-sm font-medium text-[#170F49] mb-2">
                                 Language/Communication
@@ -12803,11 +12985,11 @@ const StudentPage = () => {
 
                       {/* Cognitive */}
                       {activeEducationSubsection === "cognitive" && (
-                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 max-md:p-3 space-y-8 max-md:space-y-3 mb-8 max-md:mb-5">
                           <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">
                             Cognitive
                           </h3>
-                          <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
+                          <div className="bg-white rounded-xl p-6 max-md:p-3 space-y-6 max-md:space-y-3 shadow-lg">
                             <div>
                               <label className="block text-sm font-medium text-[#170F49] mb-2">
                                 Attention
@@ -12926,12 +13108,12 @@ const StudentPage = () => {
                           </div>
 
                           {/* Concept Formation */}
-                          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6">
+                          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6 max-md:space-y-4">
                             <h4 className="text-md font-medium text-[#170F49]">
                               Concept formation (Indicate ability to match,
                               identify name wherever applicable)
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-md:gap-2">
                               <div>
                                 <label className="block text-sm font-medium text-[#170F49] mb-2">
                                   Color
@@ -13100,12 +13282,12 @@ const StudentPage = () => {
 
                       {/* Academic */}
                       {activeEducationSubsection === "academic" && (
-                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 max-md:p-3 space-y-8 max-md:space-y-3 mb-8 max-md:mb-5">
                           <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#6366f1]/10">
                             Academic (give brief history: class attended/attending
                             indicate class/grade/level wherever appropriate)
                           </h3>
-                          <div className="bg-white rounded-xl p-6 space-y-6 shadow-lg">
+                          <div className="bg-white rounded-xl p-6 max-md:p-3 space-y-6 max-md:space-y-3 shadow-lg">
                             <div>
                               <label className="block text-sm font-medium text-[#170F49] mb-2">
                                 Reading
@@ -13179,7 +13361,7 @@ const StudentPage = () => {
 
                       {/* Prevocational/Domestic */}
                       {activeEducationSubsection === "prevocational" && (
-                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-8 mb-8">
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 max-md:p-3 space-y-8 max-md:space-y-3 mb-8 max-md:mb-5">
                           <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
                             Prevocational/Domestic (Specify ability and interest)
                           </h3>
@@ -13203,7 +13385,7 @@ const StudentPage = () => {
                               </p>
                             )}
                           </div>
-                          <div className="space-y-6">
+                          <div className="space-y-6 max-md:space-y-4">
                             <div>
                               <label className="block text-sm font-medium text-[#170F49] mb-2">
                                 Items of interest
@@ -13256,7 +13438,7 @@ const StudentPage = () => {
 
                       {/* Other Info */}
                       {activeEducationSubsection === "other-info" && (
-                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6 mb-8">
+                        <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-6 space-y-6 max-md:space-y-4 mb-8 max-md:mb-5">
                           <h3 className="text-lg font-semibold text-[#170F49] pb-2 border-b border-[#E38B52]/10">
                             Additional Information
                           </h3>
@@ -13326,8 +13508,8 @@ const StudentPage = () => {
 
                   {/* Medical Information */}
                   {activeCaseSection === "medical" && (
-                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-0 max-md:shadow-none max-md:bg-transparent max-md:border-none border border-white/20 w-full">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -13344,13 +13526,13 @@ const StudentPage = () => {
                         </svg>
                         Medical Information
                       </h2>
-                      <div className="space-y-6">
+                      <div className="space-y-6 max-md:space-y-4">
                         {/* Medical Status */}
-                        <div className="p-6 bg-white/50 rounded-2xl">
+                        <div className="p-6 max-md:p-3 bg-white/50 rounded-2xl w-full">
                           <h3 className="text-lg font-semibold text-[#170F49] mb-4">
                             Medical Status
                           </h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6 max-md:gap-5">
                             <div>
                               <p className="text-sm text-[#6F6C90]">
                                 Specific Diagnostic
@@ -13403,7 +13585,7 @@ const StudentPage = () => {
                         </div>
 
                         {/* Drug History */}
-                        <div className="p-6 bg-white/50 rounded-2xl">
+                        <div className="p-6 max-md:p-3 bg-white/50 rounded-2xl w-full">
                           <h3 className="text-lg font-semibold text-[#170F49] mb-4">
                             Drug History
                           </h3>
@@ -13586,17 +13768,17 @@ const StudentPage = () => {
                                     ))}
                                   </tbody>
                                 </table>
-                              </div>
+                               </div>
                             </>
                           )}
                         </div>
 
                         {/* Allergies */}
-                        <div className="p-6 bg-white/50 rounded-2xl">
+                        <div className="p-6 max-md:p-3 bg-white/50 rounded-2xl w-full">
                           <h3 className="text-lg font-semibold text-[#170F49] mb-4">
                             Allergies
                           </h3>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-md:gap-2">
                             <div>
                               <p className="text-sm text-[#6F6C90]">
                                 Drug Allergy
@@ -13659,8 +13841,8 @@ const StudentPage = () => {
 
                   {/* Documents Section */}
                   {activeCaseSection === "documents" && (
-                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 pb-4 border-b border-[#E38B52]/20 flex items-center">
+                    <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-0 max-md:shadow-none max-md:bg-transparent max-md:border-none border border-white/20 w-full">
+                      <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           className="h-6 w-6 mr-2 text-[#E38B52]"
@@ -13677,7 +13859,7 @@ const StudentPage = () => {
                         </svg>
                         Documents
                       </h2>
-                      <div className="p-6 bg-white/50 rounded-2xl">
+                      <div className="p-6 max-md:p-3 bg-white/50 rounded-2xl w-full">
                         <div className="space-y-4">
                           <div className="flex items-center justify-between p-4 bg-white/70 rounded-xl">
                             <div className="flex items-center gap-3">
@@ -13812,7 +13994,7 @@ const StudentPage = () => {
           )}
 
           {/* Action Buttons with adjusted margin */}
-          <div className="flex gap-4 mt-6 md:mt-8">
+          <div className="flex max-md:flex-col gap-4 max-md:gap-3 mt-6 md:mt-8 max-md:px-4 max-md:pb-6">
             {editMode ? (
               <>
                 <button
@@ -13945,7 +14127,7 @@ const StudentPage = () => {
       {editingTherapyReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl mx-4 my-8 overflow-y-auto max-h-[90vh]">
-            <div className="flex justify-between items-center mb-6 pb-4 border-b">
+            <div className="flex justify-between items-center mb-6 max-md:mb-4 pb-4 border-b">
               <h2 className="text-2xl font-bold text-[#170F49]">
                 Edit {editingTherapyReport.therapy_type} Report
               </h2>
@@ -14162,7 +14344,7 @@ const StudentPage = () => {
             <h2 className="text-2xl font-bold text-[#170F49] mb-2">
               {student?.name || "Student"}
             </h2>
-            <p className="text-sm text-[#6F6C90] mb-6">
+            <p className="text-sm text-[#6F6C90] mb-6 max-md:mb-4">
               {fromDate || "Any time"}  {toDate || "Any time"}
             </p>
             <div className="mb-4 text-sm text-[#333]">
@@ -14182,7 +14364,10 @@ const StudentPage = () => {
       )}
       {/* Move the button component INSIDE the main div */}
       <DynamicScrollButtons />{" "}
-    </div>
+    
+      
+
+</div>
   );
 };
 

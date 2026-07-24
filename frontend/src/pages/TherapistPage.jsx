@@ -282,7 +282,7 @@ const TherapistPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f7f7f7]">
+      <div className="min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col items-center justify-center bg-[#f7f7f7]">
         <div className="text-2xl text-[#E38B52]">
           Loading therapist information...
         </div>
@@ -292,18 +292,32 @@ const TherapistPage = () => {
 
   if (!therapist) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f7f7f7]">
+      <div className="min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col items-center justify-center bg-[#f7f7f7]">
         <div className="text-2xl text-[#E38B52]">Therapist not found.</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center bg-[#f7f7f7] relative overflow-hidden py-20">
+    <div className="min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col items-center bg-[#f7f7f7] relative overflow-hidden py-20 max-lg:py-0 max-lg:pb-[calc(40px+env(safe-area-inset-bottom))] max-lg:pt-0 max-lg:overflow-x-hidden">
+
+      {/* Mobile Sticky Header */}
+      <div className="hidden max-lg:flex sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 py-3 items-center shadow-sm">
+        <button
+          onClick={() => window.history.back()}
+          className="flex items-center gap-2 text-[#6F6C90] hover:text-[#170F49] transition-colors bg-transparent p-0 m-0 border-none shadow-none"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span className="font-medium text-sm">Back</span>
+        </button>
+      </div>
+
       {/* Back button */}
       <button
         onClick={() => window.history.back()}
-        className="absolute top-8 left-8 bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl p-3 border border-white/20 hover:-translate-y-1 transition-all duration-200 flex items-center gap-2 z-10"
+        className="absolute top-8 left-8 max-lg:hidden bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl p-3 border border-white/20 hover:-translate-y-1 transition-all duration-200 flex items-center gap-2 z-10"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -328,19 +342,19 @@ const TherapistPage = () => {
       <div className="absolute top-0 -left-40 w-[500px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float animation-delay-7000 z-0" />
 
       <div className="w-[90%] max-w-[1200px] mx-4 flex-1 flex flex-col">
-        <h1 className="text-3xl font-bold text-[#170F49] mb-8 text-center font-baskervville">
+        <h1 className="text-3xl font-bold text-[#170F49] mb-8 max-md:mb-5 text-center font-baskervville">
           Therapist Information
         </h1>
 
         {/* Main content container */}
-        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-3 border border-white/20">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-md:gap-4 md:gap-8 max-md:gap-4">
             {/* Basic Information Section */}
             <div className="col-span-full">
               <h2 className="text-xl font-semibold text-[#170F49] mb-4">
                 Personal Information
               </h2>
-              <div className="flex flex-col md:flex-row gap-6 p-4 md:p-6 bg-white/50 rounded-2xl">
+              <div className="flex flex-col md:flex-row gap-6 max-md:gap-4 p-4 md:p-6 bg-white/50 rounded-2xl">
                 {/* Therapist Photo */}
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-40 h-40 rounded-2xl overflow-hidden border-4 border-white/50 shadow-xl">
@@ -408,7 +422,7 @@ const TherapistPage = () => {
                 </div>
 
                 {/* Therapist Details */}
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pl-8 md:pl-12">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-md:gap-4 pl-8 md:pl-12">
                   <div>
                     <p className="text-sm text-[#6F6C90]">Full Name</p>
                     {isEditing ? (
@@ -528,7 +542,7 @@ const TherapistPage = () => {
               <h2 className="text-xl font-semibold text-[#170F49] mb-4">
                 Contact Information
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white/50 rounded-2xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-md:gap-4 p-6 bg-white/50 rounded-2xl">
                 <div>
                   <p className="text-sm text-[#6F6C90]">Mobile Number</p>
                   {isEditing ? (
@@ -597,7 +611,7 @@ const TherapistPage = () => {
               <h2 className="text-xl font-semibold text-[#170F49] mb-4">
                 Identification Details
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white/50 rounded-2xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-md:gap-4 p-6 bg-white/50 rounded-2xl">
                 <div>
                   <p className="text-sm text-[#6F6C90]">Aadhar Number</p>
                   <p className="text-[#170F49] font-medium">
@@ -624,7 +638,7 @@ const TherapistPage = () => {
               <h2 className="text-xl font-semibold text-[#170F49] mb-4">
                 Professional Information
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white/50 rounded-2xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-md:gap-4 p-6 bg-white/50 rounded-2xl">
                 <div>
                   <p className="text-sm text-[#6F6C90]">RCI Number</p>
                   {isEditing ? (

@@ -380,8 +380,8 @@ const TherapistStudentAssignmentModal = ({
   }
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 px-4 py-6 overflow-y-auto">
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.28)]">
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 p-0 md:p-4 overflow-y-auto">
+      <div className="flex h-[100dvh] md:h-auto md:max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-none md:rounded-3xl border border-slate-100 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.28)]">
         <div className="border-b border-slate-100 bg-gradient-to-r from-[#fff6ef] to-[#fffaf6] px-4 py-3 sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -725,7 +725,7 @@ const TherapistStudentAssignmentModal = ({
         <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
           <div className="bg-white rounded-3xl p-6 shadow-[0_20px_60px_rgba(15,23,42,0.3)] max-w-md w-full border border-slate-100 animate-in fade-in zoom-in duration-200">
             <h4 className="text-lg font-bold text-[#170F49] mb-2">Unsaved Changes</h4>
-            <p className="text-sm text-[#6F6C8F] mb-6 leading-relaxed">
+            <p className="text-sm text-[#6F6C8F] mb-6 max-md:mb-4 leading-relaxed">
               You have unsaved student assignment changes. Are you sure you want to close and discard these changes?
             </p>
             <div className="flex justify-end gap-3">

@@ -205,11 +205,25 @@ const AddTherapist = () => {
   }
 
   return (
-    <div className="add-therapist-root min-h-screen w-full flex flex-col items-center justify-center bg-[#f7f7f7] relative overflow-hidden py-20">
+    <div className="add-therapist-root min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col items-center justify-center bg-[#f7f7f7] relative overflow-hidden py-20 max-lg:py-0 max-lg:pb-[calc(40px+env(safe-area-inset-bottom))] max-lg:pt-0 max-lg:overflow-x-hidden">
+
+      {/* Mobile Sticky Header */}
+      <div className="hidden max-lg:flex sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 py-3 items-center shadow-sm">
+        <button
+          onClick={() => window.history.back()}
+          className="flex items-center gap-2 text-[#6F6C90] hover:text-[#170F49] transition-colors bg-transparent p-0 m-0 border-none shadow-none"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span className="font-medium text-sm">Back</span>
+        </button>
+      </div>
+
       {/* Back button */}
       <button
         onClick={() => window.history.back()}
-        className="absolute top-8 left-8 bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl p-3 border border-white/20 hover:-translate-y-1 transition-all duration-200 flex items-center gap-2 z-10"
+        className="absolute top-8 left-8 max-lg:hidden bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl p-3 border border-white/20 hover:-translate-y-1 transition-all duration-200 flex items-center gap-2 z-10"
       >
         <svg 
           xmlns="http://www.w3.org/2000/svg" 
@@ -232,14 +246,14 @@ const AddTherapist = () => {
       <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000 z-0" />
       <div className="absolute top-0 -left-40 w-[500px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float animation-delay-7000 z-0" />
       
-      <div className="w-[90%] max-w-[1200px] mx-4 flex-1 flex flex-col justify-center">
-        <h1 className="text-3xl font-bold text-[#170F49] mb-8 text-center font-baskervville">
+      <div className="w-[90%] max-w-[1200px] mx-4 flex-1 flex flex-col justify-center max-lg:w-[95%] max-lg:mx-auto max-lg:mt-4">
+        <h1 className="text-3xl font-bold text-[#170F49] mb-8 max-md:mb-5 text-center font-baskervville">
           Add Therapist
         </h1>
         
         {/* Container with adjusted padding */}
-        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20 max-w-[600px] mx-auto w-full">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-3 border border-white/20 max-w-[600px] mx-auto w-full">
+          <form onSubmit={handleSubmit} className="space-y-6 max-md:space-y-4">
             <div className="space-y-2 w-full">
               <label className="block text-sm font-medium text-[#170F49] ml-4">
                 Name
@@ -496,7 +510,7 @@ const AddTherapist = () => {
             </div>
 
             {/* Specialization Section */}
-            <div className="space-y-6 w-full">
+            <div className="space-y-6 max-md:space-y-4 w-full">
               <h2 className="text-xl font-semibold text-[#170F49] border-b pb-2">
                 Specialization
               </h2>

@@ -189,7 +189,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f7f7f7] relative overflow-hidden py-20">
+    <div className="min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col items-center justify-center bg-[#f7f7f7] relative overflow-hidden max-lg:overflow-y-auto max-lg:overflow-x-hidden py-20 max-lg:py-8">
       {/* Animated background blobs */}
       <div className="absolute top-0 -left-40 w-[600px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float" />
       <div className="absolute -bottom-32 right-40 w-[600px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000" />
@@ -199,13 +199,13 @@ const LoginPage = () => {
       <div className="w-[90%] max-w-[1200px] mx-4 flex-1 flex flex-col justify-center">
         {showForgotFlow ? (
           <div>
-            <h1 className="text-3xl font-bold text-[#B3541E] mb-8 text-center font-baskervville">
+            <h1 className="text-3xl font-bold text-[#B3541E] mb-8 max-md:mb-5 text-center font-baskervville">
               Reset Password
             </h1>
 
-            <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20 max-w-[450px] mx-auto w-full">
+            <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-3 border border-white/20 max-w-[450px] mx-auto w-full">
               {forgotStep === 1 ? (
-                <form onSubmit={handleForgotRequest} className="space-y-6">
+                <form onSubmit={handleForgotRequest} className="space-y-6 max-md:space-y-4">
                   <h2 className="text-lg font-semibold text-[#5E534C] text-center mb-2">
                     Request Verification Code
                   </h2>
@@ -256,7 +256,7 @@ const LoginPage = () => {
                   </div>
                 </form>
               ) : (
-                <form onSubmit={handleForgotReset} className="space-y-6">
+                <form onSubmit={handleForgotReset} className="space-y-6 max-md:space-y-4">
                   <h2 className="text-lg font-semibold text-[#5E534C] text-center mb-2">
                     Enter Verification Code
                   </h2>
@@ -356,13 +356,13 @@ const LoginPage = () => {
           </div>
         ) : (
           <div>
-            <h1 className="text-3xl font-bold text-[#B3541E] mb-8 text-center font-baskervville">
+            <h1 className="text-3xl font-bold text-[#B3541E] mb-8 max-md:mb-5 text-center font-baskervville">
               Sign in to your account
             </h1>
 
             {/* Login container */}
-            <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20 max-w-[450px] mx-auto w-full">
-              <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 max-md:p-3 border border-white/20 max-w-[450px] mx-auto w-full">
+              <form onSubmit={handleSubmit} className="space-y-6 max-md:space-y-4">
                 {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
                 {/* Username field */}

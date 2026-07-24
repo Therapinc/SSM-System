@@ -34,3 +34,38 @@
 .animate-slideIn {
   animation: slideIn 0.6s ease-out 0.2s both;
 }
+
+/* Hide scrollbar visually but keep it functional (touch scroll still works) */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pinch-zoom;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Thin orange scrollbar for pill containers on mobile */
+.pill-scroll {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pinch-zoom;
+}
+.pill-scroll::-webkit-scrollbar {
+  height: 3px;
+}
+.pill-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pill-scroll::-webkit-scrollbar-thumb {
+  background: #E38B52;
+  border-radius: 99px;
+}
+
+/* Prevent horizontal page scroll on mobile without breaking child scroll containers */
+/* Use html (viewport scroll root) NOT body — body overflow:hidden blocks iOS touch scroll on children */
+@media (max-width: 767px) {
+  html {
+    overflow-x: hidden;
+  }
+}

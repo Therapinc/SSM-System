@@ -38,7 +38,7 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-white relative overflow-hidden"> {/* Changed background to white */}
+    <div className="min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col bg-white relative overflow-hidden max-lg:overflow-x-hidden"> {/* Changed background to white */}
       {/* Removed Animated background blobs for cleaner look like the example */}
 
       {/* Header Section - Replaces Navigation */}
@@ -69,7 +69,7 @@ const LandingPage = () => {
       </header>
 
       {/* Main Image and Hero Text Container */}
-      <div className="relative w-full h-screen flex items-center justify-center overflow-hidden"> {/* Full screen height */}
+      <div className="relative w-full h-screen max-lg:h-[100dvh] flex items-center justify-center overflow-hidden"> {/* Full screen height */}
         {/* Background Image with Blur and Gradient */}
         <div className="absolute inset-0 z-0 transform scale-105"> {/* Added scale-105 here */}
           <img
@@ -84,7 +84,7 @@ const LandingPage = () => {
         {/* Centered Hero Text - Updated Structure and Styling */}
         <div className="relative z-10 text-center max-w-3xl px-4"> {/* Increased max-width slightly */}
           {/* Main Heading */}
-          <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-[#B3541E] mb-6 font-baskervville leading-tight"> {/* Improved contrast for hero title */}
+          <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-[#B3541E] mb-6 max-md:mb-4 font-baskervville leading-tight"> {/* Improved contrast for hero title */}
             Every Child Matters ,<br/>Every Moment Counts
           </h2>
           {/* Subtitle */}
@@ -99,7 +99,7 @@ const LandingPage = () => {
       <div className="relative z-10 bg-white pt-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Vision and Mission Blocks */}
         {/* Removed max-w-7xl and horizontal padding from inner divs as the parent now handles it */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-md:gap-4 w-full mb-12">
           <div className="bg-white/30 backdrop-blur-xl rounded-3xl overflow-hidden border border-white/20 shadow-xl hover:bg-white/40 hover:-translate-y-1 hover:shadow-2xl transition-all duration-300 group">
             <div className="h-48 overflow-hidden">
               <img
@@ -136,9 +136,9 @@ const LandingPage = () => {
         </div>
 
         {/* Services and Features */}
-        <h2 className="text-3xl font-bold text-[#D3723B] mb-8 font-baskervville text-center">Our Services & Facilities</h2>
+        <h2 className="text-3xl font-bold text-[#D3723B] mb-8 max-md:mb-5 font-baskervville text-center">Our Services & Facilities</h2>
         {/* Removed max-w-7xl and horizontal padding from inner divs as the parent now handles it */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10 w-full mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-md:gap-4 lg:gap-10 w-full mb-16">
           {[
             {
               title: "Physiotherapy",
@@ -314,7 +314,7 @@ const LandingPage = () => {
       {/* Footer - Remains outside the main content centered div */}
       <footer className="relative z-10 bg-white/30 backdrop-blur-xl border-t border-white/20 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between gap-8">
+          <div className="flex flex-col md:flex-row justify-between gap-8 max-md:gap-4">
             <div className="text-[#6F6C90] text-base space-y-3">
               <p className="text-xl font-bold text-[#D3723B]">If you wish to extend your helping hands, Please contact us.</p>
               <p className="text-lg font-medium">Donations to our institution are eligible for tax exemption under section 80G. Please make your contributions in the name of "St. Martha's Special School"</p>
@@ -325,7 +325,7 @@ const LandingPage = () => {
               </div>
             </div>
             <div className="flex flex-col">
-              <h3 className="text-3xl font-bold text-[#D3723B] mb-6 text-left">Contact Us</h3>
+              <h3 className="text-3xl font-bold text-[#D3723B] mb-6 max-md:mb-4 text-left">Contact Us</h3>
               <div className="text-[#6F6C90] text-base space-y-3">
               <div className="grid grid-cols-[32px_1fr] gap-x-3 gap-y-3 mt-2">
                 <div className="flex items-center justify-center h-8"><i className="fa-solid fa-location-dot fa-lg text-[#D3723B]"></i></div>
