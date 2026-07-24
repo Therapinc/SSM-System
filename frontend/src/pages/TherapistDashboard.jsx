@@ -646,7 +646,7 @@ const TherapistDashboard = () => {
                 {/* Filter Button */}
                 <button
                   onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                  className="px-5 py-2.5 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B52]/90 transition-all flex items-center gap-2 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] hover:shadow-[0_6px_8px_-1px_rgba(0,0,0,0.1)]"
+                  className="px-3 sm:px-5 py-2.5 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B52]/90 transition-all flex items-center gap-1.5 sm:gap-2 shadow-md hover:shadow-lg text-[13px] sm:text-base whitespace-nowrap"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -660,7 +660,7 @@ const TherapistDashboard = () => {
                       clipRule="evenodd"
                     />
                   </svg>
-                  Filter Students
+                  Filter
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className={`h-4 w-4 transition-transform ${showFilterDropdown ? "rotate-180" : ""
@@ -1503,13 +1503,13 @@ const TherapistDashboard = () => {
       </aside>
 
       {/* ----------------- MOBILE BOTTOM NAV ----------------- */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-[60] px-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-         <button className="flex flex-col items-center justify-center w-full h-16 transition text-[#E38B52]">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-center gap-16 sm:gap-24 items-center h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-[60] px-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+         <button className="flex flex-col items-center justify-center w-20 h-16 transition text-[#E38B52]">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
             <span className="text-[10px] mt-1 font-medium">My Students</span>
          </button>
          
-         <div className="relative flex flex-col items-center justify-center w-full h-16 group">
+         <div className="relative flex flex-col items-center justify-center w-20 h-16 group">
             <button className="flex flex-col items-center justify-center w-full h-full text-gray-400 transition hover:text-gray-600">
                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                <span className="text-[10px] mt-1 font-medium">Menu</span>
@@ -1534,11 +1534,11 @@ const TherapistDashboard = () => {
               <h1 className="text-xl font-bold text-[#170F49] font-baskervville">Therapist Portal</h1>
           </div>
 
-          <div className="flex-1 w-full max-w-7xl mx-auto p-2 sm:p-4 z-10">
-             <div className="relative bg-white/30 backdrop-blur-xl rounded-[24px] shadow-xl p-4 sm:p-6 border border-white/20 h-auto min-h-[50dvh] mb-6">
+          <div className="flex-1 w-full max-w-7xl mx-auto px-0 py-2 sm:p-4 z-10">
+             <div className="relative bg-white/30 backdrop-blur-xl rounded-none sm:rounded-[24px] shadow-xl p-4 sm:p-6 border-y sm:border border-white/20 h-auto min-h-[50dvh] mb-6">
 
           {/* Filter and Search Section */}
-          <div className="flex flex-col md:flex-row justify-between items-center mb-5 px-2 gap-3">
+          <div className="flex flex-row justify-between items-center mb-5 gap-3">
             {/* Search Bar */}
             <div className="relative">
               <input
@@ -1590,7 +1590,7 @@ const TherapistDashboard = () => {
                 {/* Filter Button */}
                 <button
                   onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                  className="px-5 py-2.5 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B52]/90 transition-all flex items-center gap-2 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] hover:shadow-[0_6px_8px_-1px_rgba(0,0,0,0.1)]"
+                  className="px-3 sm:px-5 py-2.5 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B52]/90 transition-all flex items-center gap-1.5 sm:gap-2 shadow-md hover:shadow-lg text-[13px] sm:text-base whitespace-nowrap"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -1604,7 +1604,7 @@ const TherapistDashboard = () => {
                       clipRule="evenodd"
                     />
                   </svg>
-                  Filter Students
+                  Filter
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className={`h-4 w-4 transition-transform ${showFilterDropdown ? "rotate-180" : ""
@@ -1687,10 +1687,10 @@ const TherapistDashboard = () => {
                 <div
                   key={student.id}
                   onClick={() => handleStudentClick(student.id)}
-                  className="bg-white rounded-2xl py-2.5 px-3 sm:p-4 shadow-[0_2px_10px_rgba(0,0,0,0.08)] hover:shadow-md transition-all duration-300 cursor-pointer mb-1.5"
+                  className="bg-white rounded-2xl py-2.5 px-3.5 sm:p-4 shadow-[0_2px_10px_rgba(0,0,0,0.06)] hover:shadow-md transition-all duration-300 cursor-pointer mb-1.5"
                 >
-                  <div className="flex items-center gap-4 text-[#170F49]">
-                    <div className="w-[50px] h-[50px] rounded-lg overflow-hidden shrink-0">
+                  <div className="flex items-center space-x-3 sm:space-x-4 text-[#170F49]">
+                    <div className="w-[46px] h-[46px] sm:w-[50px] sm:h-[50px] rounded-lg overflow-hidden shrink-0">
                       <img
                         src={
                           student.photo_url ||
@@ -1707,57 +1707,42 @@ const TherapistDashboard = () => {
                       />
                     </div>
                     <div className="flex-1 min-w-0 py-0.5">
-                      <h3 className="text-[16px] sm:text-[17px] font-semibold text-[#170F49] truncate">
-                        {student.name}
-                      </h3>
-                      <div className="space-y-1">
-                        <p className="text-sm text-[#6F6C8F]">
-                          <span className="font-medium">Class:</span>{" "}
-                          {student.class_name || student.className || "-"}
-                        </p>
-                        <p className="text-sm text-[#6F6C8F]">
-                          <span className="font-medium">Division:</span>{" "}
-                          {student.division || "-"}
-                        </p>
-                        <p className="text-sm text-[#6F6C8F]">
-                          <span className="font-medium">Roll No:</span>{" "}
-                          {student.roll_no || student.rollNo || "-"}
-                        </p>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[16px] sm:text-[17px] font-semibold text-[#170F49] truncate pr-2">
+                          {student.name}
+                        </h3>
+                        <span className="text-slate-300 shrink-0">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </span>
+                      </div>
+                      <div className="mt-0.5 flex items-center text-[12px] sm:text-[13px] text-[#6F6C8F] truncate">
+                        {student.class_name || student.className || "Unknown"}
+                        <span className="mx-1.5 opacity-50">•</span>
+                        Div {student.division || "-"}
+                        <span className="mx-1.5 opacity-50">•</span>
+                        Roll {student.roll_no || student.rollNo || "—"}
+                      </div>
+                      <div className="mt-2.5 sm:mt-3 flex justify-end">
+                        <button
+                          className="px-4 py-1.5 sm:px-5 sm:py-2 text-[13px] sm:text-sm font-semibold bg-[#E38B52] text-white rounded-xl shadow-sm hover:bg-[#E38B52]/90 transition-all hover:scale-[1.02]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedStudent(student);
+                            setShowReportDialog(true);
+                            setReportDate(new Date().toISOString().slice(0, 10));
+                            const initialType = specialization || "Speech Therapy";
+                            setTherapyType(initialType);
+                            setProgressLevel("Excellent");
+                            setUnlockedGoals({});
+                            loadPreviousGoals(student.id, initialType);
+                          }}
+                        >
+                          Enter Report
+                        </button>
                       </div>
                     </div>
-                    {/* Enter Report button */}
-                    <button
-                      className="px-4 py-2 bg-[#E38B52] text-white rounded-lg shadow-md hover:bg-[#E38B52]/90 transition-transform hover:scale-105"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedStudent(student);
-                        setShowReportDialog(true);
-                        setReportDate(new Date().toISOString().slice(0, 10));
-                        const initialType = specialization || "Speech Therapy";
-                        setTherapyType(initialType);
-                        setProgressLevel("Excellent");
-                        setUnlockedGoals({});
-                        loadPreviousGoals(student.id, initialType);
-                      }}
-                    >
-                      Enter Report
-                    </button>
-                    <button className="text-[#E38B52] hover:text-[#4f46e5] transition-colors">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
                   </div>
                 </div>
               ))

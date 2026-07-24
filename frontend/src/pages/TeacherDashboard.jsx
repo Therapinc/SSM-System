@@ -652,15 +652,22 @@ const TeacherDashboard = () => {
                     key={therapist.id}
                     className="bg-white rounded-2xl p-6 shadow-md transition-all duration-300"
                   >
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-[#170F49]">{therapist.name || "-"}</h3>
-                        <p className="text-sm text-[#6F6C8F]">Specialization: {therapist.specialization || "-"}</p>
+                    <div className="flex items-center justify-between gap-4 text-[#170F49]">
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden">
+                          <img src={`https://eu.ui-avatars.com/api/?name=${therapist.name.replace(" ", "+")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-semibold text-[#170F49] truncate">{therapist.name || "-"}</h3>
+                          <div className="mt-1 flex items-center text-sm text-[#6F6C8F] truncate">
+                            <span className="text-sm mr-1.5">🩺</span> {therapist.specialization || "Not provided"}
+                          </div>
+                        </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleAssignStudents(therapist)}
-                        className="px-4 py-2 bg-[#E38B52] text-white rounded-lg shadow-md hover:bg-[#E38B52]/90 transition-transform hover:scale-105"
+                        className="px-5 py-2 text-sm font-semibold bg-[#E38B52] text-white rounded-xl shadow-sm hover:bg-[#E38B52]/90 transition-all hover:scale-[1.02] whitespace-nowrap"
                       >
                         Assign Students
                       </button>
@@ -850,7 +857,7 @@ const TeacherDashboard = () => {
              Students
            </button>
            <button onClick={() => setActiveTab("therapists")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${activeTab === 'therapists' ? 'bg-[#E38B52] text-white shadow-md' : 'text-gray-600 hover:bg-orange-50'}`}>
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
              Therapists
            </button>
         </nav>
@@ -873,7 +880,7 @@ const TeacherDashboard = () => {
             <span className="text-[10px] mt-1 font-medium">Students</span>
          </button>
          <button onClick={() => setActiveTab("therapists")} className={`flex flex-col items-center justify-center w-full h-16 transition ${activeTab==='therapists'?'text-[#E38B52] scale-110':'text-gray-400 scale-95'}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
             <span className="text-[10px] mt-1 font-medium">Therapists</span>
          </button>
          
@@ -1177,20 +1184,31 @@ const TeacherDashboard = () => {
                 {therapists.map((therapist) => (
                   <div
                     key={therapist.id}
-                    className="bg-white rounded-2xl p-6 shadow-md transition-all duration-300"
+                    className="bg-white rounded-2xl py-3 px-3.5 sm:p-4 shadow-[0_2px_10px_rgba(0,0,0,0.06)] hover:shadow-md transition-all duration-300 mb-1.5"
                   >
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <h3 className="text-[16px] sm:text-[17px] font-semibold text-[#170F49] truncate">{therapist.name || "-"}</h3>
-                        <p className="text-sm text-[#6F6C8F]">Specialization: {therapist.specialization || "-"}</p>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 text-[#170F49]">
+                      <div className="flex items-center gap-3 sm:gap-4 flex-1">
+                        <div className="w-[46px] h-[46px] sm:w-[50px] sm:h-[50px] rounded-lg overflow-hidden shrink-0">
+                          <img src={`https://eu.ui-avatars.com/api/?name=${therapist.name.replace(" ", "+")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0 py-0.5">
+                          <h3 className="text-[16px] sm:text-[17px] font-semibold text-[#170F49] truncate pr-2">
+                            {therapist.name || "-"}
+                          </h3>
+                          <div className="mt-0.5 flex items-center text-[12px] sm:text-[13px] text-[#6F6C8F] truncate">
+                            <span className="text-sm mr-1.5">🩺</span> {therapist.specialization || "Not provided"}
+                          </div>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleAssignStudents(therapist)}
-                        className="px-4 py-2 bg-[#E38B52] text-white rounded-lg shadow-md hover:bg-[#E38B52]/90 transition-transform hover:scale-105"
-                      >
-                        Assign Students
-                      </button>
+                      <div className="mt-2.5 sm:mt-0 flex justify-end items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleAssignStudents(therapist)}
+                          className="px-4 py-1.5 sm:px-5 sm:py-2 text-[13px] sm:text-sm font-semibold bg-[#E38B52] text-white rounded-xl shadow-sm hover:bg-[#E38B52]/90 transition-all hover:scale-[1.02] whitespace-nowrap"
+                        >
+                          Assign Students
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

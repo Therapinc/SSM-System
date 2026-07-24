@@ -552,14 +552,14 @@ const TherapistStudentAssignmentModal = ({
             </p>
           </div>
 
-          <div className="flex h-full min-h-0 lg:min-h-[460px] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white">
+          <div className="flex flex-col h-auto lg:h-full lg:min-h-[460px] lg:overflow-hidden rounded-3xl border border-slate-200 bg-white">
             <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
               <p className="text-sm text-[#6F6C8F]">
                 Use the checklist to assign or unassign multiple students at once.
               </p>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-3 py-3 sm:px-4">
+            <div className="flex-1 overflow-y-visible lg:overflow-y-auto px-3 py-3 sm:px-4">
               {loading ? (
                 <div className="flex min-h-[320px] items-center justify-center text-[#6F6C8F]">
                   Loading students...
@@ -695,7 +695,12 @@ const TherapistStudentAssignmentModal = ({
               </div>
             )}
 
-            <div className="sticky bottom-0 border-t border-slate-100 bg-white px-4 py-3 sm:px-5">
+            
+          </div>
+        </div>
+        
+        {/* Full-width sticky footer for both mobile and desktop */}
+        <div className="sticky bottom-0 mt-auto rounded-b-3xl border-t border-slate-100 bg-white px-4 py-3 sm:px-5">
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
@@ -718,8 +723,6 @@ const TherapistStudentAssignmentModal = ({
                 </button>
               </div>
             </div>
-          </div>
-        </div>
       </div>
       {showConfirmClose && (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">

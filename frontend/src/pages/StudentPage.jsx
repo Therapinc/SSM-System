@@ -1729,12 +1729,40 @@ const StudentPage = () => {
   };
 
   const startCreateIepForm = () => {
+    const draftStr = localStorage.getItem(`draft_iep_${id}`);
+    if (draftStr) {
+      if (window.confirm("You have an unsaved IEP draft. Do you want to restore it?")) {
+        try {
+          const parsed = JSON.parse(draftStr);
+          setIepFormDraft(parsed);
+          setIepFormViewRecord(null);
+          setIepFormMode("create");
+          return;
+        } catch(e) { console.error(e); }
+      } else {
+        localStorage.removeItem(`draft_iep_${id}`);
+      }
+    }
     setIepFormDraft(createEmptyIepForm());
     setIepFormViewRecord(null);
     setIepFormMode("create");
   };
 
   const startEditIepForm = (record) => {
+    const draftStr = localStorage.getItem(`draft_iep_${id}`);
+    if (draftStr) {
+      if (window.confirm("You have an unsaved IEP draft. Do you want to restore it?")) {
+        try {
+          const parsed = JSON.parse(draftStr);
+          setIepFormDraft(parsed);
+          setIepFormViewRecord(null);
+          setIepFormMode("edit");
+          return;
+        } catch(e) { console.error(e); }
+      } else {
+        localStorage.removeItem(`draft_iep_${id}`);
+      }
+    }
     setIepFormDraft(normalizeIepRecord(record));
     setIepFormViewRecord(null);
     setIepFormMode("edit");
@@ -3206,6 +3234,90 @@ const StudentPage = () => {
   // Toast notification state
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
 
+  // GLOBAL UNSAVED CHANGES TRACKER & AUTO-SAVE
+  const isDirty = editMode || (unsavedTableIndex !== null) || (iepFormMode === "edit" || iepFormMode === "create") || (editingTherapyReport !== null);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
+  // Case Record Drafts
+  useEffect(() => {
+    if (editMode && id && editData) {
+      const timer = setTimeout(() => {
+        localStorage.setItem(`draft_case_record_${id}`, JSON.stringify({ editData, householdRows, drugRows }));
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [editMode, id, editData, householdRows, drugRows]);
+
+  // IEP Drafts
+  useEffect(() => {
+    if ((iepFormMode === "create" || iepFormMode === "edit") && id && iepFormDraft) {
+      const timer = setTimeout(() => {
+        localStorage.setItem(`draft_iep_${id}`, JSON.stringify(iepFormDraft));
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [iepFormMode, id, iepFormDraft]);
+
+  // Therapy Report Drafts
+  useEffect(() => {
+    if (editingTherapyReport && id) {
+      const timer = setTimeout(() => {
+        localStorage.setItem(`draft_therapy_${id}_${editingTherapyReport.id}`, JSON.stringify({
+          editTherapyGoals,
+          editTherapyPresentComplaints,
+          editTherapyCurrentObservation,
+          editTherapyAssessmentDone,
+          editTherapyProvisionalDiagnosis,
+          editTherapyProgressLevel,
+          editTherapyReportDate,
+        }));
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [editingTherapyReport, id, editTherapyGoals, editTherapyPresentComplaints, editTherapyCurrentObservation, editTherapyAssessmentDone, editTherapyProvisionalDiagnosis, editTherapyProgressLevel, editTherapyReportDate]);
+
+  // Term Reports Drafts
+  useEffect(() => {
+    if (unsavedTableIndex !== null && id && savedTables.length > 0) {
+      const timer = setTimeout(() => {
+        localStorage.setItem(`draft_term_reports_${id}`, JSON.stringify({
+          savedTables,
+          unsavedTableIndex,
+        }));
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [unsavedTableIndex, id, savedTables]);
+
+  // Restore Term Reports Draft on Load
+  useEffect(() => {
+    if (initialLoadDone && student && id) {
+      const draftStr = localStorage.getItem(`draft_term_reports_${id}`);
+      if (draftStr) {
+        if (window.confirm("You have an unsaved Term Reports draft. Restore it?")) {
+          try {
+            const parsed = JSON.parse(draftStr);
+            setSavedTables(parsed.savedTables);
+            setUnsavedTableIndex(parsed.unsavedTableIndex);
+          } catch (e) {}
+        } else {
+          localStorage.removeItem(`draft_term_reports_${id}`);
+        }
+      }
+    }
+  }, [initialLoadDone, student, id]);
+
+
   // Toast notification helper
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
@@ -3244,6 +3356,22 @@ const StudentPage = () => {
 
   // Start editing: initialize editData
   const handleEditStart = () => {
+    const draftStr = localStorage.getItem(`draft_case_record_${id}`);
+    if (draftStr) {
+      if (window.confirm("You have an unsaved draft of the Case Record from earlier. Do you want to restore it?")) {
+         try {
+           const parsed = JSON.parse(draftStr);
+           if (parsed.editData) setEditData(parsed.editData);
+           if (parsed.householdRows) setHouseholdRows(parsed.householdRows);
+           if (parsed.drugRows) setDrugRows(parsed.drugRows);
+           setEditMode(true);
+           return;
+         } catch(e) { console.error(e); }
+      } else {
+        localStorage.removeItem(`draft_case_record_${id}`);
+      }
+    }
+    
     if (student) {
       setHouseholdRows(normalizeHouseholdRows(student.household));
       setDrugRows(normalizeDrugRows(student.drug_history));
@@ -3507,6 +3635,7 @@ const StudentPage = () => {
 
   // Save changes
   const handleEditSave = async () => {
+    localStorage.removeItem(`draft_case_record_${id}`);
     try {
       // Prevent saving when Aadhaar validation failed
       if (aadharEditError) {
@@ -3763,6 +3892,7 @@ const StudentPage = () => {
   };
 
   const handleEditTherapyReportSave = async (e) => {
+    if (editingTherapyReport) localStorage.removeItem(`draft_therapy_${id}_${editingTherapyReport.id}`);
     e.preventDefault();
     if (!editingTherapyReport) return;
     setEditTherapySubmitting(true);
@@ -6908,7 +7038,7 @@ const StudentPage = () => {
                     {/* Horizontal filter bar at the top */}
                     <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-4 w-full">
                       <div className="flex flex-col sm:flex-row flex-wrap items-end gap-6 max-md:gap-2 flex-1">
-                        <div className="flex flex-row items-center min-w-[200px] gap-2">
+                        <div className="flex flex-col md:flex-row items-start md:items-center min-w-[200px] gap-1 md:gap-2 w-full md:w-auto">
                           <span className="text-sm font-semibold text-gray-700">
                             Date Range
                           </span>
@@ -6954,7 +7084,7 @@ const StudentPage = () => {
                             </svg>
                           </div>
                         </div>
-                        <div className="flex flex-row items-center min-w-[170px] gap-2">
+                        <div className="flex flex-col md:flex-row items-start md:items-center min-w-[170px] gap-1 md:gap-2 w-full md:w-auto">
                           <span className="text-sm font-semibold text-gray-700">
                             Therapy
                           </span>
@@ -6998,7 +7128,7 @@ const StudentPage = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex flex-row items-end gap-2 lg:justify-end lg:min-w-[320px] lg:flex-shrink-0">
+                      <div className="flex flex-row flex-wrap justify-center sm:justify-start items-end gap-2 lg:justify-end lg:min-w-[320px] lg:flex-shrink-0">
                         <button
                           onClick={() => {
                             setFromDate("");
@@ -7163,7 +7293,7 @@ const StudentPage = () => {
                       </div>
                     )}
                     {!aiSummarizing && !aiAnalysis && !aiSummary && (
-                      <div className="mt-4 p-8 rounded-2xl border border-dashed border-gray-300 bg-gray-50/50 text-center text-gray-500 animate-fadeIn">
+                      <div className="mt-4 p-8 max-md:pb-20 rounded-2xl border border-dashed border-gray-300 bg-gray-50/50 text-center text-gray-500 animate-fadeIn">
                         <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M9 4.5L10.5 8L14 9.5L10.5 11L9 14.5L7.5 11L4 9.5L7.5 8L9 4.5zm10 8.5l1 2.5l2.5 1l-2.5 1l-1 2.5l-1-2.5l-2.5-1l2.5-1l1-2.5zm-2-9l.75 1.75l1.75.75l-1.75.75l-.75 1.75l-.75-1.75l-1.75-.75l1.75-.75l.75-1.75z" />
                         </svg>
@@ -7811,6 +7941,26 @@ const StudentPage = () => {
                                     <button
                                       type="button"
                                       onClick={() => {
+                                        const draftStr = localStorage.getItem(`draft_therapy_${id}_${r.id}`);
+                                        if (draftStr) {
+                                          if (window.confirm("You have an unsaved draft for this therapy report. Restore it?")) {
+                                            try {
+                                              const parsed = JSON.parse(draftStr);
+                                              setEditingTherapyReport(r);
+                                              setEditTherapyGoals(parsed.editTherapyGoals || {});
+                                              setEditTherapyPresentComplaints(parsed.editTherapyPresentComplaints || "");
+                                              setEditTherapyCurrentObservation(parsed.editTherapyCurrentObservation || "");
+                                              setEditTherapyAssessmentDone(parsed.editTherapyAssessmentDone || "");
+                                              setEditTherapyProvisionalDiagnosis(parsed.editTherapyProvisionalDiagnosis || "");
+                                              setEditTherapyProgressLevel(parsed.editTherapyProgressLevel || "Excellent");
+                                              setEditTherapyReportDate(parsed.editTherapyReportDate || "");
+                                              setEditTherapyError(null);
+                                              return;
+                                            } catch(e) {}
+                                          } else {
+                                            localStorage.removeItem(`draft_therapy_${id}_${r.id}`);
+                                          }
+                                        }
                                         setEditingTherapyReport(r);
                                         setEditTherapyReportDate(r.report_date);
                                         setEditTherapyPresentComplaints(r.present_complaints || "");
@@ -12556,8 +12706,8 @@ const StudentPage = () => {
                       </h2>
 
                       {/* Horizontal Navigation for Subsections */}
-                      <div className="w-full overflow-x-auto pill-scroll mb-4 pb-2">
-                        <div className="flex gap-2 min-w-max">
+                      <div className="w-full max-w-[calc(100vw-32px)] md:max-w-full overflow-x-auto pill-scroll mb-4 pb-2">
+                        <div className="flex gap-2 min-w-max pr-6">
                           {[
                             { id: "self-help", label: "Self Help" },
                             { id: "motor", label: "Motor" },
@@ -12653,7 +12803,7 @@ const StudentPage = () => {
                             </div>
                           </div>
 
-                          <div className="space-y-6 max-md:space-y-4">
+                          <div className="bg-white rounded-xl p-6 max-md:p-3 space-y-6 max-md:space-y-3 shadow-lg mt-6">
                             <div>
                               <label className="block text-sm font-medium text-[#170F49] mb-2">
                                 Toilet Habits (Include mention hygenic where
