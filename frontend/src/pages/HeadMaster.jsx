@@ -566,11 +566,11 @@ const HeadMaster = () => {
         </div>
       </div>
 
-      <div className="fixed top-0 -left-40 w-[600px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float z-0" />
-      <div className="fixed -bottom-32 right-40 w-[600px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000 z-0" />
-      <div className="fixed top-1/2 left-1/2 w-[500px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000 z-0" />
+      <div className="fixed top-0 -left-40 w-[600px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float z-0 pointer-events-none" />
+      <div className="fixed -bottom-32 right-40 w-[600px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000 z-0 pointer-events-none" />
+      <div className="fixed top-1/2 left-1/2 w-[500px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000 z-0 pointer-events-none" />
 
-      <div className="w-[90%] max-w-[1200px] mx-4 z-10">
+      <div className="relative w-[90%] max-w-[1200px] mx-4 z-10">
         <div className="flex justify-center mb-8">
           <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative">
             <div
@@ -614,12 +614,12 @@ const HeadMaster = () => {
         <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
           {activeTab === "students" ? (
             <>
-              <div className="flex justify-between items-center mb-8 px-4">
-                <div ref={studentSearchContainerRef} id="search-container" className="relative">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 px-4">
+                <div ref={studentSearchContainerRef} id="search-container" className="relative w-full md:w-auto">
                   <input
                     type="text"
                     placeholder="Search students..."
-                    className="w-[443px] pl-10 pr-10 py-3 rounded-xl border bg-[#FAF9F6] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 placeholder:text-gray-400 hover:placeholder:text-gray-600"
+                    className="w-full md:w-[443px] pl-10 pr-10 py-3 rounded-xl border bg-[#FAF9F6] shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-[#E38B52] transition-all duration-300 placeholder:text-gray-400 hover:placeholder:text-gray-600"
                     value={studentSearch}
                     onChange={(e) => setStudentSearch(e.target.value)}
                   />
@@ -681,7 +681,7 @@ const HeadMaster = () => {
                         <ul className="p-2 space-y-2" role="listbox" aria-label="Class filter options">
                           <li>
                             <button
-                              onClick={() => { setSelectedClass("all"); setShowFilterDropdown(false); }}
+                              onMouseDown={(e) => { e.preventDefault(); setSelectedClass("all"); setShowFilterDropdown(false); }}
                               className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === "all" ? "font-semibold" : ""}`}
                             >
                               All Students
@@ -691,7 +691,7 @@ const HeadMaster = () => {
                             CLASS_OPTIONS.map((c) => (
                               <li key={c}>
                                 <button
-                                  onClick={() => { setSelectedClass(c); setShowFilterDropdown(false); }}
+                                  onMouseDown={(e) => { e.preventDefault(); setSelectedClass(c); setShowFilterDropdown(false); }}
                                   className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === c ? "font-semibold" : ""}`}
                                 >
                                   {c}
@@ -702,7 +702,7 @@ const HeadMaster = () => {
                             classesList.map((c) => (
                               <li key={c}>
                                 <button
-                                  onClick={() => { setSelectedClass(c); setShowFilterDropdown(false); }}
+                                  onMouseDown={(e) => { e.preventDefault(); setSelectedClass(c); setShowFilterDropdown(false); }}
                                   className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === c ? "font-semibold" : ""}`}
                                 >
                                   {c}
@@ -851,7 +851,7 @@ const HeadMaster = () => {
                           <h3 className="text-lg font-semibold text-[#170F49]">{teacher.name}</h3>
                           <div className="space-y-1">
                             <p className="text-sm text-[#6F6C8F]"><span className="font-medium">Mobile:</span> {teacher.mobile_number}</p>
-                            <p className="text-sm text-[#6F6C8F]"><span className="font-medium">Qualifications:</span> {teacher.qualifications_details}</p>
+                            <p className="text-sm text-[#6F6C8F] line-clamp-2 break-words"><span className="font-medium">Qualifications:</span> {teacher.qualifications_details}</p>
                           </div>
                         </div>
                         <div className="flex space-x-2">
@@ -972,14 +972,14 @@ const HeadMaster = () => {
                             <div className="hidden sm:block space-y-1 mt-1">
                               <p className="text-sm text-[#6F6C8F] truncate"><span className="font-medium">Mobile:</span> {therapist.mobile_number || "Not provided"}</p>
                               {therapist.specialization && <p className="text-sm text-[#6F6C8F] truncate"><span className="font-medium">Specialization:</span> {therapist.specialization}</p>}
-                              {therapist.qualifications_details && <p className="text-sm text-[#6F6C8F] truncate"><span className="font-medium">Qualifications:</span> {therapist.qualifications_details}</p>}
+                              {therapist.qualifications_details && <p className="text-sm text-[#6F6C8F] line-clamp-2 break-words"><span className="font-medium">Qualifications:</span> {therapist.qualifications_details}</p>}
                             </div>
                             
                             {/* Mobile Info (Compact layout) */}
                             <div className="sm:hidden space-y-1 mt-1.5">
                               {therapist.specialization && <p className="text-[13px] text-slate-500 truncate flex items-center gap-1.5"><span className="text-sm">🩺</span> {therapist.specialization}</p>}
                               <p className="text-[13px] text-slate-500 truncate flex items-center gap-1.5"><span className="text-sm">📞</span> {therapist.mobile_number || "Not provided"}</p>
-                              {therapist.qualifications_details && <p className="text-[13px] text-slate-500 truncate flex items-center gap-1.5"><span className="text-sm">🎓</span> {therapist.qualifications_details}</p>}
+                              {therapist.qualifications_details && <p className="text-[13px] text-slate-500 flex items-start gap-1.5"><span className="text-sm mt-0.5 flex-shrink-0">🎓</span> <span className="line-clamp-2 break-words">{therapist.qualifications_details}</span></p>}
                             </div>
                           </div>
                         </div>
@@ -1270,7 +1270,7 @@ const HeadMaster = () => {
                         <ul className="p-2 space-y-2" role="listbox" aria-label="Class filter options">
                           <li>
                             <button
-                              onClick={() => { setSelectedClass("all"); setShowFilterDropdown(false); }}
+                              onMouseDown={(e) => { e.preventDefault(); setSelectedClass("all"); setShowFilterDropdown(false); }}
                               className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === "all" ? "font-semibold" : ""}`}
                             >
                               All Students
@@ -1280,7 +1280,7 @@ const HeadMaster = () => {
                             CLASS_OPTIONS.map((c) => (
                               <li key={c}>
                                 <button
-                                  onClick={() => { setSelectedClass(c); setShowFilterDropdown(false); }}
+                                  onMouseDown={(e) => { e.preventDefault(); setSelectedClass(c); setShowFilterDropdown(false); }}
                                   className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === c ? "font-semibold" : ""}`}
                                 >
                                   {c}
@@ -1291,7 +1291,7 @@ const HeadMaster = () => {
                             classesList.map((c) => (
                               <li key={c}>
                                 <button
-                                  onClick={() => { setSelectedClass(c); setShowFilterDropdown(false); }}
+                                  onMouseDown={(e) => { e.preventDefault(); setSelectedClass(c); setShowFilterDropdown(false); }}
                                   className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === c ? "font-semibold" : ""}`}
                                 >
                                   {c}
