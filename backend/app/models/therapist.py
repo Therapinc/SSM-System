@@ -23,6 +23,8 @@ class Therapist(Base):
     category = Column(String, nullable=True)
     email = Column(String, nullable=True)
     specialization = Column(String, nullable=True)  # e.g., Speech Therapy, Occupational Therapy, etc.
+    photo_url = Column(String, nullable=True)
+    photo_public_id = Column(String, nullable=True)
     assigned_students = relationship(
         "Student",
         secondary=therapist_student_assignments,

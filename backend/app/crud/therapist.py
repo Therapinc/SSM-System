@@ -1,4 +1,5 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Union
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from app.models.therapist import Therapist
 from app.schemas.therapist import TherapistCreate, TherapistUpdate
@@ -16,10 +17,18 @@ def create_therapist(db: Session, therapist: TherapistCreate) -> Therapist:
     db.refresh(db_therapist)
     return db_therapist
 
-def update_therapist(db: Session, therapist_id: int, therapist: TherapistUpdate) -> Optional[Therapist]:
+def update_therapist(
+    db: Session,
+    therapist_id: int,
+    therapist: Union[TherapistUpdate, Dict[str, Any]],
+) -> Optional[Therapist]:
     db_therapist = get_therapist(db, therapist_id)
     if db_therapist:
-        update_data = therapist.dict(exclude_unset=True)
+        if isinstance(therapist, dict):
+            update_data = therapist
+        else:
+            update_data = therapist.dict(exclude_unset=True)
+        update_data = jsonable_encoder(update_data)
         for key, value in update_data.items():
             setattr(db_therapist, key, value)
         db.commit()

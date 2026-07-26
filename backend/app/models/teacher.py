@@ -20,3 +20,5 @@ class Teacher(Base):
     category = Column(String, nullable=True)
     email = Column(String, nullable=True)
     class_assignments = Column(JSON, nullable=True)
+    photo_url = Column(String, nullable=True)
+    photo_public_id = Column(String, nullable=True)

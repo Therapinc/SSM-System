@@ -19,6 +19,8 @@ class TherapistBase(BaseModel):
     category: Optional[str] = None
     email: Optional[str] = None
     specialization: Optional[str] = None
+    photo_url: Optional[str] = None
+    photo_public_id: Optional[str] = None
 
 class TherapistCreate(TherapistBase):
     pass
@@ -39,6 +41,8 @@ class TherapistUpdate(BaseModel):
     category: Optional[str] = None
     email: Optional[str] = None
     specialization: Optional[str] = None
+    photo_url: Optional[str] = None
+    photo_public_id: Optional[str] = None
 
 class Therapist(TherapistBase):
     id: int

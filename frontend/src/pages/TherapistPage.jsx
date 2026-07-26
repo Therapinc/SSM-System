@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { formatAadhaar, cleanAadhaar } from "../utils/validation";
 import { useParams } from "react-router-dom";
 import axios from "axios";
@@ -20,6 +20,7 @@ const TherapistPage = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [photoError, setPhotoError] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Toast notification state
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
@@ -119,7 +120,7 @@ const TherapistPage = () => {
     setPhotoError(null);
     try {
       const formData = new FormData();
-      formData.append("photo", photoFile);
+      formData.append("file", photoFile);
 
       const headers = {};
       const token = localStorage.getItem("token");
@@ -162,9 +163,69 @@ const TherapistPage = () => {
       showToast("Photo uploaded successfully.");
     } catch (err) {
       console.error("Photo upload failed", err, err.response?.data || "");
-      setPhotoError(err.message || "Upload failed. Please try again.");
+      const errorMessage =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        (typeof err.response?.data === "string"
+          ? err.response.data
+          : err.response?.data
+            ? JSON.stringify(err.response.data)
+            : err.message) ||
+        "Upload failed. Please try again.";
+      setPhotoError(errorMessage);
+      showToast(`Failed to upload photo: ${errorMessage}`, "error");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    if (photoPreview) {
+      try {
+        URL.revokeObjectURL(photoPreview);
+      } catch (err) { }
+      setPhotoPreview(null);
+      setPhotoFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = null;
+      return;
+    }
+
+    if (!therapist?.photoUrl && !therapist?.photo_url) {
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this therapist's photo?")) {
+      return;
+    }
+
+    try {
+      const headers = {};
+      const token = localStorage.getItem("token");
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      await axios.delete(`${API_BASE_URL}/api/v1/therapists/${id}/photo`, { headers });
+
+      setTherapist((prev) => ({ ...(prev || {}), photoUrl: null }));
+      if (photoPreview) {
+        URL.revokeObjectURL(photoPreview);
+      }
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      setUploadProgress(0);
+      showToast("Photo deleted successfully.");
+    } catch (err) {
+      console.error("Photo delete failed", err, err.response?.data || "");
+      const errorMessage =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        (typeof err.response?.data === "string"
+          ? err.response.data
+          : err.response?.data
+            ? JSON.stringify(err.response.data)
+            : err.message) ||
+        "Delete failed. Please try again.";
+      setPhotoError(errorMessage);
+      showToast(`Failed to delete photo: ${errorMessage}`, "error");
     }
   };
 
@@ -356,69 +417,81 @@ const TherapistPage = () => {
               </h2>
               <div className="flex flex-col md:flex-row gap-6 max-md:gap-4 p-4 md:p-6 bg-white/50 rounded-2xl">
                 {/* Therapist Photo */}
-                <div className="flex flex-col items-center gap-3">
+                <div className="flex flex-col items-center gap-4">
                   <div className="w-40 h-40 rounded-2xl overflow-hidden border-4 border-white/50 shadow-xl">
                     <img
                       src={
-                        therapist.photoUrl ||
-                        `https://eu.ui-avatars.com/api/?name=${therapist.name.replace(" ", "+")}&size=250`
+                        photoPreview ||
+                        therapist?.photoUrl ||
+                        therapist?.photo_url ||
+                        "https://placehold.co/200x200/EFEFEF/AAAAAA?text=No+Photo"
                       }
                       alt="Therapist"
                       className="w-full h-full object-cover"
                     />
                   </div>
 
-                  {/* Photo upload controls */}
-                  <div className="flex flex-col items-center gap-2">
-                    <input
-                      id="therapist-photo-input"
-                      type="file"
-                      accept=".png,.jpg,.jpeg"
-                      onChange={handlePhotoSelect}
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-2">
-                      <label
-                        htmlFor="therapist-photo-input"
-                        className="cursor-pointer text-sm text-[#E38B52] hover:underline"
-                      >
-                        Choose Photo
-                      </label>
-                      {photoPreview ? (
-                        <button
-                          type="button"
-                          onClick={cancelPhotoSelection}
-                          className="text-sm text-gray-500 hover:text-gray-700"
-                        >
-                          Cancel
-                        </button>
-                      ) : null}
-                    </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handlePhotoSelect}
+                    accept="image/png, image/jpeg"
+                    style={{ display: "none" }}
+                  />
 
-                    {photoPreview && (
-                      <div className="mt-2 w-28 h-28 rounded-md overflow-hidden border border-gray-200">
-                        <img
-                          src={photoPreview}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2.5 bg-white rounded-lg border border-[#E38B52]/30 hover:bg-[#E38B52] hover:border-[#E38B52] transition-all duration-200 shadow-md group"
+                      title="Upload Photo"
+                      type="button"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600 group-hover:text-white transition-colors duration-200">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                    </button>
 
-                    <div className="flex items-center gap-2 mt-2">
+                    {(therapist?.photoUrl || therapist?.photo_url || photoPreview) && (
                       <button
+                        onClick={handlePhotoDelete}
+                        className="p-2.5 bg-white rounded-lg border border-red-500/30 hover:bg-red-500 hover:border-red-500 transition-all duration-200 shadow-md group"
+                        title="Delete Photo"
                         type="button"
-                        onClick={uploadPhoto}
-                        disabled={!photoFile || uploading}
-                        className={`px-3 py-2 rounded-md text-white ${photoFile && !uploading ? "bg-[#E38B52] hover:bg-[#C8742F]" : "bg-gray-300 cursor-not-allowed"}`}
                       >
-                        {uploading ? `Uploading ${uploadProgress}%` : "Upload"}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600 group-hover:text-white transition-colors duration-200">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
                       </button>
-                      {photoError && (
-                        <p className="text-sm text-red-500">{photoError}</p>
-                      )}
-                    </div>
+                    )}
                   </div>
+
+                  {photoFile && (
+                    <button
+                      onClick={uploadPhoto}
+                      disabled={uploading}
+                      className={`mt-2 px-4 py-2 text-white text-sm rounded-xl transition-all duration-200 shadow-md flex items-center justify-center gap-2 ${uploading ? "bg-gray-400 cursor-not-allowed" : "bg-green-500 hover:bg-green-600"}`}
+                      type="button"
+                    >
+                      {uploading ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                          </svg>
+                          Uploading...
+                        </>
+                      ) : (
+                        "Upload Photo"
+                      )}
+                    </button>
+                  )}
+
+                  {photoError && (
+                    <p className="text-sm text-red-500 text-center max-w-xs">{photoError}</p>
+                  )}
                 </div>
 
                 {/* Therapist Details */}

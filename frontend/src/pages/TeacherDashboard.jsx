@@ -655,7 +655,7 @@ const TeacherDashboard = () => {
                     <div className="flex items-center justify-between gap-4 text-[#170F49]">
                       <div className="flex items-center gap-4 flex-1">
                         <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden">
-                          <img src={`https://eu.ui-avatars.com/api/?name=${therapist.name.replace(" ", "+")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
+                          <img src={therapist.photo_url || therapist.photoUrl || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-lg font-semibold text-[#170F49] truncate">{therapist.name || "-"}</h3>
@@ -1189,7 +1189,7 @@ const TeacherDashboard = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 text-[#170F49]">
                       <div className="flex items-center gap-3 sm:gap-4 flex-1">
                         <div className="w-[46px] h-[46px] sm:w-[50px] sm:h-[50px] rounded-lg overflow-hidden shrink-0">
-                          <img src={`https://eu.ui-avatars.com/api/?name=${therapist.name.replace(" ", "+")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
+                          <img src={therapist.photo_url || therapist.photoUrl || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0 py-0.5">
                           <h3 className="text-[16px] sm:text-[17px] font-semibold text-[#170F49] truncate pr-2">

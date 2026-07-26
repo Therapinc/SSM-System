@@ -1,6 +1,6 @@
 from typing import List, Optional, Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, load_only
@@ -9,6 +9,7 @@ from app.api import deps
 from app.crud.student import student as student_crud
 from app.crud.teacher import teacher
 from app.db.session import get_db
+from app.core.cloudinary import build_profile_photo_public_id, delete_image, get_cloudinary_folder, upload_image
 from app.models.student import Student as StudentModel
 from app.schemas.student import StudentListItem
 from app.schemas.teacher import Teacher, TeacherCreate, TeacherUpdate
@@ -24,6 +25,10 @@ class TeachersPage(BaseModel):
     page: int
     limit: int
     total_pages: int
+
+
+def _serialize_teacher_with_photo(db_teacher) -> Dict[str, Any]:
+    return {c.name: getattr(db_teacher, c.name) for c in db_teacher.__table__.columns}
 
 
 @router.post("/", response_model=Teacher)
@@ -74,6 +79,67 @@ def read_teacher(
     return db_teacher
 
 
+@router.post("/{teacher_id}/photo", response_model=Teacher)
+def upload_teacher_photo(
+    teacher_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(deps.get_current_active_user),
+):
+    db_teacher = teacher.get(db, id=teacher_id)
+    if db_teacher is None:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    contents = file.file.read()
+    max_size = 200 * 1024
+    if len(contents) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Photo size exceeds 200KB limit. Uploaded file: {len(contents) / 1024:.2f}KB",
+        )
+
+    uploaded = upload_image(
+        contents,
+        folder=get_cloudinary_folder("teachers"),
+        public_id=build_profile_photo_public_id("Tr", db_teacher.id),
+        overwrite=True,
+    )
+
+    updated_teacher = teacher.update(
+        db=db,
+        db_obj=db_teacher,
+        obj_in={
+            "photo_url": uploaded.get("secure_url") or uploaded.get("url"),
+            "photo_public_id": uploaded.get("public_id"),
+        },
+    )
+    return updated_teacher
+
+
+@router.delete("/{teacher_id}/photo", response_model=Teacher)
+def delete_teacher_photo(
+    teacher_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(deps.get_current_active_user),
+):
+    db_teacher = teacher.get(db, id=teacher_id)
+    if db_teacher is None:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    if getattr(db_teacher, "photo_public_id", None):
+        try:
+            delete_image(db_teacher.photo_public_id)
+        except Exception as error:
+            raise HTTPException(status_code=500, detail=f"Failed to delete teacher photo: {error}") from error
+
+    updated_teacher = teacher.update(
+        db=db,
+        db_obj=db_teacher,
+        obj_in={"photo_url": None, "photo_public_id": None},
+    )
+    return updated_teacher
+
+
 @router.put("/{teacher_id}", response_model=Teacher)
 def update_teacher(
     teacher_id: int,
@@ -115,6 +181,11 @@ def delete_teacher(
     db_teacher = teacher.get(db, id=teacher_id)
     if db_teacher is None:
         raise HTTPException(status_code=404, detail="Teacher not found")
+    if getattr(db_teacher, "photo_public_id", None):
+        try:
+            delete_image(db_teacher.photo_public_id)
+        except Exception as error:
+            raise HTTPException(status_code=500, detail=f"Failed to delete teacher photo: {error}") from error
     teacher.remove(db=db, id=teacher_id)
     return {"message": "Teacher deleted successfully"}
 

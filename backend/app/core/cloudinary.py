@@ -34,6 +34,12 @@ def get_cloudinary_folder(*parts: str) -> str:
     return "/".join([prefix, *clean_parts]) if clean_parts else prefix
 
 
+def build_profile_photo_public_id(prefix: str, identifier: object) -> str:
+    """Build a deterministic human-readable public_id for a profile photo."""
+    clean_identifier = str(identifier).strip().replace(" ", "_")
+    return f"{prefix}_{clean_identifier}_profile_photo"
+
+
 def upload_image(
     file_bytes: bytes,
     *,

@@ -33,6 +33,8 @@ class TeacherBase(BaseModel):
     qualifications_details: Optional[str] = None
     category: Optional[str] = None
     class_assignments: Optional[List[ClassAssignment]] = None
+    photo_url: Optional[str] = None
+    photo_public_id: Optional[str] = None
 
 # Create Teacher Schema (used for input when creating)
 class TeacherCreate(TeacherBase):
@@ -65,6 +67,8 @@ class TeacherUpdate(BaseModel):
     category: Optional[str] = None
     email: Optional[str] = None
     class_assignments: Optional[List[ClassAssignment]] = None
+    photo_url: Optional[str] = None
+    photo_public_id: Optional[str] = None
 
     @model_validator(mode='before')
     @classmethod

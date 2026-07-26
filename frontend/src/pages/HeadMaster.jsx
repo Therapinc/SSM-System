@@ -845,7 +845,7 @@ const HeadMaster = () => {
                     >
                       <div className="flex items-center space-x-4 text-[#170F49]">
                         <div className="w-16 h-16 rounded-lg overflow-hidden">
-                          <img src={`https://eu.ui-avatars.com/api/?name=${teacher.name.replace(" ", "+")}&size=250`} alt="Teacher" className="w-full h-full object-cover" />
+                          <img src={teacher.photo_url || teacher.photoUrl || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(teacher.name || "Teacher")}&size=250`} alt="Teacher" className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-[#170F49]">{teacher.name}</h3>
@@ -955,7 +955,7 @@ const HeadMaster = () => {
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-[#170F49]">
                         <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1">
                           <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-lg overflow-hidden mt-0.5 sm:mt-0">
-                            <img src={`https://eu.ui-avatars.com/api/?name=${therapist.name.replace(" ", "+")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
+                            <img src={therapist.photo_url || therapist.photoUrl || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-start w-full">
@@ -1440,7 +1440,7 @@ const HeadMaster = () => {
                     >
                       <div className="flex items-center gap-4 text-[#170F49]">
                         <div className="w-[50px] h-[50px] rounded-lg overflow-hidden shrink-0">
-                          <img src={`https://eu.ui-avatars.com/api/?name=${teacher.name.replace(" ", "+")}&size=250`} alt="Teacher" className="w-full h-full object-cover" />
+                          <img src={teacher.photo_url || teacher.photoUrl || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(teacher.name || "Teacher")}&size=250`} alt="Teacher" className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0 py-0.5">
                           <h3 className="text-[16px] sm:text-[17px] font-semibold text-[#170F49] truncate">{teacher.name}</h3>
@@ -1550,7 +1550,7 @@ const HeadMaster = () => {
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-[#170F49]">
                         <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1">
                           <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-lg overflow-hidden mt-0.5 sm:mt-0">
-                            <img src={`https://eu.ui-avatars.com/api/?name=${therapist.name.replace(" ", "+")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
+                            <img src={therapist.photo_url || therapist.photoUrl || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-start w-full">

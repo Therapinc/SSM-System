@@ -1,12 +1,13 @@
 from typing import List, Optional, Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api import deps
 from app.crud import therapist as crud_therapist
 from app.crud import therapist_assignment as crud_therapist_assignment
+from app.core.cloudinary import build_profile_photo_public_id, delete_image, get_cloudinary_folder, upload_image
 from app.schemas import student as schemas_student
 from app.schemas import therapist as schemas_therapist
 from app.utils.pagination import Page, PageParams
@@ -21,6 +22,10 @@ class TherapistsPage(BaseModel):
     page: int
     limit: int
     total_pages: int
+
+
+def _serialize_therapist_with_photo(db_therapist) -> Dict[str, Any]:
+    return {c.name: getattr(db_therapist, c.name) for c in db_therapist.__table__.columns}
 
 
 @router.get("/", response_model=TherapistsPage)
@@ -63,6 +68,67 @@ def read_therapist(
     return db_therapist
 
 
+@router.post("/{therapist_id}/photo", response_model=schemas_therapist.Therapist)
+def upload_therapist_photo(
+    therapist_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_admin_user),
+):
+    db_therapist = crud_therapist.get_therapist(db, therapist_id=therapist_id)
+    if db_therapist is None:
+        raise HTTPException(status_code=404, detail="Therapist not found")
+
+    contents = file.file.read()
+    max_size = 200 * 1024
+    if len(contents) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Photo size exceeds 200KB limit. Uploaded file: {len(contents) / 1024:.2f}KB",
+        )
+
+    uploaded = upload_image(
+        contents,
+        folder=get_cloudinary_folder("therapists"),
+        public_id=build_profile_photo_public_id("Therapist", db_therapist.id),
+        overwrite=True,
+    )
+
+    updated_therapist = crud_therapist.update_therapist(
+        db,
+        therapist_id=therapist_id,
+        therapist={
+            "photo_url": uploaded.get("secure_url") or uploaded.get("url"),
+            "photo_public_id": uploaded.get("public_id"),
+        },
+    )
+    return updated_therapist
+
+
+@router.delete("/{therapist_id}/photo", response_model=schemas_therapist.Therapist)
+def delete_therapist_photo(
+    therapist_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_admin_user),
+):
+    db_therapist = crud_therapist.get_therapist(db, therapist_id=therapist_id)
+    if db_therapist is None:
+        raise HTTPException(status_code=404, detail="Therapist not found")
+
+    if getattr(db_therapist, "photo_public_id", None):
+        try:
+            delete_image(db_therapist.photo_public_id)
+        except Exception as error:
+            raise HTTPException(status_code=500, detail=f"Failed to delete therapist photo: {error}") from error
+
+    updated_therapist = crud_therapist.update_therapist(
+        db,
+        therapist_id=therapist_id,
+        therapist={"photo_url": None, "photo_public_id": None},
+    )
+    return updated_therapist
+
+
 @router.put("/{therapist_id}", response_model=schemas_therapist.Therapist)
 def update_therapist(
     therapist_id: int,
@@ -101,6 +167,14 @@ def delete_therapist(
     db: Session = Depends(deps.get_db),
     current_user=Depends(deps.get_current_admin_user),
 ):
+    db_therapist = crud_therapist.get_therapist(db, therapist_id=therapist_id)
+    if not db_therapist:
+        raise HTTPException(status_code=404, detail="Therapist not found")
+    if db_therapist and getattr(db_therapist, "photo_public_id", None):
+        try:
+            delete_image(db_therapist.photo_public_id)
+        except Exception as error:
+            raise HTTPException(status_code=500, detail=f"Failed to delete therapist photo: {error}") from error
     success = crud_therapist.delete_therapist(db, therapist_id=therapist_id)
     if not success:
         raise HTTPException(status_code=404, detail="Therapist not found")
