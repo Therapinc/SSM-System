@@ -25,8 +25,21 @@ from app.api.deps import get_current_active_user
 from app.models.therapist import Therapist
 from app.models.user import User
 from app.models.user import UserRole
+from app.core.cloudinary import delete_image, get_cloudinary_folder, upload_image
 
 router = APIRouter()
+
+
+def _serialize_student_with_photo(student_obj) -> Dict[str, Any]:
+    student_data = {c.name: getattr(student_obj, c.name) for c in student_obj.__table__.columns}
+    if not student_data.get("photo_url") and student_data.get("photo"):
+        try:
+            b64_photo = base64.b64encode(student_data["photo"]).decode("utf-8")
+            student_data["photo_url"] = f"data:image/jpeg;base64,{b64_photo}"
+        except Exception:
+            student_data["photo_url"] = None
+    student_data.pop("photo", None)
+    return student_data
 
 
 def _get_student_documents_metadata(db: Session, student_id: int) -> List[Dict[str, Any]]:
@@ -124,21 +137,7 @@ def get_my_student_data(
             detail="Student record not found for this user"
         )
     
-    # Serialize student data safely
-    student_data = {c.name: getattr(student, c.name) for c in student.__table__.columns}
-    
-    # Convert photo bytes to base64 URL if present
-    if student_data.get('photo'):
-        try:
-            b64_photo = base64.b64encode(student_data['photo']).decode('utf-8')
-            student_data['photo_url'] = f"data:image/jpeg;base64,{b64_photo}"
-        except Exception:
-            student_data['photo_url'] = None
-    else:
-        student_data['photo_url'] = None
-    
-    # Remove raw photo bytes
-    student_data.pop('photo', None)
+    student_data = _serialize_student_with_photo(student)
     
     # Strip file_data from documents to keep payload small
     student_data['documents'] = _get_student_documents_metadata(db, student.id)
@@ -194,17 +193,7 @@ def read_student(
     if db_student is None:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    # Build a safe, JSON-serializable dict from table columns
-    student_data = {c.name: getattr(db_student, c.name) for c in db_student.__table__.columns}
-    if student_data.get('photo'):
-        try:
-            b64_photo = base64.b64encode(student_data['photo']).decode('utf-8')
-            student_data['photo_url'] = f"data:image/jpeg;base64,{b64_photo}"
-        except Exception:
-            student_data['photo_url'] = None
-    else:
-        student_data['photo_url'] = None
-    student_data.pop('photo', None)
+    student_data = _serialize_student_with_photo(db_student)
     # Strip file_data from documents to keep payload small
     student_data['documents'] = _get_student_documents_metadata(db, student_id)
 
@@ -234,20 +223,21 @@ def upload_student_photo(
             detail=f"Photo size exceeds 200KB limit. Uploaded file: {len(contents) / 1024:.2f}KB"
         )
 
-    update_data = {"photo": contents}
+    cloudinary_folder = get_cloudinary_folder("students", db_student.student_id)
+    uploaded = upload_image(
+        contents,
+        folder=cloudinary_folder,
+        public_id="profile_photo",
+        overwrite=True,
+    )
+    update_data = {
+        "photo": contents,
+        "photo_url": uploaded.get("secure_url") or uploaded.get("url"),
+        "photo_public_id": uploaded.get("public_id"),
+    }
     updated_student = crud_student.update(db=db, db_obj=db_student, obj_in=update_data)
 
-    # Return serialized student data with photo_url
-    student_data = {c.name: getattr(updated_student, c.name) for c in updated_student.__table__.columns}
-    if student_data.get('photo'):
-        try:
-            b64_photo = base64.b64encode(student_data['photo']).decode('utf-8')
-            student_data['photo_url'] = f"data:image/jpeg;base64,{b64_photo}"
-        except Exception:
-            student_data['photo_url'] = None
-    else:
-        student_data['photo_url'] = None
-    student_data.pop('photo', None)
+    student_data = _serialize_student_with_photo(updated_student)
     # Strip file_data from documents
     student_data['documents'] = _get_student_documents_metadata(db, student_id)
     return student_data
@@ -265,12 +255,17 @@ def delete_student_photo(
     if not db_student:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    update_data = {"photo": None}
+    if getattr(db_student, "photo_public_id", None):
+        try:
+            delete_image(db_student.photo_public_id)
+        except Exception:
+            pass
+
+    update_data = {"photo": None, "photo_url": None, "photo_public_id": None}
     updated_student = crud_student.update(db=db, db_obj=db_student, obj_in=update_data)
 
-    student_data = {c.name: getattr(updated_student, c.name) for c in updated_student.__table__.columns}
+    student_data = _serialize_student_with_photo(updated_student)
     student_data['photo_url'] = None
-    student_data.pop('photo', None)
     # Strip file_data from documents
     student_data['documents'] = _get_student_documents_metadata(db, student_id)
     return student_data
@@ -296,17 +291,7 @@ def update_student(
         update_data['photo'] = update_data['photo']  # bytes expected
     db_student = crud_student.update(db=db, db_obj=db_student, obj_in=update_data)
 
-    # Serialize the updated student safely
-    student_data = {c.name: getattr(db_student, c.name) for c in db_student.__table__.columns}
-    if student_data.get('photo'):
-        try:
-            b64_photo = base64.b64encode(student_data['photo']).decode('utf-8')
-            student_data['photo_url'] = f"data:image/jpeg;base64,{b64_photo}"
-        except Exception:
-            student_data['photo_url'] = None
-    else:
-        student_data['photo_url'] = None
-    student_data.pop('photo', None)
+    student_data = _serialize_student_with_photo(db_student)
     # Strip file_data from documents
     student_data['documents'] = _get_student_documents_metadata(db, student_id)
     return student_data

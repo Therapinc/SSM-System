@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     BREVO_API_KEY: Optional[str] = None
     RESEND_API_KEY: Optional[str] = None
     RESEND_FROM_EMAIL: Optional[str] = "Special School System <onboarding@resend.dev>"
+
+    # Runtime environment used for Cloudinary folder selection
+    APP_ENV: str = "development"
+
+    # Cloudinary image storage
+    CLOUDINARY_CLOUD_NAME: Optional[str] = None
+    CLOUDINARY_API_KEY: Optional[str] = None
+    CLOUDINARY_API_SECRET: Optional[str] = None
     
     # Google Generative AI (Gemini API) settings
     GEMINI_API_KEY: Optional[str] = None

@@ -20,6 +20,7 @@ STUDENT_LIST_LOAD_COLUMNS = (
     Student.email,
     Student.created_at,
     Student.updated_at,
+    Student.photo_url,
 )
 
 
@@ -41,5 +42,5 @@ def serialize_student_list_item(student: Student) -> Dict[str, Any]:
         "email": student.email,
         "created_at": student.created_at,
         "updated_at": student.updated_at,
-        "photo_url": None,
+        "photo_url": student.photo_url,
     }

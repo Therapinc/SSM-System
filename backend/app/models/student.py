@@ -67,7 +67,9 @@ class Student(Base):
     identification_marks = Column(Text, nullable=True)
     
     # Additional Fields
-    photo = Column(LargeBinary, nullable=True) # 👈 Add this line for the image
+    photo = Column(LargeBinary, nullable=True) # legacy fallback for existing database data
+    photo_url = Column(String, nullable=True)
+    photo_public_id = Column(String, nullable=True)
     # Documents/Certificates stored as JSONB array: [{name, file_data (base64), upload_date, file_size}]
     documents = Column(JSONB, nullable=True)
     created_at = Column(Date)

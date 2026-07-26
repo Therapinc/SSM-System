@@ -163,6 +163,8 @@ class StudentBase(BaseModel):
     development_history_items: Optional[str] = None
     
     photo: Optional[bytes] = None
+    photo_url: Optional[str] = None
+    photo_public_id: Optional[str] = None
 
     class Config:
         # Allow arbitrary types including bytes without validation
@@ -205,18 +207,6 @@ class Student(StudentBase):
     created_at: date
     updated_at: date
     case_record: Optional[Dict[str, Any]] = None
-    # Don't include photo in response, only photo_url
-
-    @computed_field
-    @property
-    def photo_url(self) -> Optional[str]:
-        if self.photo:
-            try:
-                b64_photo = base64.b64encode(self.photo).decode("utf-8")
-                return f"data:image/jpeg;base64,{b64_photo}"
-            except Exception:
-                return None
-        return None
 
     model_config = {
     "from_attributes": True,

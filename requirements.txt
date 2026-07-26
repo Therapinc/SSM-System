@@ -19,6 +19,7 @@ python-dotenv==1.0.0
 pydantic[email]==2.4.2
 pydantic-settings==2.0.3
 requests==2.31.0
+cloudinary==1.41.0
 
 # Google Generative AI (Gemini API)
 google-generativeai>=0.3.0
