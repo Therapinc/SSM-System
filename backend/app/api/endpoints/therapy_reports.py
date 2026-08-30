@@ -447,6 +447,7 @@ Your task is to analyze the session notes and write a factual progress summary f
 STRICT CLINICAL RULES:
 - Write in professional, objective, evidence-based clinical language.
 - Summarize only what is explicitly documented. Do NOT make assumptions, extrapolate, or invent details.
+- Compare earlier and later sessions when multiple reports are available. Highlight only clearly documented improvements, consistent performance, or continuing difficulties. Do not infer progress where the reports do not provide evidence.
 - For each sub-area, write a coherent summary of 2-3 complete sentences detailing the student's current status and progress.
 - Describe progress or challenges objectively (e.g. "the student demonstrated...", "required prompts for...", "performance was consistent").
 - If the notes describe inconsistent or fluctuating progress, report that directly.
@@ -474,35 +475,60 @@ def _generate_fallback_summary(
     student_name: str,
     max_field_length: Optional[int]
 ) -> Dict[str, str]:
+    """Build structured, date-anchored progress summaries from raw session notes.
+
+    Notes are grouped by session date and formatted as date-prefixed points
+    (e.g. '2026-08-05: Observed steady progress; 2026-08-20: Required minimal
+    prompts.') capped at clean sentence/clause boundaries.
+    """
     fallback_summaries = {}
     for sub in active_sub_areas:
-        sub_notes = []
+        # Collect (date, note_text) pairs so output is chronological
+        dated_notes: List[tuple] = []
         for r in kept_reports:
             parsed = _parse_goals_achieved(r.goals_achieved)
-            if isinstance(parsed, dict) and sub in parsed:
-                val = parsed[sub]
-                if isinstance(val, dict):
-                    notes = val.get("notes", "").strip()
-                    response = val.get("response", "").strip()
-                    if notes:
-                        sub_notes.append(notes)
-                    if response:
-                        sub_notes.append(response)
-                elif isinstance(val, str) and val.strip():
-                    sub_notes.append(val.strip())
-        
-        scrubbed_notes = [_scrub_pii_name(n, student_name) for n in sub_notes]
-        if max_field_length is not None:
-            scrubbed_notes = [n[:max_field_length] for n in scrubbed_notes]
-            
-        if scrubbed_notes:
-            summary_text = "Observations: " + "; ".join(scrubbed_notes[:3])
-            if len(summary_text) > 400:
-                summary_text = summary_text[:397] + "..."
-            fallback_summaries[sub] = summary_text
-        else:
+            if not isinstance(parsed, dict) or sub not in parsed:
+                continue
+            val = parsed[sub]
+            date_label = r.report_date.isoformat() if hasattr(r.report_date, "isoformat") else str(r.report_date)
+            if isinstance(val, dict):
+                note_parts = []
+                notes = val.get("notes", "").strip()
+                response = val.get("response", "").strip()
+                if notes:
+                    note_parts.append(notes)
+                if response:
+                    note_parts.append(response)
+                if note_parts:
+                    dated_notes.append((date_label, " ".join(note_parts)))
+            elif isinstance(val, str) and val.strip():
+                dated_notes.append((date_label, val.strip()))
+
+        if not dated_notes:
             fallback_summaries[sub] = "No documented progress details in this period."
-            
+            continue
+
+        # Scrub PII and optionally truncate each note
+        cleaned: List[str] = []
+        for date_label, note in dated_notes:
+            scrubbed = _scrub_pii_name(note, student_name)
+            if max_field_length is not None:
+                scrubbed = scrubbed[:max_field_length]
+            cleaned.append(f"{date_label}: {scrubbed}")
+
+        # Join with " ; " and cap at 450 chars, cutting only at a "; " boundary
+        joined = " ; ".join(cleaned)
+        if len(joined) > 450:
+            # Walk backwards from char 450 to find last "; " boundary
+            cut = joined.rfind(" ; ", 0, 450)
+            if cut > 0:
+                joined = joined[:cut]
+            else:
+                # No boundary found — hard-cut at 447 chars
+                joined = joined[:447] + "..."
+
+        fallback_summaries[sub] = joined
+
     return fallback_summaries
 
 
@@ -676,24 +702,51 @@ async def ai_summarize_reports(
     total_chars = _calculate_total_char_count(kept_reports, student_name)
     if total_chars > 40000:
         truncated = True
-        if len(kept_reports) >= 31:
-            # Normal Pruning: Keep first 5 and last 25
-            kept_reports = kept_reports[:5] + kept_reports[-25:]
-        
-        # Check if still exceeding 40k
+        if len(kept_reports) > 30:
+            # Uniform Sampling: Keep first 2 (baseline), last 10 (recent status),
+            # and up to 18 reports uniformly spread across the middle — so no
+            # multi-week block is silently dropped from the clinical record.
+            BASELINE = 2
+            RECENT = 10
+            MIDDLE_BUDGET = 18
+            head = kept_reports[:BASELINE]
+            tail = kept_reports[-RECENT:]
+            # Middle is everything between baseline and recent tail
+            tail_start_idx = max(BASELINE, len(kept_reports) - RECENT)
+            middle_pool = kept_reports[BASELINE:tail_start_idx]
+            if len(middle_pool) <= MIDDLE_BUDGET:
+                middle_sample = middle_pool
+            else:
+                # Pick evenly spaced indices across the middle pool
+                step = len(middle_pool) / MIDDLE_BUDGET
+                middle_sample = [middle_pool[int(i * step)] for i in range(MIDDLE_BUDGET)]
+            # De-duplicate by id preserving chronological order
+            seen_ids: set = set()
+            merged = []
+            for r in head + middle_sample + tail:
+                if r.id not in seen_ids:
+                    seen_ids.add(r.id)
+                    merged.append(r)
+            kept_reports = sorted(merged, key=lambda r: r.report_date)
+            logging.info(
+                f"Uniform sampling: {len(kept_reports)} reports kept "
+                f"(baseline={BASELINE}, middle_sample={len(middle_sample)}, recent={RECENT})."
+            )
+
+        # Check if still exceeding 40k after sampling
         total_chars = _calculate_total_char_count(kept_reports, student_name)
         if total_chars > 40000:
             active_sub_areas = _get_active_sub_areas(kept_reports)
             n_sub = len(active_sub_areas) if active_sub_areas else 1
             max_field_length = 40000 // (len(kept_reports) * n_sub * 2)
-            
+
             # Incremental pruning loop if max_field_length < 150
             while max_field_length < 150 and len(kept_reports) > 10:
-                kept_reports.pop(5)  # Pop oldest middle report
+                kept_reports.pop(len(kept_reports) // 2)  # Pop a middle report
                 active_sub_areas = _get_active_sub_areas(kept_reports)
                 n_sub = len(active_sub_areas) if active_sub_areas else 1
                 max_field_length = 40000 // (len(kept_reports) * n_sub * 2)
-                
+
             if max_field_length < 150:
                 # Fallback: If we hit the 10-report floor and max_field_length is still < 150
                 # (which requires a pathologically high active_sub_areas count), we clamp
@@ -728,7 +781,11 @@ async def ai_summarize_reports(
     response_text = None
     model_name = "fallback-data-analysis"
 
-    for attempt in range(1, 4):
+    # Up to 3 attempts (0, 1, 2). Retryable errors (503, timeout, network) get
+    # incremental backoff (1.5s then 3s). Non-retryable errors (429, 4xx auth)
+    # bail immediately so the user gets the fallback summary without extra delay.
+    MAX_RETRIES = 2
+    for attempt in range(MAX_RETRIES + 1):
         try:
             response = await asyncio.to_thread(
                 client.models.generate_content,
@@ -747,30 +804,34 @@ async def ai_summarize_reports(
             response_text = response.text
             break
         except Exception as e:
+            is_last_attempt = attempt == MAX_RETRIES
             status_code = _get_gemini_error_status_code(e)
-            if status_code == 503:
-                logging.warning(f"Gemini attempt {attempt} failed with 503: {e}")
-                if attempt == 1:
-                    logging.warning("Gemini temporarily unavailable; retrying once")
-                    await asyncio.sleep(1.5)
+
+            # Fast-fail for quota / auth errors — no point retrying
+            if status_code in (429, 400, 401, 403):
+                logging.warning(
+                    f"Gemini non-retryable error (HTTP {status_code}) on attempt {attempt}; "
+                    f"using local fallback: {e}"
+                )
+                break
+
+            # Retry transient errors: 503 service unavailable, timeouts, network blips
+            if status_code == 503 or _is_retryable_gemini_error(e):
+                if not is_last_attempt:
+                    delay = 1.5 * (attempt + 1)  # 1.5s then 3.0s
+                    logging.warning(
+                        f"Gemini attempt {attempt} failed ({type(e).__name__}, "
+                        f"HTTP {status_code}); retrying in {delay}s: {e}"
+                    )
+                    await asyncio.sleep(delay)
                     continue
-                logging.warning("Gemini retry failed; using local fallback")
+                logging.warning(
+                    f"Gemini all {MAX_RETRIES + 1} attempts exhausted; using local fallback: {e}"
+                )
                 break
 
-            if status_code == 429:
-                logging.warning(f"Gemini quota/rate limit reached; using local fallback (429): {e}")
-                break
-
-            if _is_retryable_gemini_error(e):
-                logging.warning(f"Gemini attempt {attempt} failed with timeout/network error: {e}")
-                if attempt == 1:
-                    logging.warning("Gemini timeout/network error; retrying once")
-                    await asyncio.sleep(1.5)
-                    continue
-                logging.warning("Gemini retry failed; using local fallback")
-                break
-
-            logging.warning(f"Gemini non-retryable error: {type(e).__name__}: {e}")
+            # Unknown error — don't retry
+            logging.warning(f"Gemini unknown error on attempt {attempt}: {type(e).__name__}: {e}")
             break
 
     # Parse JSON structured output

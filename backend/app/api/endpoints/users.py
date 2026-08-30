@@ -145,12 +145,29 @@ def read_user_me(
     current_user: models.User = Depends(deps.get_current_active_user),
 ) -> Any:
     """
-    Get current user.
+    Get current user. Enriches response with display name and specialization
+    from the Teacher or Therapist profile tables so the frontend can show the
+    real name instead of the auto-generated username.
     """
-    if current_user and str(current_user.role).lower() == "therapist":
+    role = str(current_user.role).lower()
+
+    if role == "therapist":
         from app.models.therapist import Therapist
         from sqlalchemy import func
-        therapist = db.query(Therapist).filter(func.lower(Therapist.email) == current_user.email.lower()).first()
+        therapist = db.query(Therapist).filter(
+            func.lower(Therapist.email) == current_user.email.lower()
+        ).first()
         if therapist:
             current_user.specialization = therapist.specialization
+            current_user.name = therapist.name or None
+
+    elif role == "teacher":
+        from app.models.teacher import Teacher
+        from sqlalchemy import func
+        teacher = db.query(Teacher).filter(
+            func.lower(Teacher.email) == current_user.email.lower()
+        ).first()
+        if teacher:
+            current_user.name = teacher.name or None
+
     return current_user

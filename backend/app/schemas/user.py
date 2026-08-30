@@ -28,6 +28,7 @@ class UserInDBBase(UserBase):
 
 class User(UserInDBBase):
     specialization: Optional[str] = None
+    name: Optional[str] = None
 
 class UserInDB(UserInDBBase):
     hashed_password: str

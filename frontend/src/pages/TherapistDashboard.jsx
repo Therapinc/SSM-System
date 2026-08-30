@@ -360,7 +360,8 @@ const TherapistDashboard = () => {
         const { data } = await axios.get(`${API_BASE_URL}/api/v1/users/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (data?.username) setUserName(data.username);
+        if (data?.name) setUserName(data.name);
+        else if (data?.username) setUserName(data.username);
         else if (data?.email) setUserName(data.email.split("@")[0]);
         if (data?.specialization) {
           const spec = data.specialization;

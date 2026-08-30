@@ -794,6 +794,9 @@ const StudentPage = () => {
   const [aiModel, setAiModel] = useState("meta-llama/Llama-3.3-70B-Instruct");
   const aiSummaryAbortControllerRef = useRef(null);
   const [collapsedSummarySections, setCollapsedSummarySections] = useState({});
+  // Loading dialogue message rotation
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
+  const loadingMsgIntervalRef = useRef(null);
 
   // Therapy report editing state
   const [editingTherapyReport, setEditingTherapyReport] = useState(null);
@@ -2875,6 +2878,23 @@ const StudentPage = () => {
     );
   };
 
+  // Pool of 12 short, clinical-sounding loading messages for variety.
+  // Picked randomly on start and cycled every 2.5s so it never feels repetitive.
+  const AI_LOADING_MESSAGES = [
+    "Reading session notes...",
+    "Identifying progress patterns...",
+    "Reviewing goals achieved...",
+    "Cross-checking clinical observations...",
+    "Preparing structured summary...",
+    "Analysing therapy sub-areas...",
+    "Verifying documented progress...",
+    "Filtering relevant data...",
+    "Compiling findings...",
+    "Almost there...",
+    "Organising clinical insights...",
+    "Finalising summary output...",
+  ];
+
   const handleAISummarize = async () => {
     // Clear dismissed flag so the new result always shows
     sessionStorage.removeItem(`ai_summary_dismissed_${id}`);
@@ -2898,6 +2918,13 @@ const StudentPage = () => {
       setAiSummaryError("Please select a therapy type first.");
       return;
     }
+
+    // Start rotating loading messages from a random position
+    const startIdx = Math.floor(Math.random() * AI_LOADING_MESSAGES.length);
+    setLoadingMsgIndex(startIdx);
+    loadingMsgIntervalRef.current = setInterval(() => {
+      setLoadingMsgIndex((prev) => (prev + 1) % AI_LOADING_MESSAGES.length);
+    }, 2500);
 
     setAiSummarizing(true);
     const abortController = new AbortController();
@@ -2941,6 +2968,11 @@ const StudentPage = () => {
       console.error("AI summarize failed", e);
       setAiSummaryError(e.message || "Failed to generate AI summary.");
     } finally {
+      // Always clear the interval and loading state
+      if (loadingMsgIntervalRef.current) {
+        clearInterval(loadingMsgIntervalRef.current);
+        loadingMsgIntervalRef.current = null;
+      }
       aiSummaryAbortControllerRef.current = null;
       setAiSummarizing(false);
     }
@@ -6561,6 +6593,8 @@ const StudentPage = () => {
       className="min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col items-center bg-[#f7f7f7] relative overflow-hidden py-20"
     >
 
+
+
       {showDocumentDeleteConfirm && pendingDocumentDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-[#FAF9F6] rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all">
@@ -7100,7 +7134,6 @@ const StudentPage = () => {
                               title="Filter by therapy type"
                               aria-label="Therapy type"
                             >
-                              <option value="">All Types</option>
                               <option value="Behavioral Therapy">
                                 Behavioral
                               </option>
@@ -7412,7 +7445,42 @@ const StudentPage = () => {
                             )}
 
                             <div className="p-3">
-                              {translating ? (
+                              {aiSummarizing ? (
+                                <div className="p-6 my-2 bg-gradient-to-r from-orange-50 to-amber-50 rounded-2xl border border-orange-200/80 shadow-inner space-y-4 animate-fadeIn">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-orange-500/10 text-[#E38B52] flex-shrink-0">
+                                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                      </div>
+                                      <div>
+                                        <h5 className="text-sm font-bold text-gray-800">Generating AI Progress Analysis...</h5>
+                                        <p className="text-xs text-[#E38B52] font-semibold min-h-[1.25rem] transition-all duration-300">
+                                          {AI_LOADING_MESSAGES[loadingMsgIndex]}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={handleStopAISummarize}
+                                      className="px-3 py-1.5 border border-red-300 text-red-600 text-xs font-semibold rounded-xl bg-white hover:bg-red-50 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <rect x="5" y="5" width="10" height="10" rx="1" />
+                                      </svg>
+                                      Stop
+                                    </button>
+                                  </div>
+                                  {/* Moving animated progress bar */}
+                                  <div className="w-full h-2 bg-orange-100/80 rounded-full overflow-hidden relative">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-[#E38B52] via-[#D67A3F] to-[#C56930] rounded-full transition-all duration-500 animate-pulse"
+                                      style={{ width: `${Math.min(95, (loadingMsgIndex + 1) * 8.5)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ) : translating ? (
                                 <div className="flex items-center gap-2 text-gray-600">
                                   <div className="w-4 h-4 border-2 border-[#E38B52] border-t-transparent rounded-full animate-spin"></div>
                                   Translating to Malayalam...
@@ -7438,18 +7506,18 @@ const StudentPage = () => {
                                 </div>
                               ) : (
                                 renderSummaryContent(
-                                  aiSummarizing ? aiSummary : getUnifiedSummaryText(aiAnalysis),
-                                  aiSummarizing,
+                                  getUnifiedSummaryText(aiAnalysis),
+                                  false,
                                 )
                               )}
                             </div>
                           </div>
 
                           {aiAnalysis?.model === "fallback-data-analysis" && (
-                            <div className="mt-3 text-xs text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-200 flex items-start gap-2 shadow-sm">
-                              <span className="text-sm font-bold">⚠️</span>
+                            <div className="mt-3 text-xs text-amber-800 bg-amber-50 p-3.5 rounded-xl border border-amber-200 shadow-sm flex items-start gap-2.5">
+                              <span className="text-base font-bold flex-shrink-0">ℹ️</span>
                               <div>
-                                <span className="font-semibold">Fallback Analysis:</span> AI service is currently unavailable or daily requests quota exceeded. This summary was generated using the database-driven fallback generator.
+                                <span className="font-semibold">Local Database Analysis:</span> AI service was temporarily busy or unreachable. This summary was synthesized directly from your documented session notes.
                               </div>
                             </div>
                           )}
@@ -7653,7 +7721,6 @@ const StudentPage = () => {
                           }}
                           className="h-10 px-3 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#E38B52] focus:border-[#E38B52] transition-all cursor-pointer hover:bg-orange-50/20 disabled:bg-gray-100 disabled:opacity-75 w-full"
                         >
-                          <option value="">All Types</option>
                           <option value="Behavioral Therapy">Behavioral</option>
                           <option value="Occupational Therapy">Occupational</option>
                           <option value="Physiotherapy">Physiotherapy</option>
