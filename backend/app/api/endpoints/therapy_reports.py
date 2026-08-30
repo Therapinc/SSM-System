@@ -506,6 +506,42 @@ def _generate_fallback_summary(
     return fallback_summaries
 
 
+def _get_gemini_error_status_code(exc: Exception) -> Optional[int]:
+    """Extract a status code from common google-genai/httpx exceptions."""
+    for attr_name in ("status_code", "status", "code", "statusCode"):
+        value = getattr(exc, attr_name, None)
+        if isinstance(value, int):
+            return value
+
+    response = getattr(exc, "response", None)
+    if response is not None:
+        response_status = getattr(response, "status_code", None)
+        if isinstance(response_status, int):
+            return response_status
+
+    exc_text = str(exc).lower()
+    if "503" in exc_text:
+        return 503
+    if "429" in exc_text:
+        return 429
+    return None
+
+
+def _is_retryable_gemini_error(exc: Exception) -> bool:
+    """Only retry errors that are reasonably transient."""
+    status_code = _get_gemini_error_status_code(exc)
+    if status_code == 503:
+        return True
+    if status_code in (429, 400, 401, 403):
+        return False
+    if isinstance(exc, (TimeoutError, ConnectionError, OSError)):
+        return True
+    exc_name = type(exc).__name__.lower()
+    if any(token in exc_name for token in ("timeout", "network", "connect")):
+        return True
+    return False
+
+
 @router.post("/summary/ai", response_model=TherapySummaryResponse)
 async def ai_summarize_reports(
     payload: TherapySummaryRequest = Body(...),
@@ -685,15 +721,17 @@ async def ai_summarize_reports(
     # Layer 4: Sliding window rate limit check
     await api_rate_limiter.acquire()
 
-    # Layer 5: Gemini API execution with exponential backoff & JSON mode
+    # Layer 5: Gemini API execution with targeted retry + JSON mode
     client = _get_gemini_client()
     prompt = _build_ai_summary_prompt(kept_reports, student_name, active_sub_areas, max_field_length)
 
     response_text = None
+    model_name = "fallback-data-analysis"
 
-    for attempt in range(3):
+    for attempt in range(1, 4):
         try:
-            response = client.models.generate_content(
+            response = await asyncio.to_thread(
+                client.models.generate_content,
                 model=settings.GEMINI_MODEL,
                 contents=prompt,
                 config=genai_types.GenerateContentConfig(
@@ -709,30 +747,52 @@ async def ai_summarize_reports(
             response_text = response.text
             break
         except Exception as e:
-            logging.warning(f"Gemini API call failed on attempt {attempt + 1}: {e}")
-            if attempt < 2:
-                await asyncio.sleep((2 ** attempt) + (time.time() % 1))
-            else:
-                logging.error(f"All 3 attempts to Gemini API failed: {e}")
+            status_code = _get_gemini_error_status_code(e)
+            if status_code == 503:
+                logging.warning(f"Gemini attempt {attempt} failed with 503: {e}")
+                if attempt == 1:
+                    logging.warning("Gemini temporarily unavailable; retrying once")
+                    await asyncio.sleep(1.5)
+                    continue
+                logging.warning("Gemini retry failed; using local fallback")
+                break
+
+            if status_code == 429:
+                logging.warning(f"Gemini quota/rate limit reached; using local fallback (429): {e}")
+                break
+
+            if _is_retryable_gemini_error(e):
+                logging.warning(f"Gemini attempt {attempt} failed with timeout/network error: {e}")
+                if attempt == 1:
+                    logging.warning("Gemini timeout/network error; retrying once")
+                    await asyncio.sleep(1.5)
+                    continue
+                logging.warning("Gemini retry failed; using local fallback")
+                break
+
+            logging.warning(f"Gemini non-retryable error: {type(e).__name__}: {e}")
+            break
 
     # Parse JSON structured output
     summaries = None
     if response_text:
         try:
             parsed = json.loads(response_text)
-            if isinstance(parsed, dict):
-                summaries = {}
-                for sub in active_sub_areas:
-                    summaries[sub] = parsed.get(sub, "No documented progress details in this period.")
-        except Exception as e:
-            logging.warning(f"Failed to parse Gemini JSON response: {response_text}, error: {e}")
+            if not isinstance(parsed, dict):
+                raise ValueError("Gemini response is not a JSON object")
+            summaries = {}
+            for sub in active_sub_areas:
+                summaries[sub] = parsed.get(sub, "No documented progress details in this period.")
+            logging.info("Gemini summary generated successfully")
+            model_name = settings.GEMINI_MODEL
+        except (TypeError, ValueError, json.JSONDecodeError) as e:
+            logging.warning(f"Gemini response JSON parsing failed; using local fallback: {e}")
+            response_text = None
 
     # Fallback to local DB-driven analysis if Gemini response is missing or malformed
     if summaries is None:
         summaries = _generate_fallback_summary(kept_reports, active_sub_areas, student_name, max_field_length)
         model_name = "fallback-data-analysis"
-    else:
-        model_name = settings.GEMINI_MODEL
 
     # Cache the result. skipped_report_dates is already a List[str] (ISO format), pass directly.
     create_or_update_cache(
