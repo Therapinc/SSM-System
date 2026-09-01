@@ -75,7 +75,9 @@ const HeadMaster = () => {
     ["admin", "hm", "headmaster"].includes(
       String(user?.role || "").toLowerCase(),
     );
-  const [selectedClass, setSelectedClass] = useState("all");
+  const [selectedClass, setSelectedClass] = useState(
+    () => sessionStorage.getItem("hm_selectedClass") || "all",
+  );
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [classesList, setClassesList] = useState([]);
   const filterRef = useRef(null);
@@ -98,13 +100,19 @@ const HeadMaster = () => {
   const [teacherSearch, setTeacherSearch] = useState("");
   const debouncedTeacherSearch = useDebouncedValue(teacherSearch, 400);
   const [teacherPage, setTeacherPage] = useState(1);
-  const [studentSearch, setStudentSearch] = useState("");
+  const [studentSearch, setStudentSearch] = useState(
+    () => sessionStorage.getItem("hm_studentSearch") || "",
+  );
   const debouncedStudentSearch = useDebouncedValue(studentSearch, 400);
   const [therapistSearch, setTherapistSearch] = useState("");
   const debouncedTherapistSearch = useDebouncedValue(therapistSearch, 400);
   const [students, setStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
-  const [studentPage, setStudentPage] = useState(1);
+  const [studentPage, setStudentPage] = useState(() => {
+    const p = sessionStorage.getItem("hm_studentPage");
+    return p ? parseInt(p, 10) : 1;
+  });
+  const isInitialStudentFilterRun = useRef(true);
   const studentLimit = 50;
   const [studentTotalPages, setStudentTotalPages] = useState(1);
   const [studentTotal, setStudentTotal] = useState(0);
@@ -302,8 +310,25 @@ const HeadMaster = () => {
   }, [activeTab, debouncedStudentSearch, selectedClass, studentPage, studentLimit]);
 
   useEffect(() => {
+    if (isInitialStudentFilterRun.current) {
+      isInitialStudentFilterRun.current = false;
+      return;
+    }
     setStudentPage(1);
   }, [debouncedStudentSearch, selectedClass]);
+
+  useEffect(() => {
+    if (!studentsLoading && students.length > 0) {
+      const savedScroll = sessionStorage.getItem("hm_scroll_pos");
+      if (savedScroll !== null) {
+        const y = parseInt(savedScroll, 10);
+        setTimeout(() => {
+          window.scrollTo(0, y);
+          sessionStorage.removeItem("hm_scroll_pos");
+        }, 100);
+      }
+    }
+  }, [studentsLoading, students]);
 
   useEffect(() => {
     setTeacherPage(1);
@@ -320,7 +345,13 @@ const HeadMaster = () => {
   const handleAddStudent = () => { navigate("/add-student"); };
   const handleAddTeacher = () => { navigate("/add-teacher"); };
   const handleAddTherapist = () => { navigate("/add-therapist"); };
-  const handleStudentClick = (studentId) => { navigate(`/student/${studentId}`); };
+  const handleStudentClick = (studentId) => {
+    sessionStorage.setItem("hm_scroll_pos", String(window.scrollY));
+    sessionStorage.setItem("hm_studentPage", String(studentPage));
+    sessionStorage.setItem("hm_studentSearch", studentSearch);
+    sessionStorage.setItem("hm_selectedClass", selectedClass);
+    navigate(`/student/${studentId}`);
+  };
   const handleTeacherClick = (teacherId) => { navigate(`/teacher/${teacherId}`); };
   const handleTherapistClick = (therapistId) => { navigate(`/therapist/${therapistId}`); };
 

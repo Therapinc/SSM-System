@@ -215,10 +215,14 @@ const TherapistDashboard = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [filterOption, setFilterOption] = useState("all");
-  const [selectedClass, setSelectedClass] = useState("all");
+  const [selectedClass, setSelectedClass] = useState(
+    () => sessionStorage.getItem("th_selectedClass") || "all",
+  );
   const [isSearchFloating, setIsSearchFloating] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [studentSearch, setStudentSearch] = useState("");
+  const [studentSearch, setStudentSearch] = useState(
+    () => sessionStorage.getItem("th_studentSearch") || "",
+  );
   const [students, setStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -414,11 +418,27 @@ const TherapistDashboard = () => {
     fetchStudents();
   }, [userName]);
 
+  useEffect(() => {
+    if (!studentsLoading && students.length > 0) {
+      const savedScroll = sessionStorage.getItem("th_scroll_pos");
+      if (savedScroll !== null) {
+        const y = parseInt(savedScroll, 10);
+        setTimeout(() => {
+          window.scrollTo(0, y);
+          sessionStorage.removeItem("th_scroll_pos");
+        }, 100);
+      }
+    }
+  }, [studentsLoading, students]);
+
   const handleLogout = () => {
     setShowLogoutModal(true);
   };
 
   const handleStudentClick = (studentId) => {
+    sessionStorage.setItem("th_scroll_pos", String(window.scrollY));
+    sessionStorage.setItem("th_studentSearch", studentSearch);
+    sessionStorage.setItem("th_selectedClass", selectedClass);
     navigate(`/student/${studentId}`);
   };
 

@@ -25,10 +25,14 @@ const TeacherDashboard = () => {
   const [userName, setUserName] = useState("        ");
   const [activeTab, setActiveTab] = useState("students");
   const [filterOption, setFilterOption] = useState("all");
-  const [selectedClass, setSelectedClass] = useState("all");
+  const [selectedClass, setSelectedClass] = useState(
+    () => sessionStorage.getItem("td_selectedClass") || "all",
+  );
   const [isSearchFloating, setIsSearchFloating] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [studentSearch, setStudentSearch] = useState("");
+  const [studentSearch, setStudentSearch] = useState(
+    () => sessionStorage.getItem("td_studentSearch") || "",
+  );
   const [allStudents, setAllStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [profileError, setProfileError] = useState("");
@@ -157,6 +161,19 @@ const TeacherDashboard = () => {
   }, [userName]);
 
   useEffect(() => {
+    if (!studentsLoading && allStudents.length > 0) {
+      const savedScroll = sessionStorage.getItem("td_scroll_pos");
+      if (savedScroll !== null) {
+        const y = parseInt(savedScroll, 10);
+        setTimeout(() => {
+          window.scrollTo(0, y);
+          sessionStorage.removeItem("td_scroll_pos");
+        }, 100);
+      }
+    }
+  }, [studentsLoading, allStudents]);
+
+  useEffect(() => {
     const fetchTherapists = async () => {
       setTherapistsLoading(true);
       try {
@@ -201,6 +218,9 @@ const TeacherDashboard = () => {
   };
 
   const handleStudentClick = (studentId) => {
+    sessionStorage.setItem("td_scroll_pos", String(window.scrollY));
+    sessionStorage.setItem("td_studentSearch", studentSearch);
+    sessionStorage.setItem("td_selectedClass", selectedClass);
     navigate(`/student/${studentId}`);
   };
 
