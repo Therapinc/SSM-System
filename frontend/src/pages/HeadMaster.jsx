@@ -78,9 +78,15 @@ const HeadMaster = () => {
   const [selectedClass, setSelectedClass] = useState(
     () => sessionStorage.getItem("hm_selectedClass") || "all",
   );
+  const [selectedDivision, setSelectedDivision] = useState(
+    () => sessionStorage.getItem("hm_selectedDivision") || "all",
+  );
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showDivisionDropdown, setShowDivisionDropdown] = useState(false);
   const [classesList, setClassesList] = useState([]);
+  const [divisionsList, setDivisionsList] = useState([]);
   const filterRef = useRef(null);
+  const divisionRef = useRef(null);
   const [isSearchFloating, setIsSearchFloating] = useState(false);
   const [notification, setNotification] = useState({ message: "", type: "" });
   const [activeTab, setActiveTab] = useState(() => {
@@ -200,16 +206,21 @@ const HeadMaster = () => {
 
   useEffect(() => {
     const classSet = new Set();
+    const divSet = new Set();
     CLASS_OPTIONS.forEach((className) => classSet.add(className));
     students.forEach((s) => {
       if (s.class_name) classSet.add(s.class_name);
+      if (s.division) divSet.add(s.division.toString().trim());
     });
-    const derived = Array.from(classSet).sort();
-    setClassesList(derived);
+    setClassesList(Array.from(classSet).sort());
+    setDivisionsList(Array.from(divSet).sort());
 
     const handleClickOutside = (e) => {
       if (filterRef.current && !filterRef.current.contains(e.target)) {
         setShowFilterDropdown(false);
+      }
+      if (divisionRef.current && !divisionRef.current.contains(e.target)) {
+        setShowDivisionDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -290,6 +301,7 @@ const HeadMaster = () => {
           params.search = debouncedStudentSearch.trim();
         }
         if (selectedClass && selectedClass !== "all") params.class_name = selectedClass;
+        if (selectedDivision && selectedDivision !== "all") params.division = selectedDivision;
         const { data } = await axios.get(`${API_BASE_URL}/api/v1/students/`, { params });
         const items = Array.isArray(data?.items) ? data.items : [];
         setStudentTotal(data?.total ?? 0);
@@ -307,7 +319,7 @@ const HeadMaster = () => {
     if (activeTab === "students") {
       fetchStudents();
     }
-  }, [activeTab, debouncedStudentSearch, selectedClass, studentPage, studentLimit]);
+  }, [activeTab, debouncedStudentSearch, selectedClass, selectedDivision, studentPage, studentLimit]);
 
   useEffect(() => {
     if (isInitialStudentFilterRun.current) {
@@ -693,55 +705,107 @@ const HeadMaster = () => {
                     Add Student
                   </button>
 
+                  {/* Single Unified Filter Button */}
                   <div className="relative" ref={filterRef}>
                     <button
                       onClick={() => setShowFilterDropdown((s) => !s)}
                       className="px-4 py-3 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B52]/90 transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2"
                       aria-haspopup="listbox"
                       aria-expanded={showFilterDropdown}
-                      aria-label="Filter students by class"
+                      aria-label="Filter students by class and division"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
                       </svg>
-                      <span className="text-sm font-medium">{selectedClass === "all" ? "Filter" : selectedClass}</span>
+                      <span className="text-sm font-medium">
+                        {selectedClass === "all" && selectedDivision === "all"
+                          ? "Filter"
+                          : selectedClass !== "all" && selectedDivision !== "all"
+                            ? `${selectedClass} (Div ${selectedDivision})`
+                            : selectedClass !== "all"
+                              ? selectedClass
+                              : `Div ${selectedDivision}`}
+                      </span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`h-4 w-4 transition-transform ${showFilterDropdown ? "rotate-180" : ""}`}
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
                     </button>
 
                     {showFilterDropdown && (
-                      <div className="absolute right-0 mt-2 w-52 bg-[#FAF9F6] rounded-xl shadow-lg overflow-hidden z-50">
-                        <ul className="p-2 space-y-2" role="listbox" aria-label="Class filter options">
-                          <li>
+                      <div
+                        className="absolute right-0 mt-2 w-64 bg-[#FAF9F6] rounded-2xl shadow-xl border border-[#E38B52]/20 p-4 z-50 space-y-4"
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {/* Class Selection */}
+                        <div>
+                          <label className="block text-xs font-bold text-[#170F49] uppercase tracking-wider mb-1.5">
+                            Class
+                          </label>
+                          <select
+                            value={selectedClass}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSelectedClass(val);
+                              sessionStorage.setItem("hm_selectedClass", val);
+                            }}
+                            className="w-full px-3 py-2 text-sm text-[#170F49] bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#E38B52] shadow-sm"
+                          >
+                            <option value="all">All Classes</option>
+                            {(classesList.length > 0 ? classesList : CLASS_OPTIONS).map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Division Selection */}
+                        <div>
+                          <label className="block text-xs font-bold text-[#170F49] uppercase tracking-wider mb-1.5">
+                            Division
+                          </label>
+                          <select
+                            value={selectedDivision}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSelectedDivision(val);
+                              sessionStorage.setItem("hm_selectedDivision", val);
+                            }}
+                            className="w-full px-3 py-2 text-sm text-[#170F49] bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#E38B52] shadow-sm"
+                          >
+                            <option value="all">All Divisions</option>
+                            {divisionsList.map((divOpt) => (
+                              <option key={divOpt} value={divOpt}>
+                                Division {divOpt}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Reset Filters Option */}
+                        {(selectedClass !== "all" || selectedDivision !== "all") && (
+                          <div className="pt-2 border-t border-gray-200/60">
                             <button
-                              onMouseDown={(e) => { e.preventDefault(); setSelectedClass("all"); setShowFilterDropdown(false); }}
-                              className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === "all" ? "font-semibold" : ""}`}
+                              type="button"
+                              onClick={() => {
+                                setSelectedClass("all");
+                                setSelectedDivision("all");
+                                sessionStorage.setItem("hm_selectedClass", "all");
+                                sessionStorage.setItem("hm_selectedDivision", "all");
+                                setShowFilterDropdown(false);
+                              }}
+                              className="w-full py-1.5 text-xs text-red-600 font-semibold hover:bg-red-50 rounded-lg transition-colors text-center"
                             >
-                              All Students
+                              Reset Filters
                             </button>
-                          </li>
-                          {classesList.length === 0 ? (
-                            CLASS_OPTIONS.map((c) => (
-                              <li key={c}>
-                                <button
-                                  onMouseDown={(e) => { e.preventDefault(); setSelectedClass(c); setShowFilterDropdown(false); }}
-                                  className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === c ? "font-semibold" : ""}`}
-                                >
-                                  {c}
-                                </button>
-                              </li>
-                            ))
-                          ) : (
-                            classesList.map((c) => (
-                              <li key={c}>
-                                <button
-                                  onMouseDown={(e) => { e.preventDefault(); setSelectedClass(c); setShowFilterDropdown(false); }}
-                                  className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === c ? "font-semibold" : ""}`}
-                                >
-                                  {c}
-                                </button>
-                              </li>
-                            ))
-                          )}
-                        </ul>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1285,52 +1349,103 @@ const HeadMaster = () => {
                   <div className="relative flex-1" ref={filterRef}>
                     <button
                       onClick={() => setShowFilterDropdown((s) => !s)}
-                      className="w-full h-[48px] justify-center px-4 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B52]/90 transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2"
+                      className="w-full h-[48px] justify-center px-4 bg-[#E38B52] text-white rounded-xl hover:bg-[#E38B52]/90 transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] flex items-center gap-2"
                       aria-haspopup="listbox"
                       aria-expanded={showFilterDropdown}
-                      aria-label="Filter students by class"
+                      aria-label="Filter students by class and division"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
                       </svg>
-                      <span className="text-sm font-medium">{selectedClass === "all" ? "Filter" : selectedClass}</span>
+                      <span className="text-xs sm:text-sm font-medium truncate max-w-[120px]">
+                        {selectedClass === "all" && selectedDivision === "all"
+                          ? "Filter"
+                          : selectedClass !== "all" && selectedDivision !== "all"
+                            ? `${selectedClass} (${selectedDivision})`
+                            : selectedClass !== "all"
+                              ? selectedClass
+                              : `Div ${selectedDivision}`}
+                      </span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`h-4 w-4 shrink-0 transition-transform ${showFilterDropdown ? "rotate-180" : ""}`}
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
                     </button>
 
                     {showFilterDropdown && (
-                      <div className="absolute right-0 mt-2 w-52 bg-[#FAF9F6] rounded-xl shadow-lg overflow-hidden z-50">
-                        <ul className="p-2 space-y-2" role="listbox" aria-label="Class filter options">
-                          <li>
+                      <div
+                        className="absolute right-0 mt-2 w-60 bg-[#FAF9F6] rounded-2xl shadow-xl border border-[#E38B52]/20 p-4 z-50 space-y-3"
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {/* Class Selection */}
+                        <div>
+                          <label className="block text-xs font-bold text-[#170F49] uppercase tracking-wider mb-1">
+                            Class
+                          </label>
+                          <select
+                            value={selectedClass}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSelectedClass(val);
+                              sessionStorage.setItem("hm_selectedClass", val);
+                            }}
+                            className="w-full px-3 py-2 text-sm text-[#170F49] bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#E38B52] shadow-sm"
+                          >
+                            <option value="all">All Classes</option>
+                            {(classesList.length > 0 ? classesList : CLASS_OPTIONS).map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Division Selection */}
+                        <div>
+                          <label className="block text-xs font-bold text-[#170F49] uppercase tracking-wider mb-1">
+                            Division
+                          </label>
+                          <select
+                            value={selectedDivision}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSelectedDivision(val);
+                              sessionStorage.setItem("hm_selectedDivision", val);
+                            }}
+                            className="w-full px-3 py-2 text-sm text-[#170F49] bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#E38B52] shadow-sm"
+                          >
+                            <option value="all">All Divisions</option>
+                            {divisionsList.map((divOpt) => (
+                              <option key={divOpt} value={divOpt}>
+                                Division {divOpt}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Reset Filters Option */}
+                        {(selectedClass !== "all" || selectedDivision !== "all") && (
+                          <div className="pt-2 border-t border-gray-200/60">
                             <button
-                              onMouseDown={(e) => { e.preventDefault(); setSelectedClass("all"); setShowFilterDropdown(false); }}
-                              className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === "all" ? "font-semibold" : ""}`}
+                              type="button"
+                              onClick={() => {
+                                setSelectedClass("all");
+                                setSelectedDivision("all");
+                                sessionStorage.setItem("hm_selectedClass", "all");
+                                sessionStorage.setItem("hm_selectedDivision", "all");
+                                setShowFilterDropdown(false);
+                              }}
+                              className="w-full py-1.5 text-xs text-red-600 font-semibold hover:bg-red-50 rounded-lg transition-colors text-center"
                             >
-                              All Students
+                              Reset Filters
                             </button>
-                          </li>
-                          {classesList.length === 0 ? (
-                            CLASS_OPTIONS.map((c) => (
-                              <li key={c}>
-                                <button
-                                  onMouseDown={(e) => { e.preventDefault(); setSelectedClass(c); setShowFilterDropdown(false); }}
-                                  className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === c ? "font-semibold" : ""}`}
-                                >
-                                  {c}
-                                </button>
-                              </li>
-                            ))
-                          ) : (
-                            classesList.map((c) => (
-                              <li key={c}>
-                                <button
-                                  onMouseDown={(e) => { e.preventDefault(); setSelectedClass(c); setShowFilterDropdown(false); }}
-                                  className={`w-full text-left px-4 py-2 rounded-lg hover:bg-[#E38B52]/10 ${selectedClass === c ? "font-semibold" : ""}`}
-                                >
-                                  {c}
-                                </button>
-                              </li>
-                            ))
-                          )}
-                        </ul>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

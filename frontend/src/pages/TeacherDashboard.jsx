@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import TherapistStudentAssignmentModal from "../components/TherapistStudentAssignmentModal.jsx";
@@ -28,8 +28,12 @@ const TeacherDashboard = () => {
   const [selectedClass, setSelectedClass] = useState(
     () => sessionStorage.getItem("td_selectedClass") || "all",
   );
+  const [selectedDivision, setSelectedDivision] = useState(
+    () => sessionStorage.getItem("td_selectedDivision") || "all",
+  );
   const [isSearchFloating, setIsSearchFloating] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const filterRef = useRef(null);
   const [studentSearch, setStudentSearch] = useState(
     () => sessionStorage.getItem("td_studentSearch") || "",
   );
@@ -63,8 +67,22 @@ const TeacherDashboard = () => {
         return classLabel.toLowerCase().includes(selectedClass.toLowerCase());
       });
     }
+    if (selectedDivision && selectedDivision !== "all") {
+      visible = visible.filter((s) => {
+        const divLabel = (s.division || "").toString().trim().toLowerCase();
+        return divLabel === selectedDivision.toLowerCase();
+      });
+    }
     return visible;
-  }, [allStudents, studentSearch, selectedClass]);
+  }, [allStudents, studentSearch, selectedClass, selectedDivision]);
+
+  const divisionsList = useMemo(() => {
+    const set = new Set();
+    allStudents.forEach((s) => {
+      if (s.division) set.add(s.division.toString().trim());
+    });
+    return Array.from(set).sort();
+  }, [allStudents]);
   const [therapists, setTherapists] = useState([]);
   const [therapistsLoading, setTherapistsLoading] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
@@ -79,6 +97,16 @@ const TeacherDashboard = () => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
 
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (filterRef.current && !filterRef.current.contains(e.target)) {
+        setShowFilterDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -221,6 +249,7 @@ const TeacherDashboard = () => {
     sessionStorage.setItem("td_scroll_pos", String(window.scrollY));
     sessionStorage.setItem("td_studentSearch", studentSearch);
     sessionStorage.setItem("td_selectedClass", selectedClass);
+    sessionStorage.setItem("td_selectedDivision", selectedDivision);
     navigate(`/student/${studentId}`);
   };
 
@@ -487,7 +516,7 @@ const TeacherDashboard = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="relative">
+              <div className="relative" ref={filterRef}>
                 {/* Filter Button */}
                 <button
                   onClick={() => setShowFilterDropdown(!showFilterDropdown)}
@@ -505,7 +534,15 @@ const TeacherDashboard = () => {
                       clipRule="evenodd"
                     />
                   </svg>
-                  Filter Students
+                  <span className="text-sm font-medium">
+                    {selectedClass === "all" && selectedDivision === "all"
+                      ? "Filter Students"
+                      : selectedClass !== "all" && selectedDivision !== "all"
+                        ? `${selectedClass} (${selectedDivision})`
+                        : selectedClass !== "all"
+                          ? selectedClass
+                          : `Div ${selectedDivision}`}
+                  </span>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className={`h-4 w-4 transition-transform ${
@@ -523,51 +560,74 @@ const TeacherDashboard = () => {
                 </button>
                 {/* Filter Dropdown Menu */}
                 {showFilterDropdown && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg overflow-hidden z-50">
-                    <div className="p-2 space-y-2">
+                  <div
+                    className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#E38B52]/20 p-4 z-50 space-y-3"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div>
+                      <label className="block text-xs font-bold text-[#170F49] uppercase tracking-wider mb-1">
+                        Class
+                      </label>
                       <select
-                        value={filterOption}
+                        value={selectedClass}
                         onChange={(e) => {
-                          setFilterOption(e.target.value);
+                          setSelectedClass(e.target.value);
+                          sessionStorage.setItem("td_selectedClass", e.target.value);
                         }}
-                        className="w-full px-4 py-2.5 text-sm text-[#170F49] bg-[#FAF9F6] rounded-lg border border-gray-200 hover:border-[#E38B52] focus:outline-none focus:border-[#E38B52] transition-all duration-200"
+                        className="w-full px-3 py-2 text-sm text-[#170F49] bg-[#FAF9F6] rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#E38B52]"
                       >
-                        <option value="all">All Students</option>
-                        <option value="class">Class</option>
+                        <option value="all">All Classes</option>
+                        <option value="PrePrimary">PrePrimary</option>
+                        <option value="Primary 1">Primary 1</option>
+                        <option value="Primary 2">Primary 2</option>
+                        <option value="Secondary">Secondary</option>
+                        <option value="Pre vocational 1">Pre vocational 1</option>
+                        <option value="Pre vocational 2">Pre vocational 2</option>
+                        <option value="caregroup-below-18">Care group below 18 years</option>
+                        <option value="caregroup-above-18">Care group Above 18 years</option>
+                        <option value="vocational">Vocational 18-35 years</option>
                       </select>
+                    </div>
 
-                      {filterOption === "class" && (
-                        <select
-                          value={selectedClass}
-                          onChange={(e) => {
-                            setSelectedClass(e.target.value);
+                    <div>
+                      <label className="block text-xs font-bold text-[#170F49] uppercase tracking-wider mb-1">
+                        Division
+                      </label>
+                      <select
+                        value={selectedDivision}
+                        onChange={(e) => {
+                          setSelectedDivision(e.target.value);
+                          sessionStorage.setItem("td_selectedDivision", e.target.value);
+                        }}
+                        className="w-full px-3 py-2 text-sm text-[#170F49] bg-[#FAF9F6] rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#E38B52]"
+                      >
+                        <option value="all">All Divisions</option>
+                        {divisionsList.map((divOpt) => (
+                          <option key={divOpt} value={divOpt}>
+                            Division {divOpt}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {(selectedClass !== "all" || selectedDivision !== "all") && (
+                      <div className="pt-2 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedClass("all");
+                            setSelectedDivision("all");
+                            sessionStorage.setItem("td_selectedClass", "all");
+                            sessionStorage.setItem("td_selectedDivision", "all");
                             setShowFilterDropdown(false);
                           }}
-                          className="w-full px-4 py-2.5 text-sm text-[#170F49] bg-[#FAF9F6] rounded-lg border border-gray-200 hover:border-[#E38B52] focus:outline-none focus:border-[#E38B52] transition-all duration-200"
+                          className="w-full py-1.5 text-xs text-red-600 font-semibold hover:bg-red-50 rounded-lg transition-colors text-center"
                         >
-                          <option value="all">All Classes</option>
-                          <option value="PrePrimary">PrePrimary</option>
-                          <option value="Primary 1">Primary 1</option>
-                          <option value="Primary 2">Primary 2</option>
-                          <option value="Secondary">Secondary</option>
-                          <option value="Pre vocational 1">
-                            Pre vocational 1
-                          </option>
-                          <option value="Pre vocational 2">
-                            Pre vocational 2
-                          </option>
-                          <option value="caregroup-below-18">
-                            Care group below 18 years
-                          </option>
-                          <option value="caregroup-above-18">
-                            Care group Above 18 years
-                          </option>
-                          <option value="vocational">
-                            Vocational 18-35 years
-                          </option>
-                        </select>
-                      )}
-                    </div>
+                          Reset Filters
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1021,7 +1081,7 @@ const TeacherDashboard = () => {
             </div>
 
             <div className="flex items-center gap-3 w-full">
-              <div className="relative">
+              <div className="relative" ref={filterRef}>
                 {/* Filter Button */}
                 <button
                   onClick={() => setShowFilterDropdown(!showFilterDropdown)}
@@ -1029,7 +1089,7 @@ const TeacherDashboard = () => {
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
+                    className="h-5 w-5 shrink-0"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
@@ -1039,10 +1099,18 @@ const TeacherDashboard = () => {
                       clipRule="evenodd"
                     />
                   </svg>
-                  Filter Students
+                  <span className="text-xs sm:text-sm font-medium truncate max-w-[120px]">
+                    {selectedClass === "all" && selectedDivision === "all"
+                      ? "Filter Students"
+                      : selectedClass !== "all" && selectedDivision !== "all"
+                        ? `${selectedClass} (${selectedDivision})`
+                        : selectedClass !== "all"
+                          ? selectedClass
+                          : `Div ${selectedDivision}`}
+                  </span>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className={`h-4 w-4 transition-transform ${
+                    className={`h-4 w-4 shrink-0 transition-transform ${
                       showFilterDropdown ? "rotate-180" : ""
                     }`}
                     viewBox="0 0 20 20"
@@ -1057,51 +1125,74 @@ const TeacherDashboard = () => {
                 </button>
                 {/* Filter Dropdown Menu */}
                 {showFilterDropdown && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg overflow-hidden z-50">
-                    <div className="p-2 space-y-2">
+                  <div
+                    className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#E38B52]/20 p-4 z-50 space-y-3"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <div>
+                      <label className="block text-xs font-bold text-[#170F49] uppercase tracking-wider mb-1">
+                        Class
+                      </label>
                       <select
-                        value={filterOption}
+                        value={selectedClass}
                         onChange={(e) => {
-                          setFilterOption(e.target.value);
+                          setSelectedClass(e.target.value);
+                          sessionStorage.setItem("td_selectedClass", e.target.value);
                         }}
-                        className="w-full px-4 py-2.5 text-sm text-[#170F49] bg-[#FAF9F6] rounded-lg border border-gray-200 hover:border-[#E38B52] focus:outline-none focus:border-[#E38B52] transition-all duration-200"
+                        className="w-full px-3 py-2 text-sm text-[#170F49] bg-[#FAF9F6] rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#E38B52]"
                       >
-                        <option value="all">All Students</option>
-                        <option value="class">Class</option>
+                        <option value="all">All Classes</option>
+                        <option value="PrePrimary">PrePrimary</option>
+                        <option value="Primary 1">Primary 1</option>
+                        <option value="Primary 2">Primary 2</option>
+                        <option value="Secondary">Secondary</option>
+                        <option value="Pre vocational 1">Pre vocational 1</option>
+                        <option value="Pre vocational 2">Pre vocational 2</option>
+                        <option value="caregroup-below-18">Care group below 18 years</option>
+                        <option value="caregroup-above-18">Care group Above 18 years</option>
+                        <option value="vocational">Vocational 18-35 years</option>
                       </select>
+                    </div>
 
-                      {filterOption === "class" && (
-                        <select
-                          value={selectedClass}
-                          onChange={(e) => {
-                            setSelectedClass(e.target.value);
+                    <div>
+                      <label className="block text-xs font-bold text-[#170F49] uppercase tracking-wider mb-1">
+                        Division
+                      </label>
+                      <select
+                        value={selectedDivision}
+                        onChange={(e) => {
+                          setSelectedDivision(e.target.value);
+                          sessionStorage.setItem("td_selectedDivision", e.target.value);
+                        }}
+                        className="w-full px-3 py-2 text-sm text-[#170F49] bg-[#FAF9F6] rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#E38B52]"
+                      >
+                        <option value="all">All Divisions</option>
+                        {divisionsList.map((divOpt) => (
+                          <option key={divOpt} value={divOpt}>
+                            Division {divOpt}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {(selectedClass !== "all" || selectedDivision !== "all") && (
+                      <div className="pt-2 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedClass("all");
+                            setSelectedDivision("all");
+                            sessionStorage.setItem("td_selectedClass", "all");
+                            sessionStorage.setItem("td_selectedDivision", "all");
                             setShowFilterDropdown(false);
                           }}
-                          className="w-full px-4 py-2.5 text-sm text-[#170F49] bg-[#FAF9F6] rounded-lg border border-gray-200 hover:border-[#E38B52] focus:outline-none focus:border-[#E38B52] transition-all duration-200"
+                          className="w-full py-1.5 text-xs text-red-600 font-semibold hover:bg-red-50 rounded-lg transition-colors text-center"
                         >
-                          <option value="all">All Classes</option>
-                          <option value="PrePrimary">PrePrimary</option>
-                          <option value="Primary 1">Primary 1</option>
-                          <option value="Primary 2">Primary 2</option>
-                          <option value="Secondary">Secondary</option>
-                          <option value="Pre vocational 1">
-                            Pre vocational 1
-                          </option>
-                          <option value="Pre vocational 2">
-                            Pre vocational 2
-                          </option>
-                          <option value="caregroup-below-18">
-                            Care group below 18 years
-                          </option>
-                          <option value="caregroup-above-18">
-                            Care group Above 18 years
-                          </option>
-                          <option value="vocational">
-                            Vocational 18-35 years
-                          </option>
-                        </select>
-                      )}
-                    </div>
+                          Reset Filters
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

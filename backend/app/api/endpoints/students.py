@@ -69,6 +69,7 @@ def read_students(
     pagination: PageParams = Depends(),
     search: Optional[str] = None,
     class_name: Optional[str] = None,
+    division: Optional[str] = None,
     current_user: User = Depends(get_current_active_user)
 ) -> Dict[str, Any]:
     """
@@ -101,6 +102,9 @@ def read_students(
 
     if class_name:
         query = query.filter(crud_student.model.class_name == class_name)
+
+    if division:
+        query = query.filter(crud_student.model.division == division)
 
     total = query.count()
     students_from_db = (
