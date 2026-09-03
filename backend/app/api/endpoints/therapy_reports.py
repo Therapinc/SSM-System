@@ -201,7 +201,7 @@ def create_report(
         )
 
 
-@router.get("/student/{student_id}")
+@router.get("/student/{student_id}", response_model=schemas.therapy_report.PaginatedTherapyReports)
 def list_reports_for_student(
     student_id: int,
     db: Session = Depends(deps.get_db),

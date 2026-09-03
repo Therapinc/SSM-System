@@ -83,3 +83,11 @@ class TherapyReport(TherapyReportBase):
     class Config:
         from_attributes = True
         orm_mode = True  # Keep for backwards compatibility
+
+
+class PaginatedTherapyReports(BaseModel):
+    """Paginated response wrapper for therapy reports."""
+    items: list[TherapyReport]
+    total: int
+    page: int
+    page_size: int
