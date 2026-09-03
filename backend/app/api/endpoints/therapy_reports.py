@@ -16,7 +16,7 @@ except ImportError:
     genai = None  # type: ignore
     genai_types = None  # type: ignore
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app import crud, schemas
 from app.api import deps
@@ -902,11 +902,21 @@ def get_summary_history(
     from app.models.therapy_summary import TherapySummary
     from app.models.student import Student
     
-    db_student = crud_student.get_by_student_id(db, student_id=student_id)
+    db_student = (
+        db.query(Student)
+        .options(load_only(Student.id))
+        .filter(Student.student_id == student_id)
+        .first()
+    )
     if not db_student:
         try:
             student_int_id = int(student_id)
-            db_student = db.query(Student).filter(Student.id == student_int_id).first()
+            db_student = (
+                db.query(Student)
+                .options(load_only(Student.id))
+                .filter(Student.id == student_int_id)
+                .first()
+            )
         except ValueError:
             pass
             

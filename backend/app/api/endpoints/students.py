@@ -320,7 +320,7 @@ def delete_student(
     """
     Delete a student.
     """
-    db_student = crud_student.get(db, id=student_id)
+    db_student = db.query(crud_student.model.id).filter(crud_student.model.id == student_id).first()
     if db_student is None:
         raise HTTPException(status_code=404, detail="Student not found")
     crud_student.remove(db=db, id=student_id)
@@ -362,7 +362,7 @@ def upload_student_document(
     if file_size > max_size:
         raise HTTPException(status_code=400, detail=f"File size exceeds 5MB limit. File size: {file_size / (1024 * 1024):.2f}MB")
     
-    db_student = crud_student.get(db, id=student_id)
+    db_student = db.query(crud_student.model.id).filter(crud_student.model.id == student_id).first()
     if not db_student:
         raise HTTPException(status_code=404, detail="Student not found")
 
@@ -429,7 +429,7 @@ def get_student_documents(
     """
     Get all documents for a student.
     """
-    db_student = crud_student.get(db, id=student_id)
+    db_student = db.query(crud_student.model.id).filter(crud_student.model.id == student_id).first()
     if not db_student:
         raise HTTPException(status_code=404, detail="Student not found")
     
@@ -450,7 +450,7 @@ def download_student_document(
     """
     Download a specific document by UUID.
     """
-    db_student = crud_student.get(db, id=student_id)
+    db_student = db.query(crud_student.model.id).filter(crud_student.model.id == student_id).first()
     if not db_student:
         raise HTTPException(status_code=404, detail="Student not found")
     
@@ -489,7 +489,7 @@ def delete_student_document(
     """
     Delete a specific document by UUID.
     """
-    db_student = crud_student.get(db, id=student_id)
+    db_student = db.query(crud_student.model.id).filter(crud_student.model.id == student_id).first()
     if not db_student:
         raise HTTPException(status_code=404, detail="Student not found")
     
