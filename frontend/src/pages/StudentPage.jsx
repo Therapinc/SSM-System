@@ -814,6 +814,9 @@ const StudentPage = () => {
   // Special Ed
   const fileInputRef = useRef(null);
   const loadedStudentDbIdRef = useRef(null);
+  const specTablesSyncSkipRef = useRef(true);
+  const iepDataSyncSkipRef = useRef(true);
+  const iepProgramSyncSkipRef = useRef(true);
   const [phaseSavedStatus, setPhaseSavedStatus] = useState({}); // Track which phases are saved per table
   const [savedTables, setSavedTables] = useState([]);
   const [unsavedTableIndex, setUnsavedTableIndex] = useState(null); // Track which table has unsaved edits
@@ -826,6 +829,7 @@ const StudentPage = () => {
   const [activeSkillByTable, setActiveSkillByTable] = useState({});
   const [activeQuestionByTable, setActiveQuestionByTable] = useState({});
   const [pulsatingEditButton, setPulsatingEditButton] = useState({});
+  const [tableHasModifications, setTableHasModifications] = useState(false);
   const questionRefs = useRef({});
   // Guard helpers: prevent interacting with other tables while one has unsaved edits
   const isAnotherTableUnsaved = (table) =>
@@ -834,7 +838,22 @@ const StudentPage = () => {
 
   const warnIfUnsavedOther = (tableIndex, actionText = "open or modify another table") => {
     if (isAnotherTableUnsaved(savedTables[tableIndex])) {
-      showToast(`Save the current table before ${actionText}`, "warning");
+      const activeIdx = unsavedTableIndex;
+      if (!tableHasModifications) {
+        if (activeIdx !== null && savedTables[activeIdx]) {
+          handleSetTableEditable(savedTables[activeIdx], false);
+        }
+        return false;
+      }
+      if (activeIdx !== null) {
+        setPulsatingEditButton({ [activeIdx]: true });
+        setTimeout(() => setPulsatingEditButton({}), 3500);
+        const saveBtn = document.getElementById(`spec-table-save-btn-${activeIdx}`);
+        if (saveBtn) {
+          saveBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+      showToast(`Please save the active table before ${actionText}!`, "warning");
       return true;
     }
     return false;
@@ -1105,6 +1124,10 @@ const StudentPage = () => {
   useEffect(() => {
     if (!initialLoadDone || !id) return;
     if (String(loadedStudentDbIdRef.current) !== String(id)) return;
+    if (iepDataSyncSkipRef.current) {
+      iepDataSyncSkipRef.current = false;
+      return;
+    }
     const syncIepData = async () => {
       try {
         const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -1125,6 +1148,10 @@ const StudentPage = () => {
   useEffect(() => {
     if (!initialLoadDone || !id) return;
     if (String(loadedStudentDbIdRef.current) !== String(id)) return;
+    if (specTablesSyncSkipRef.current) {
+      specTablesSyncSkipRef.current = false;
+      return;
+    }
     const syncSpecTables = async () => {
       try {
         const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -1145,6 +1172,10 @@ const StudentPage = () => {
   useEffect(() => {
     if (!initialLoadDone || !id) return;
     if (String(loadedStudentDbIdRef.current) !== String(id)) return;
+    if (iepProgramSyncSkipRef.current) {
+      iepProgramSyncSkipRef.current = false;
+      return;
+    }
     const syncIepProgramRecords = async () => {
       try {
         const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -1732,18 +1763,18 @@ const StudentPage = () => {
   };
 
   const startCreateIepForm = () => {
-    const draftStr = localStorage.getItem(`draft_iep_${id}`);
+    const draftKey = `draft_iep_${id}`;
+    const draftStr = localStorage.getItem(draftKey);
     if (draftStr) {
-      if (window.confirm("You have an unsaved IEP draft. Do you want to restore it?")) {
-        try {
-          const parsed = JSON.parse(draftStr);
-          setIepFormDraft(parsed);
-          setIepFormViewRecord(null);
-          setIepFormMode("create");
-          return;
-        } catch(e) { console.error(e); }
-      } else {
-        localStorage.removeItem(`draft_iep_${id}`);
+      try {
+        const parsed = JSON.parse(draftStr);
+        setIepFormDraft(parsed);
+        setIepFormViewRecord(null);
+        setIepFormMode("create");
+        showToast("Restored unsaved IEP draft automatically.", "info");
+        return;
+      } catch (e) {
+        localStorage.removeItem(draftKey);
       }
     }
     setIepFormDraft(createEmptyIepForm());
@@ -1752,18 +1783,18 @@ const StudentPage = () => {
   };
 
   const startEditIepForm = (record) => {
-    const draftStr = localStorage.getItem(`draft_iep_${id}`);
+    const draftKey = `draft_iep_${id}`;
+    const draftStr = localStorage.getItem(draftKey);
     if (draftStr) {
-      if (window.confirm("You have an unsaved IEP draft. Do you want to restore it?")) {
-        try {
-          const parsed = JSON.parse(draftStr);
-          setIepFormDraft(parsed);
-          setIepFormViewRecord(null);
-          setIepFormMode("edit");
-          return;
-        } catch(e) { console.error(e); }
-      } else {
-        localStorage.removeItem(`draft_iep_${id}`);
+      try {
+        const parsed = JSON.parse(draftStr);
+        setIepFormDraft(parsed);
+        setIepFormViewRecord(null);
+        setIepFormMode("edit");
+        showToast("Restored unsaved IEP draft automatically.", "info");
+        return;
+      } catch (e) {
+        localStorage.removeItem(draftKey);
       }
     }
     setIepFormDraft(normalizeIepRecord(record));
@@ -1857,6 +1888,9 @@ const StudentPage = () => {
 
   const saveIepForm = () => {
     if (!iepFormDraft) return;
+    if (id) {
+      localStorage.removeItem(`draft_iep_${id}`);
+    }
     const now = new Date().toISOString();
     const existing = [...iepFormRecords];
     if (iepFormDraft.id) {
@@ -3280,7 +3314,10 @@ const StudentPage = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
 
-  // Case Record Drafts
+  // ----------------------------------------------------
+  // Silent Draft Auto-Savers & Silent Auto-Restorers
+  // ----------------------------------------------------
+  // Case Record Silent Auto-Save
   useEffect(() => {
     if (editMode && id && editData) {
       const timer = setTimeout(() => {
@@ -3290,7 +3327,7 @@ const StudentPage = () => {
     }
   }, [editMode, id, editData, householdRows, drugRows]);
 
-  // IEP Drafts
+  // IEP Form Silent Auto-Save
   useEffect(() => {
     if ((iepFormMode === "create" || iepFormMode === "edit") && id && iepFormDraft) {
       const timer = setTimeout(() => {
@@ -3300,7 +3337,7 @@ const StudentPage = () => {
     }
   }, [iepFormMode, id, iepFormDraft]);
 
-  // Therapy Report Drafts
+  // Therapy Report Silent Auto-Save
   useEffect(() => {
     if (editingTherapyReport && id) {
       const timer = setTimeout(() => {
@@ -3318,36 +3355,14 @@ const StudentPage = () => {
     }
   }, [editingTherapyReport, id, editTherapyGoals, editTherapyPresentComplaints, editTherapyCurrentObservation, editTherapyAssessmentDone, editTherapyProvisionalDiagnosis, editTherapyProgressLevel, editTherapyReportDate]);
 
-  // Term Reports Drafts
+  // Automatically clean up any stale term report draft keys on mount to prevent false unsaved flags
   useEffect(() => {
-    if (unsavedTableIndex !== null && id && savedTables.length > 0) {
-      const timer = setTimeout(() => {
-        localStorage.setItem(`draft_term_reports_${id}`, JSON.stringify({
-          savedTables,
-          unsavedTableIndex,
-        }));
-      }, 1000);
-      return () => clearTimeout(timer);
+    if (id) {
+      try {
+        localStorage.removeItem(`draft_term_reports_${id}`);
+      } catch (e) {}
     }
-  }, [unsavedTableIndex, id, savedTables]);
-
-  // Restore Term Reports Draft on Load
-  useEffect(() => {
-    if (initialLoadDone && student && id) {
-      const draftStr = localStorage.getItem(`draft_term_reports_${id}`);
-      if (draftStr) {
-        if (window.confirm("You have an unsaved Term Reports draft. Restore it?")) {
-          try {
-            const parsed = JSON.parse(draftStr);
-            setSavedTables(parsed.savedTables);
-            setUnsavedTableIndex(parsed.unsavedTableIndex);
-          } catch (e) {}
-        } else {
-          localStorage.removeItem(`draft_term_reports_${id}`);
-        }
-      }
-    }
-  }, [initialLoadDone, student, id]);
+  }, [id]);
 
 
   // Toast notification helper
@@ -3386,24 +3401,24 @@ const StudentPage = () => {
     return percentage;
   }, [student]); // This calculation re-runs only when the 'student' object changes
 
-  // Start editing: initialize editData
+  // Start editing: initialize editData with Silent Auto-Restore
   const handleEditStart = () => {
-    const draftStr = localStorage.getItem(`draft_case_record_${id}`);
+    const draftKey = `draft_case_record_${id}`;
+    const draftStr = localStorage.getItem(draftKey);
     if (draftStr) {
-      if (window.confirm("You have an unsaved draft of the Case Record from earlier. Do you want to restore it?")) {
-         try {
-           const parsed = JSON.parse(draftStr);
-           if (parsed.editData) setEditData(parsed.editData);
-           if (parsed.householdRows) setHouseholdRows(parsed.householdRows);
-           if (parsed.drugRows) setDrugRows(parsed.drugRows);
-           setEditMode(true);
-           return;
-         } catch(e) { console.error(e); }
-      } else {
-        localStorage.removeItem(`draft_case_record_${id}`);
+      try {
+        const parsed = JSON.parse(draftStr);
+        if (parsed.editData) setEditData(parsed.editData);
+        if (parsed.householdRows) setHouseholdRows(parsed.householdRows);
+        if (parsed.drugRows) setDrugRows(parsed.drugRows);
+        setEditMode(true);
+        showToast("Restored unsaved Case Record draft automatically.", "info");
+        return;
+      } catch (e) {
+        localStorage.removeItem(draftKey);
       }
     }
-    
+
     if (student) {
       setHouseholdRows(normalizeHouseholdRows(student.household));
       setDrugRows(normalizeDrugRows(student.drug_history));
@@ -4746,6 +4761,11 @@ const StudentPage = () => {
       const programList = Array.isArray(finalIepProgram) ? finalIepProgram.map(normalizeIepRecord) : [];
       setIepFormRecords(programList);
 
+      // Reset skip refs on new student load
+      iepDataSyncSkipRef.current = true;
+      specTablesSyncSkipRef.current = true;
+      iepProgramSyncSkipRef.current = true;
+
       loadedStudentDbIdRef.current = id;
       setInitialLoadDone(true);
     } catch (e) {
@@ -5094,13 +5114,17 @@ const StudentPage = () => {
   };
 
   const handleSetTableEditable = (targetTable, editable) => {
+    setTableHasModifications(false);
     if (editable) {
       // Entering edit mode - mark as unsaved
       const tableIndex = savedTables.indexOf(targetTable);
       setUnsavedTableIndex(tableIndex);
     } else {
-      // Exiting edit mode (saving) - clear unsaved flag
+      // Exiting edit mode (saving) - clear unsaved flag and local draft
       setUnsavedTableIndex(null);
+      if (id) {
+        localStorage.removeItem(`draft_term_reports_${id}`);
+      }
 
       setPhaseSavedStatus((prev) => ({
         ...prev,
@@ -8008,24 +8032,24 @@ const StudentPage = () => {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const draftStr = localStorage.getItem(`draft_therapy_${id}_${r.id}`);
+                                        const draftKey = `draft_therapy_${id}_${r.id}`;
+                                        const draftStr = localStorage.getItem(draftKey);
                                         if (draftStr) {
-                                          if (window.confirm("You have an unsaved draft for this therapy report. Restore it?")) {
-                                            try {
-                                              const parsed = JSON.parse(draftStr);
-                                              setEditingTherapyReport(r);
-                                              setEditTherapyGoals(parsed.editTherapyGoals || {});
-                                              setEditTherapyPresentComplaints(parsed.editTherapyPresentComplaints || "");
-                                              setEditTherapyCurrentObservation(parsed.editTherapyCurrentObservation || "");
-                                              setEditTherapyAssessmentDone(parsed.editTherapyAssessmentDone || "");
-                                              setEditTherapyProvisionalDiagnosis(parsed.editTherapyProvisionalDiagnosis || "");
-                                              setEditTherapyProgressLevel(parsed.editTherapyProgressLevel || "Excellent");
-                                              setEditTherapyReportDate(parsed.editTherapyReportDate || "");
-                                              setEditTherapyError(null);
-                                              return;
-                                            } catch(e) {}
-                                          } else {
-                                            localStorage.removeItem(`draft_therapy_${id}_${r.id}`);
+                                          try {
+                                            const parsed = JSON.parse(draftStr);
+                                            setEditingTherapyReport(r);
+                                            setEditTherapyGoals(parsed.editTherapyGoals || {});
+                                            setEditTherapyPresentComplaints(parsed.editTherapyPresentComplaints || "");
+                                            setEditTherapyCurrentObservation(parsed.editTherapyCurrentObservation || "");
+                                            setEditTherapyAssessmentDone(parsed.editTherapyAssessmentDone || "");
+                                            setEditTherapyProvisionalDiagnosis(parsed.editTherapyProvisionalDiagnosis || "");
+                                            setEditTherapyProgressLevel(parsed.editTherapyProgressLevel || "Excellent");
+                                            setEditTherapyReportDate(parsed.editTherapyReportDate || "");
+                                            setEditTherapyError(null);
+                                            showToast("Restored unsaved Therapy Report draft automatically.", "info");
+                                            return;
+                                          } catch(e) {
+                                            localStorage.removeItem(draftKey);
                                           }
                                         }
                                         setEditingTherapyReport(r);
@@ -9950,10 +9974,24 @@ const StudentPage = () => {
 
                                 if (warnIfUnsavedOther(tableIndex, "opening this table")) return;
 
-                                if (table.isEditable) {
-                                  showToast("Save the table before closing it", "warning");
-                                  return;
-                                }
+                               if (table.isEditable) {
+                                 if (!tableHasModifications) {
+                                   handleSetTableEditable(table, false);
+                                   setShowTableDetails((prev) => ({
+                                     ...prev,
+                                     [tableIndex]: !prev[tableIndex],
+                                   }));
+                                   return;
+                                 }
+                                 setPulsatingEditButton({ [tableIndex]: true });
+                                 setTimeout(() => setPulsatingEditButton({}), 3500);
+                                 const saveBtn = document.getElementById(`spec-table-save-btn-${tableIndex}`);
+                                 if (saveBtn) {
+                                   saveBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+                                 }
+                                 showToast("Click the Save button below to save your changes!", "warning");
+                                 return;
+                               }
 
                                 setShowTableDetails((prev) => ({
                                   ...prev,
@@ -10170,6 +10208,7 @@ const StudentPage = () => {
 
                           const handleToggleCell = (colName, newValue) => {
                             if (!skillRow || !activeKey || !canEdit) return;
+                            setTableHasModifications(true);
 
                             const phase = table.assessment_phase || '1st assmt';
                             const isQuarterPhase =
@@ -10243,9 +10282,10 @@ const StudentPage = () => {
                                   Questionnaire (A = Yes, B = No)
                                 </h4>
                                 <div className="flex items-center gap-2">
-                                  {/* Edit/Save/Saved Toggle Ã¢â‚¬â€œ now always visible */}
+                                  {/* Edit/Save/Saved Toggle button */}
                                   <button
                                     type="button"
+                                    id={`spec-table-save-btn-${tableIndex}`}
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
@@ -10271,30 +10311,43 @@ const StudentPage = () => {
                                             ...prev,
                                             [tableIndex]: false,
                                           }));
-                                        }, 1000);
+                                        }, 1500);
                                       } else {
                                         handleSetTableEditable(table, true);
                                       }
                                     }}
                                     className={
-                                      "px-3 py-1.5 rounded-full text-[10px] font-semibold border transition-all duration-200 shadow-sm " +
+                                      "px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 shadow-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap " +
                                       (tableSavedStatus[tableIndex]
-                                        ? "bg-green-50 text-green-700 border-green-300"
-                                        : table.isEditable
-                                          ? "bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100"
-                                          : "bg-[#E38B52] text-white border-[#E38B52] hover:bg-[#C8742F] hover:shadow-md") +
-                                      (pulsatingEditButton[tableKey] ? " pulsate-edit" : "")
+                                        ? "bg-green-600 text-white border-green-600 shadow-green-200"
+                                        : pulsatingEditButton[tableIndex]
+                                          ? "bg-orange-600 text-white text-base py-3 px-8 ring-4 ring-orange-500 animate-bounce shadow-2xl"
+                                          : table.isEditable
+                                            ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 font-semibold"
+                                            : "bg-[#E38B52] text-white border-[#E38B52] hover:bg-[#C8742F] hover:shadow-md")
                                     }
                                   >
                                     {tableSavedStatus[tableIndex] ? (
-                                      <span className="flex items-center gap-1">
+                                      <span className="flex items-center gap-1.5">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                                        </svg>
                                         Saved
-                                        {/* ...check icon svg... */}
                                       </span>
                                     ) : table.isEditable ? (
-                                      "Save"
+                                      <span className="flex items-center gap-1.5">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                        </svg>
+                                        Save
+                                      </span>
                                     ) : (
-                                      "Edit"
+                                      <span className="flex items-center gap-1.5">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                        </svg>
+                                        Edit
+                                      </span>
                                     )}
                                   </button>
 

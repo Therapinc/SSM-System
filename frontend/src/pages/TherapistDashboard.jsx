@@ -196,6 +196,7 @@ const TherapistDashboard = () => {
     getTherapySections("Occupational Therapy"),
   );
   const [unlockedGoals, setUnlockedGoals] = useState({});
+  const [unlockedFields, setUnlockedFields] = useState({});
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Toast notification state
@@ -279,27 +280,98 @@ const TherapistDashboard = () => {
       );
 
       const defaultSections = getTherapySections(type);
-      if (match && match.goals_achieved && typeof match.goals_achieved === "object") {
-        // Pre-populate with previous goals (notes), but set response to ""
-        const updatedGoals = { ...defaultSections };
-        Object.entries(match.goals_achieved).forEach(([key, val]) => {
-          if (updatedGoals[key]) {
-            updatedGoals[key] = {
-              ...updatedGoals[key],
-              checked: val.checked || false,
-              notes: val.notes || "",
-              response: "", // Keep response empty for the new report
-            };
-          }
-        });
-        setGoalsAchieved(updatedGoals);
+      if (match) {
+        if (match.goals_achieved && typeof match.goals_achieved === "object") {
+          // Pre-populate with previous goals (notes), but set response to ""
+          const updatedGoals = { ...defaultSections };
+          Object.entries(match.goals_achieved).forEach(([key, val]) => {
+            if (updatedGoals[key]) {
+              updatedGoals[key] = {
+                ...updatedGoals[key],
+                checked: val.checked || false,
+                notes: val.notes || "",
+                response: "", // Keep response empty for the new report
+              };
+            }
+          });
+          setGoalsAchieved(updatedGoals);
+        } else {
+          setGoalsAchieved(defaultSections);
+        }
+
+        // Persist previous report fields for ongoing clinical profile
+        setCurrentObservation(match.current_observation || "");
+        setAssessmentDone(match.assessment_done || "");
+        setProvisionalDiagnosis(match.provisional_diagnosis || "");
+        // Present Complaints is entered fresh for each session
+        setPresentComplaints("");
       } else {
         setGoalsAchieved(defaultSections);
+        setCurrentObservation("");
+        setAssessmentDone("");
+        setProvisionalDiagnosis("");
+        setPresentComplaints("");
       }
     } catch (err) {
       console.error("Failed to load previous goals:", err);
       setGoalsAchieved(getTherapySections(type));
     }
+  };
+
+  const renderLockableField = (label, fieldKey, value, setValue, placeholder) => {
+    const isUnlocked = Boolean(unlockedFields[fieldKey]);
+    return (
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-[#170F49] font-medium text-sm">
+            {label}
+          </label>
+          <button
+            type="button"
+            onClick={() =>
+              setUnlockedFields((prev) => ({
+                ...prev,
+                [fieldKey]: !prev[fieldKey],
+              }))
+            }
+            className="text-xs font-medium text-[#E38B52] hover:text-[#E38B52]/80 transition-colors flex items-center gap-1 cursor-pointer focus:outline-none"
+          >
+            {isUnlocked ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Lock Field
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Edit Field
+              </>
+            )}
+          </button>
+        </div>
+        {isUnlocked ? (
+          <textarea
+            className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none bg-white text-sm"
+            rows="2"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={placeholder}
+          />
+        ) : (
+          <div className="w-full px-4 py-2 rounded-lg border border-gray-200 text-sm bg-gray-100 text-gray-700 min-h-[48px] whitespace-pre-wrap select-none leading-relaxed">
+            {value ? (
+              value
+            ) : (
+              <span className="text-gray-400 italic">No {label.toLowerCase()} details set. Click "Edit Field" to add.</span>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const visibleStudents = useMemo(() => {
@@ -995,6 +1067,15 @@ const TherapistDashboard = () => {
                     return;
                   }
 
+                  const processedGoals = { ...goalsAchieved };
+                  Object.keys(processedGoals).forEach((key) => {
+                    const notesStr = (processedGoals[key]?.notes || "").trim();
+                    processedGoals[key] = {
+                      ...processedGoals[key],
+                      checked: notesStr.length > 0,
+                    };
+                  });
+
                   const payload = {
                     student_id: selectedStudent.id,
                     report_date: reportDate,
@@ -1003,7 +1084,7 @@ const TherapistDashboard = () => {
                     current_observation: currentObservation?.trim() || null,
                     assessment_done: assessmentDone?.trim() || null,
                     provisional_diagnosis: provisionalDiagnosis?.trim() || null,
-                    goals_achieved: goalsAchieved,
+                    goals_achieved: processedGoals,
                     progress_level: progressLevel,
                   };
 
@@ -1116,41 +1197,9 @@ const TherapistDashboard = () => {
                 />
               </div>
 
-              <div className="mb-4">
-                <label className="block text-[#170F49] font-medium mb-1">
-                  Current Observation
-                </label>
-                <textarea
-                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none"
-                  rows="2"
-                  value={currentObservation}
-                  onChange={(e) => setCurrentObservation(e.target.value)}
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-[#170F49] font-medium mb-1">
-                  Assessment Done
-                </label>
-                <textarea
-                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none"
-                  rows="2"
-                  value={assessmentDone}
-                  onChange={(e) => setAssessmentDone(e.target.value)}
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-[#170F49] font-medium mb-1">
-                  Provisional Diagnosis
-                </label>
-                <textarea
-                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none"
-                  rows="2"
-                  value={provisionalDiagnosis}
-                  onChange={(e) => setProvisionalDiagnosis(e.target.value)}
-                />
-              </div>
+              {renderLockableField("Current Observation", "currentObservation", currentObservation, setCurrentObservation, "Enter current observation")}
+              {renderLockableField("Assessment Done", "assessmentDone", assessmentDone, setAssessmentDone, "Enter assessment done")}
+              {renderLockableField("Provisional Diagnosis", "provisionalDiagnosis", provisionalDiagnosis, setProvisionalDiagnosis, "Enter provisional diagnosis")}
 
               <div className="mb-4">
                 <label className="block text-[#170F49] font-medium mb-3">
@@ -1163,27 +1212,9 @@ const TherapistDashboard = () => {
                       className="border rounded-lg p-3 bg-gray-50"
                     >
                       <div className="flex items-center mb-2">
-                        <input
-                          type="checkbox"
-                          id={goalKey}
-                          checked={goalData.checked}
-                          onChange={(e) =>
-                            setGoalsAchieved({
-                              ...goalsAchieved,
-                              [goalKey]: {
-                                ...goalsAchieved[goalKey],
-                                checked: e.target.checked,
-                              },
-                            })
-                          }
-                          className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
-                        />
-                        <label
-                          htmlFor={goalKey}
-                          className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer"
-                        >
+                        <h4 className="text-sm font-semibold text-[#170F49]">
                           {goalData.label}
-                        </label>
+                        </h4>
                       </div>
                       <div className="mt-2 space-y-3">
                         <div>
@@ -1924,6 +1955,15 @@ const TherapistDashboard = () => {
                     return;
                   }
 
+                  const processedGoalsMobile = { ...goalsAchieved };
+                  Object.keys(processedGoalsMobile).forEach((key) => {
+                    const notesStr = (processedGoalsMobile[key]?.notes || "").trim();
+                    processedGoalsMobile[key] = {
+                      ...processedGoalsMobile[key],
+                      checked: notesStr.length > 0,
+                    };
+                  });
+
                   const payload = {
                     student_id: selectedStudent.id,
                     report_date: reportDate,
@@ -1932,7 +1972,7 @@ const TherapistDashboard = () => {
                     current_observation: currentObservation?.trim() || null,
                     assessment_done: assessmentDone?.trim() || null,
                     provisional_diagnosis: provisionalDiagnosis?.trim() || null,
-                    goals_achieved: goalsAchieved,
+                    goals_achieved: processedGoalsMobile,
                     progress_level: progressLevel,
                   };
 
@@ -2045,41 +2085,9 @@ const TherapistDashboard = () => {
                 />
               </div>
 
-              <div className="mb-4">
-                <label className="block text-[#170F49] font-medium mb-1">
-                  Current Observation
-                </label>
-                <textarea
-                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none"
-                  rows="2"
-                  value={currentObservation}
-                  onChange={(e) => setCurrentObservation(e.target.value)}
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-[#170F49] font-medium mb-1">
-                  Assessment Done
-                </label>
-                <textarea
-                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none"
-                  rows="2"
-                  value={assessmentDone}
-                  onChange={(e) => setAssessmentDone(e.target.value)}
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-[#170F49] font-medium mb-1">
-                  Provisional Diagnosis
-                </label>
-                <textarea
-                  className="w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#E38B52] resize-none"
-                  rows="2"
-                  value={provisionalDiagnosis}
-                  onChange={(e) => setProvisionalDiagnosis(e.target.value)}
-                />
-              </div>
+              {renderLockableField("Current Observation", "currentObservation", currentObservation, setCurrentObservation, "Enter current observation")}
+              {renderLockableField("Assessment Done", "assessmentDone", assessmentDone, setAssessmentDone, "Enter assessment done")}
+              {renderLockableField("Provisional Diagnosis", "provisionalDiagnosis", provisionalDiagnosis, setProvisionalDiagnosis, "Enter provisional diagnosis")}
 
               <div className="mb-4">
                 <label className="block text-[#170F49] font-medium mb-3">
@@ -2092,27 +2100,9 @@ const TherapistDashboard = () => {
                       className="border rounded-lg p-3 bg-gray-50"
                     >
                       <div className="flex items-center mb-2">
-                        <input
-                          type="checkbox"
-                          id={goalKey}
-                          checked={goalData.checked}
-                          onChange={(e) =>
-                            setGoalsAchieved({
-                              ...goalsAchieved,
-                              [goalKey]: {
-                                ...goalsAchieved[goalKey],
-                                checked: e.target.checked,
-                              },
-                            })
-                          }
-                          className="w-4 h-4 text-[#E38B52] rounded focus:ring-2 focus:ring-[#E38B52] cursor-pointer"
-                        />
-                        <label
-                          htmlFor={goalKey}
-                          className="ml-2 text-sm font-medium text-[#170F49] cursor-pointer"
-                        >
+                        <h4 className="text-sm font-semibold text-[#170F49]">
                           {goalData.label}
-                        </label>
+                        </h4>
                       </div>
                       <div className="mt-2 space-y-3">
                         <div>
