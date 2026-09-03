@@ -4790,8 +4790,8 @@ const StudentPage = () => {
         `${baseUrl}/api/v1/therapy-reports/student/${studentId}`,
         config,
       );
-      // data is expected to be an array of reports
-      const list = Array.isArray(data) ? data : [];
+      // Handle both paginated {items:[...]} and legacy array responses
+      const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
       // sort by report_date desc
       list.sort((a, b) =>
         (b.report_date || b.created_at || "").localeCompare(

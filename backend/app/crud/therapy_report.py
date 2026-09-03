@@ -30,5 +30,14 @@ def create(db: Session, *, obj_in: TherapyReportCreate) -> TherapyReport:
     return db_obj
 
 
-def get_by_student(db: Session, student_id: int) -> List[TherapyReport]:
-    return db.query(TherapyReport).filter(TherapyReport.student_id == student_id).order_by(TherapyReport.report_date.desc(), TherapyReport.id.desc()).all()
+def get_by_student(db: Session, student_id: int, *, limit: int = 0, offset: int = 0) -> List[TherapyReport]:
+    query = db.query(TherapyReport).filter(TherapyReport.student_id == student_id).order_by(TherapyReport.report_date.desc(), TherapyReport.id.desc())
+    if offset:
+        query = query.offset(offset)
+    if limit:
+        query = query.limit(limit)
+    return query.all()
+
+
+def count_by_student(db: Session, student_id: int) -> int:
+    return db.query(TherapyReport).filter(TherapyReport.student_id == student_id).count()

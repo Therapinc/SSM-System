@@ -2,7 +2,7 @@ from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from app.db.base_class import Base
 
@@ -22,6 +22,16 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     def get(self, db: Session, id: Any) -> Optional[ModelType]:
         return db.query(self.model).filter(self.model.id == id).first()
+
+    def get_deferred(self, db: Session, id: Any, defer_columns: Optional[List[str]] = None) -> Optional[ModelType]:
+        """Get a record by ID, deferring specified heavy columns to avoid pulling them from the DB."""
+        query = db.query(self.model)
+        if defer_columns:
+            for col_name in defer_columns:
+                col = getattr(self.model, col_name, None)
+                if col is not None:
+                    query = query.options(defer(col))
+        return query.filter(self.model.id == id).first()
 
     def get_multi(
         self, db: Session, *, skip: int = 0, limit: int = 100

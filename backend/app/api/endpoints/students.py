@@ -30,15 +30,18 @@ from app.core.cloudinary import delete_image, get_cloudinary_folder, upload_imag
 router = APIRouter()
 
 
+# Columns to skip when serializing — these are heavy blobs that should
+# not be transferred from Neon unless explicitly needed.
+_HEAVY_COLUMNS = {"photo", "documents"}
+
+
 def _serialize_student_with_photo(student_obj) -> Dict[str, Any]:
-    student_data = {c.name: getattr(student_obj, c.name) for c in student_obj.__table__.columns}
-    if not student_data.get("photo_url") and student_data.get("photo"):
-        try:
-            b64_photo = base64.b64encode(student_data["photo"]).decode("utf-8")
-            student_data["photo_url"] = f"data:image/jpeg;base64,{b64_photo}"
-        except Exception:
-            student_data["photo_url"] = None
-    student_data.pop("photo", None)
+    student_data = {
+        c.name: getattr(student_obj, c.name)
+        for c in student_obj.__table__.columns
+        if c.name not in _HEAVY_COLUMNS
+    }
+    # photo_url (Cloudinary URL) is always included; legacy photo binary is skipped.
     return student_data
 
 
@@ -135,7 +138,14 @@ def get_my_student_data(
     The username should match the student_id.
     """
     # Get student by student_id (which is the username for student users)
-    student = crud_student.get_by_student_id(db, student_id=current_user.username)
+    # Use a deferred query to skip heavy columns (photo binary, legacy documents JSONB)
+    from sqlalchemy.orm import defer as sa_defer
+    student = (
+        db.query(crud_student.model)
+        .options(sa_defer(crud_student.model.photo), sa_defer(crud_student.model.documents))
+        .filter(crud_student.model.student_id == current_user.username)
+        .first()
+    )
     if not student:
         raise HTTPException(
             status_code=404,
@@ -194,7 +204,7 @@ def read_student(
     """
     Get a specific student by ID, including a photo URL if available.
     """
-    db_student = crud_student.get(db, id=student_id)
+    db_student = crud_student.get_deferred(db, id=student_id, defer_columns=["photo", "documents"])
     if db_student is None:
         raise HTTPException(status_code=404, detail="Student not found")
 

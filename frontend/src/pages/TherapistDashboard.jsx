@@ -262,8 +262,8 @@ const TherapistDashboard = () => {
       const { data } = await axios.get(`${API_BASE_URL}/api/v1/therapy-reports/student/${studentId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Sort reports descending by report_date and fallback to id to ensure the latest is first
-      const reports = Array.isArray(data) ? [...data] : [];
+      // Handle both paginated {items:[...]} and legacy array responses
+      const reports = Array.isArray(data) ? [...data] : Array.isArray(data?.items) ? [...data.items] : [];
       reports.sort((a, b) => {
         const dateA = a.report_date || "";
         const dateB = b.report_date || "";

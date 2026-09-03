@@ -201,14 +201,18 @@ def create_report(
         )
 
 
-@router.get("/student/{student_id}", response_model=List[schemas.therapy_report.TherapyReport])
+@router.get("/student/{student_id}")
 def list_reports_for_student(
     student_id: int,
     db: Session = Depends(deps.get_db),
     current_user: schemas.user.User = Depends(deps.get_current_active_user),
+    page: int = 1,
+    page_size: int = 50,
 ) -> Any:
-    """List therapy reports for a student."""
-    reports = crud.therapy_report.get_by_student(db, student_id=student_id)
+    """List therapy reports for a student (paginated, default 50 per page)."""
+    total = crud.therapy_report.count_by_student(db, student_id=student_id)
+    offset = (page - 1) * page_size
+    reports = crud.therapy_report.get_by_student(db, student_id=student_id, limit=page_size, offset=offset)
     _populate_therapist_names(db, reports)
     
     role = str(getattr(current_user, "role", "") or "").lower()
@@ -219,7 +223,7 @@ def list_reports_for_student(
             reports = [r for r in reports if _normalize_therapy_type(r.therapy_type) == spec_norm]
         else:
             reports = []
-    return reports
+    return {"items": reports, "total": total, "page": page, "page_size": page_size}
 
 
 @router.put("/{report_id}", response_model=schemas.therapy_report.TherapyReport)
