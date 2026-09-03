@@ -44,7 +44,8 @@ def _serialize_student_with_photo(student_obj) -> Dict[str, Any]:
 
 def _get_student_documents_metadata(db: Session, student_id: int) -> List[Dict[str, Any]]:
     from app.models.student import StudentDocument
-    docs = db.query(StudentDocument).filter(StudentDocument.student_id == student_id).all()
+    from sqlalchemy.orm import defer
+    docs = db.query(StudentDocument).options(defer(StudentDocument.file_data)).filter(StudentDocument.student_id == student_id).all()
     return [
         {
             "id": doc.id,
@@ -52,7 +53,7 @@ def _get_student_documents_metadata(db: Session, student_id: int) -> List[Dict[s
             "documentType": doc.document_type,
             "documentLabel": doc.document_label,
             "content_type": doc.content_type,
-            "file_url": f"/api/v1/students/{student_id}/documents/{doc.id}",
+            "file_url": doc.file_data if (doc.file_data and (doc.file_data.startswith("http://") or doc.file_data.startswith("https://"))) else f"/api/v1/students/{student_id}/documents/{doc.id}",
             "upload_date": doc.upload_date.isoformat() if doc.upload_date else None,
             "file_size": doc.file_size
         }
@@ -354,14 +355,30 @@ def upload_student_document(
     resolved_document_type = document_type or documentType
     resolved_document_label = document_label or documentTypeLabel
     
-    # Convert to base64 for storage
-    import base64
     from datetime import datetime
     import uuid
-    b64_content = base64.b64encode(contents).decode('utf-8')
-    
-    # Create document entry with unique ID
     document_id = str(uuid.uuid4())
+    stored_file_data = None
+    
+    # Try uploading to Cloudinary first
+    try:
+        folder = get_cloudinary_folder("student_documents", str(student_id))
+        cloudinary_resp = upload_image(
+            contents,
+            folder=folder,
+            public_id=document_id,
+            overwrite=True,
+            resource_type="auto"
+        )
+        if cloudinary_resp and cloudinary_resp.get("secure_url"):
+            stored_file_data = cloudinary_resp.get("secure_url")
+    except Exception:
+        # Fallback to base64 encoding if Cloudinary is not configured or fails
+        pass
+
+    if not stored_file_data:
+        import base64
+        stored_file_data = base64.b64encode(contents).decode('utf-8')
     
     try:
         from app.models.student import StudentDocument
@@ -372,7 +389,7 @@ def upload_student_document(
             document_type=resolved_document_type,
             document_label=resolved_document_label,
             content_type=file_content_type,
-            file_data=b64_content,
+            file_data=stored_file_data,
             upload_date=datetime.now(),
             file_size=file_size
         )
@@ -432,14 +449,18 @@ def download_student_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     
+    is_url = document.file_data and (document.file_data.startswith("http://") or document.file_data.startswith("https://"))
+    file_url = document.file_data if is_url else f"/api/v1/students/{student_id}/documents/{document.id}"
+    file_data_payload = document.file_data if is_url else f"data:{document.content_type};base64,{document.file_data}"
+
     return {
         "id": document.id,
         "name": document.name,
         "documentType": document.document_type,
         "documentLabel": document.document_label,
         "content_type": document.content_type,
-        "file_url": f"/api/v1/students/{student_id}/documents/{document.id}",
-        "file_data": f"data:{document.content_type};base64,{document.file_data}",
+        "file_url": file_url,
+        "file_data": file_data_payload,
         "upload_date": document.upload_date.isoformat() if document.upload_date else None,
         "file_size": document.file_size
     }

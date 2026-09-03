@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 from sqlalchemy import or_, desc
 from typing import List, Optional, Dict, Any, Union
 from datetime import date
@@ -28,7 +28,11 @@ class CRUDStudent(CRUDBase[Student, StudentCreate, StudentUpdate]):
         search: Optional[str] = None,
         class_name: Optional[str] = None
     ) -> List[Student]:
-        query = db.query(Student)
+        query = db.query(Student).options(
+            defer(Student.photo),
+            defer(Student.documents),
+            defer(Student.case_record)
+        )
         
         if search:
             search_filter = or_(
