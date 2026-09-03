@@ -1096,14 +1096,14 @@ const AddStudent = () => {
 
       <div className="w-[90%] max-w-[1200px] mx-4 z-10">
         {/* Tabs */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative w-[372px]">
+        <div className="flex justify-center mb-8 px-2">
+          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative max-w-full w-full sm:w-[372px]">
             {/* Active Tab Background */}
             <div
-              className="absolute h-[calc(100%-8px)] top-[4px] transition-all duration-300 ease-in-out rounded-xl bg-[#E38B52] shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
+              className="absolute h-[calc(100%-16px)] sm:h-[calc(100%-8px)] top-[8px] sm:top-[4px] transition-all duration-300 ease-in-out rounded-xl bg-[#E38B52] shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
               style={{
-                left: activeTab === "student-details" ? "4px" : "188px",
-                width: "180px",
+                left: activeTab === "student-details" ? "4px" : "calc(50% + 2px)",
+                width: "calc(50% - 6px)",
                 background: "linear-gradient(135deg, #E38B52 0%, #F58540 100%)",
               }}
             >
@@ -1118,7 +1118,7 @@ const AddStudent = () => {
             {/* Student Details Tab */}
             <button
               onClick={() => setActiveTab("student-details")}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
+              className={`w-1/2 sm:w-[180px] px-3 sm:px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap text-sm sm:text-base ${
                 activeTab === "student-details"
                   ? "text-white"
                   : "text-[#170F49] hover:text-[#E38B52]"
@@ -1130,7 +1130,7 @@ const AddStudent = () => {
             {/* Case Record Tab */}
             <button
               onClick={() => setActiveTab("case-record")}
-              className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
+              className={`w-1/2 sm:w-[180px] px-3 sm:px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap text-sm sm:text-base ${
                 activeTab === "case-record"
                   ? "text-white"
                   : "text-[#170F49] hover:text-[#E38B52]"
@@ -2028,16 +2028,16 @@ const AddStudent = () => {
               </div>
             </div>
           ) : (
-            <div className="flex gap-6 items-start justify-center relative max-w-[1600px] mx-auto" ref={mainContentRef}>
+            <div className="flex flex-col md:flex-row gap-6 items-start justify-center relative max-w-[1600px] mx-auto w-full" ref={mainContentRef}>
               {/* Left Sidebar Navigation */}
-              <aside className="w-64 flex-shrink-0 sticky top-5 self-start">
+              <aside className="w-full md:w-64 flex-shrink-0 sticky top-5 self-start z-30">
                 <div
-                  className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-6 border border-white/20 w-64 z-30 max-h-[calc(100vh-40px)] overflow-y-auto"
+                  className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-4 md:p-6 border border-white/20 w-full md:w-64 max-h-[45vh] md:max-h-[calc(100vh-40px)] overflow-y-auto overflow-x-auto"
                 >
-                  <h3 className="text-lg font-bold text-[#170F49] mb-6 pb-3 border-b border-[#E38B52]/20">
+                  <h3 className="text-base md:text-lg font-bold text-[#170F49] mb-3 md:mb-6 pb-2 md:pb-3 border-b border-[#E38B52]/20">
                     Case Record Sections
                   </h3>
-                  <nav className="space-y-2">
+                  <nav className="flex flex-row md:flex-col overflow-x-auto gap-2 pb-2 md:pb-0 md:space-y-2 no-scrollbar">
                     {[
                       {
                         id: "identification",
@@ -2183,7 +2183,7 @@ const AddStudent = () => {
                       <button
                         key={section.id}
                         onClick={() => setActiveCaseSection(section.id)}
-                        className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-3 ${
+                        className={`w-auto md:w-full flex-shrink-0 text-left px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-3 whitespace-nowrap ${
                           activeCaseSection === section.id
                             ? "bg-[#E38B52] text-white shadow-lg"
                             : "bg-white/50 text-[#170F49] hover:bg-white/80"
@@ -2208,10 +2208,10 @@ const AddStudent = () => {
               </aside>
 
               {/* Right Content Area */}
-              <div className="flex-1 max-w-[1100px]" ref={mainContentRef}>
+              <div className="flex-1 w-full max-w-[1100px]" ref={mainContentRef}>
                 {/* Identification Data */}
                 {activeCaseSection === "identification" && (
-                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+                  <div className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-4 sm:p-6 md:p-12 border border-white/20">
                     <h2 className="text-2xl font-bold text-[#170F49] mb-10 pb-4 border-b border-[#E38B52]/20 flex items-center">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
