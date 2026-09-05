@@ -596,7 +596,13 @@ async def ai_summarize_reports(
 
     # Fetch student record
     from app.crud.student import student as crud_student
-    db_student = crud_student.get_by_student_id(db, student_id=payload.student_id)
+    from app.models.student import Student
+    db_student = (
+        db.query(Student)
+        .options(load_only(Student.id, Student.name))
+        .filter(Student.student_id == payload.student_id)
+        .first()
+    )
     if not db_student:
         raise HTTPException(status_code=404, detail=f"Student with ID {payload.student_id} not found.")
 

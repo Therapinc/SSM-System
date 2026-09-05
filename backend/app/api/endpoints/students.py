@@ -138,11 +138,11 @@ def get_my_student_data(
     The username should match the student_id.
     """
     # Get student by student_id (which is the username for student users)
-    # Use a deferred query to skip heavy columns (photo binary, legacy documents JSONB)
+    # Use a deferred query to skip the legacy documents JSONB column.
     from sqlalchemy.orm import defer as sa_defer
     student = (
         db.query(crud_student.model)
-        .options(sa_defer(crud_student.model.photo), sa_defer(crud_student.model.documents))
+        .options(sa_defer(crud_student.model.documents))
         .filter(crud_student.model.student_id == current_user.username)
         .first()
     )
@@ -204,7 +204,7 @@ def read_student(
     """
     Get a specific student by ID, including a photo URL if available.
     """
-    db_student = crud_student.get_deferred(db, id=student_id, defer_columns=["photo", "documents"])
+    db_student = crud_student.get_deferred(db, id=student_id, defer_columns=["documents"])
     if db_student is None:
         raise HTTPException(status_code=404, detail="Student not found")
 
@@ -246,7 +246,6 @@ def upload_student_photo(
         overwrite=True,
     )
     update_data = {
-        "photo": contents,
         "photo_url": uploaded.get("secure_url") or uploaded.get("url"),
         "photo_public_id": uploaded.get("public_id"),
     }
@@ -276,7 +275,7 @@ def delete_student_photo(
         except Exception:
             pass
 
-    update_data = {"photo": None, "photo_url": None, "photo_public_id": None}
+    update_data = {"photo_url": None, "photo_public_id": None}
     updated_student = crud_student.update(db=db, db_obj=db_student, obj_in=update_data)
 
     student_data = _serialize_student_with_photo(updated_student)

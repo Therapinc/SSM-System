@@ -29,7 +29,6 @@ class CRUDStudent(CRUDBase[Student, StudentCreate, StudentUpdate]):
         class_name: Optional[str] = None
     ) -> List[Student]:
         query = db.query(Student).options(
-            defer(Student.photo),
             defer(Student.documents),
             defer(Student.case_record)
         )
