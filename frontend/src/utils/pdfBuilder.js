@@ -38,8 +38,9 @@ export const sanitizeText = (text) => {
     // 4. Dashes, hyphens & minus signs
     .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, "-")
     
-    // 5. Bullets, list markers & dots
-    .replace(/[\u2022\u2023\u25E6\u2043\u2219]/g, "* ")
+    // 5. Bullets, list markers & corrupted bullet sequences (e.g. Word mojibake %ªþ or â€¢)
+    .replace(/(?:%ªþ|â€¢|Â·)/g, "* ")
+    .replace(/[\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25CF\u25CB]/g, "* ")
     .replace(/[\u2026]/g, "...")
     
     // 6. Common mathematical & currency symbols

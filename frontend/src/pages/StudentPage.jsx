@@ -1608,77 +1608,50 @@ const StudentPage = () => {
     for (let r = 0; r < rowsCount; r++) {
       const rd = rowData[r];
 
-      // Check available space on current page
-      const availableSpace = pageH - bottomMargin - y;
+      // Slices for each column that still need to be drawn
+      let remainingCols = [
+        [...rd.lines[0]],
+        [...rd.lines[1]],
+        [...rd.lines[2]],
+      ];
 
-      // If the row fits on the current page, draw it directly
-      if (rd.height <= availableSpace) {
-        for (let c = 0; c < 3; c++) {
-          const x = margin + c * colWidth;
-          doc.setLineWidth(0.7);
-          doc.rect(x, y, colWidth, rd.height, "S");
-          doc.text(rd.lines[c], x + cellPadding, y + cellPadding + 7);
-        }
-        y += rd.height;
-      } else if (availableSpace >= minRowH + 10) {
-        // Row is long and doesn't completely fit, but there IS space on the current page to start it!
-        // Calculate how many text lines fit on the current page
-        const linesFit = Math.max(1, Math.floor((availableSpace - cellPadding * 2) / lineHeight));
-        const chunk1H = linesFit * lineHeight + cellPadding * 2;
+      while (remainingCols[0].length > 0 || remainingCols[1].length > 0 || remainingCols[2].length > 0) {
+        let availableSpace = pageH - bottomMargin - y;
 
-        // Draw first chunk on current page
-        for (let c = 0; c < 3; c++) {
-          const x = margin + c * colWidth;
-          const slice1 = rd.lines[c].slice(0, linesFit);
-          doc.setLineWidth(0.7);
-          doc.rect(x, y, colWidth, chunk1H, "S");
-          if (slice1.length > 0) {
-            doc.text(slice1, x + cellPadding, y + cellPadding + 7);
-          }
-        }
-        y += chunk1H;
-
-        // Remaining lines move to next page
-        const remainingLinesMax = Math.max(
-          rd.lines[0].slice(linesFit).length,
-          rd.lines[1].slice(linesFit).length,
-          rd.lines[2].slice(linesFit).length
-        );
-
-        if (remainingLinesMax > 0) {
+        // If not enough room to draw at least 2 text lines on this page, start a new page
+        if (availableSpace < lineHeight * 2 + cellPadding * 2) {
           doc.addPage();
           y = margin;
           drawTableHeader();
           doc.setFontSize(11);
           doc.setFont("times", "normal");
-
-          const chunk2H = Math.max(minRowH, remainingLinesMax * lineHeight + cellPadding * 2);
-          for (let c = 0; c < 3; c++) {
-            const x = margin + c * colWidth;
-            const slice2 = rd.lines[c].slice(linesFit);
-            doc.setLineWidth(0.7);
-            doc.rect(x, y, colWidth, chunk2H, "S");
-            if (slice2.length > 0) {
-              doc.text(slice2, x + cellPadding, y + cellPadding + 7);
-            }
-          }
-          y += chunk2H;
+          availableSpace = pageH - bottomMargin - y;
         }
-      } else {
-        // Not enough space even for a minimal chunk, start fresh page
-        doc.addPage();
-        y = margin;
-        drawTableHeader();
-        doc.setFontSize(11);
-        doc.setFont("times", "normal");
 
+        const maxLinesCanFit = Math.max(1, Math.floor((availableSpace - cellPadding * 2) / lineHeight));
+        const maxLinesInThisChunk = Math.max(
+          Math.min(remainingCols[0].length, maxLinesCanFit),
+          Math.min(remainingCols[1].length, maxLinesCanFit),
+          Math.min(remainingCols[2].length, maxLinesCanFit),
+          1
+        );
+
+        const chunkH = Math.max(minRowH, maxLinesInThisChunk * lineHeight + cellPadding * 2);
+
+        // Draw cells for this chunk
         for (let c = 0; c < 3; c++) {
           const x = margin + c * colWidth;
+          const linesToDraw = remainingCols[c].slice(0, maxLinesCanFit);
+          remainingCols[c] = remainingCols[c].slice(maxLinesCanFit);
+
           doc.setLineWidth(0.7);
-          doc.rect(x, y, colWidth, rd.height, "S");
-          doc.text(rd.lines[c], x + cellPadding, y + cellPadding + 7);
+          doc.rect(x, y, colWidth, chunkH, "S");
+          if (linesToDraw.length > 0) {
+            doc.text(linesToDraw, x + cellPadding, y + cellPadding + 7);
+          }
         }
-        y += rd.height;
+
+        y += chunkH;
       }
     }
 
