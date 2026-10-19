@@ -1647,7 +1647,10 @@ const StudentPage = () => {
           doc.setLineWidth(0.7);
           doc.rect(x, y, colWidth, chunkH, "S");
           if (linesToDraw.length > 0) {
-            doc.text(linesToDraw, x + cellPadding, y + cellPadding + 7);
+            const cellTopY = y;
+            for (let li = 0; li < linesToDraw.length; li++) {
+              doc.text(linesToDraw[li], x + cellPadding, cellTopY + cellPadding + 10 + li * lineHeight);
+            }
           }
         }
 
