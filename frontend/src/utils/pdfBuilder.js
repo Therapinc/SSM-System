@@ -68,6 +68,7 @@ export const sanitizeText = (text) => {
     .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
     
     // 9. Non-printable control characters (except newline \n)
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, "")
     
     // 10. Collapse excessive blank lines

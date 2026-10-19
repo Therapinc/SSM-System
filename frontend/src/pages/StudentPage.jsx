@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useContext, useMemo } from "react";
 import { jsPDF } from "jspdf";
 import { sanitizeText, PdfBuilder } from "../utils/pdfBuilder";
+import { generateConsolidatedReportPDF } from "../utils/consolidatedPdfGenerator";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { formatAadhaar } from "../utils/validation";
@@ -956,6 +957,106 @@ const StudentPage = () => {
 
   const [expandedIepMonth, setExpandedIepMonth] = useState(null);
   const [editingIepMonth, setEditingIepMonth] = useState(null);
+
+  // Consolidated 6-Month / Semester Report Modal States
+  const [showConsolidatedModal, setShowConsolidatedModal] = useState(false);
+  const [consolidatedPeriodPreset, setConsolidatedPeriodPreset] = useState("term_1"); // "term_1" | "term_2" | "full_year" | "custom"
+  const [consolidatedCustomFrom, setConsolidatedCustomFrom] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 6);
+    return d.toISOString().split("T")[0];
+  });
+  const [consolidatedCustomTo, setConsolidatedCustomTo] = useState(() => {
+    return new Date().toISOString().split("T")[0];
+  });
+  const [generatingConsolidated, setGeneratingConsolidated] = useState(false);
+
+  const consolidatedPeriodInfo = useMemo(() => {
+    const cYear = selectedYear || new Date().getFullYear();
+    if (consolidatedPeriodPreset === "term_1") {
+      return {
+        title: `Term 1 / Semester 1 (${cYear})`,
+        fromDate: `${cYear}-06-01`,
+        toDate: `${cYear}-11-30`,
+        academicYear: `${cYear}-${Number(cYear) + 1}`,
+      };
+    } else if (consolidatedPeriodPreset === "term_2") {
+      return {
+        title: `Term 2 / Semester 2 (${Number(cYear) + 1})`,
+        fromDate: `${cYear}-12-01`,
+        toDate: `${Number(cYear) + 1}-05-31`,
+        academicYear: `${cYear}-${Number(cYear) + 1}`,
+      };
+    } else if (consolidatedPeriodPreset === "full_year") {
+      return {
+        title: `Full Academic Year (${cYear}-${Number(cYear) + 1})`,
+        fromDate: `${cYear}-06-01`,
+        toDate: `${Number(cYear) + 1}-05-31`,
+        academicYear: `${cYear}-${Number(cYear) + 1}`,
+      };
+    } else {
+      return {
+        title: `Consolidated Evaluation (${consolidatedCustomFrom || "Start"} to ${consolidatedCustomTo || "End"})`,
+        fromDate: consolidatedCustomFrom,
+        toDate: consolidatedCustomTo,
+        academicYear: `${cYear}-${Number(cYear) + 1}`,
+      };
+    }
+  }, [consolidatedPeriodPreset, selectedYear, consolidatedCustomFrom, consolidatedCustomTo]);
+
+  const consolidatedStats = useMemo(() => {
+    const fromD = consolidatedPeriodInfo.fromDate ? new Date(consolidatedPeriodInfo.fromDate) : null;
+    const toD = consolidatedPeriodInfo.toDate ? new Date(consolidatedPeriodInfo.toDate) : null;
+
+    const matchingTherapies = (rawReports || []).filter((r) => {
+      if (!r.report_date) return false;
+      const rDate = new Date(r.report_date);
+      if (fromD && rDate < fromD) return false;
+      if (toD && rDate > toD) return false;
+      return true;
+    });
+
+    const matchingMonths = Object.keys(savedIepByMonth || {}).filter((mKey) => {
+      const parsed = Date.parse(`1 ${mKey}`);
+      if (isNaN(parsed)) return true;
+      const mDate = new Date(parsed);
+      if (fromD && mDate < new Date(fromD.getFullYear(), fromD.getMonth(), 1)) return false;
+      if (toD && mDate > new Date(toD.getFullYear(), toD.getMonth() + 1, 0)) return false;
+      return true;
+    });
+
+    const iepProgramCount = (iepFormRecords || []).length;
+    const facpCount = (savedTables || []).length;
+
+    return {
+      therapiesCount: matchingTherapies.length,
+      monthlyIepCount: matchingMonths.length,
+      matchingMonthsList: matchingMonths,
+      iepProgramCount,
+      facpCount,
+    };
+  }, [consolidatedPeriodInfo, rawReports, savedIepByMonth, iepFormRecords, savedTables]);
+
+  const handleGenerateConsolidatedReport = async () => {
+    try {
+      setGeneratingConsolidated(true);
+      await generateConsolidatedReportPDF({
+        student,
+        period: consolidatedPeriodInfo,
+        therapyReports: rawReports || [],
+        savedIepByMonth: savedIepByMonth || {},
+        iepProgramRecords: iepFormRecords || [],
+        savedTables: savedTables || [],
+      });
+      showToast("Consolidated report generated and downloaded successfully!", "success");
+      setShowConsolidatedModal(false);
+    } catch (err) {
+      console.error("Error generating consolidated report:", err);
+      showToast("Failed to generate consolidated report. Please try again.", "error");
+    } finally {
+      setGeneratingConsolidated(false);
+    }
+  };
 
   // Replace handleIepMonthChange with:
   const handleIepMonthChange = (month) => {
@@ -7003,13 +7104,30 @@ const StudentPage = () => {
       <div className="absolute top-1/2 left-1/2 w-[500px] h-[500px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-5000 z-0" />
       <div className="absolute top-0 -left-40 w-[500px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float animation-delay-7000 z-0" />
       <div className="w-[90%] max-md:w-full max-w-[1200px] mx-4 max-md:mx-0 flex-1 flex flex-col ">
-        <div className="flex items-center justify-center relative mb-8 max-md:mb-2 max-md:-mt-2">
+        <div className="flex items-center justify-center relative mb-8 max-md:mb-4 max-md:-mt-2 max-md:flex-col max-md:gap-3">
           <button onClick={() => window.history.back()} className="absolute left-0 lg:hidden text-[#170F49] p-2 -ml-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </button>
           <h1 className="text-3xl max-md:text-xl font-bold text-[#170F49] text-center font-baskervville">
             Student Information
           </h1>
+          <div className="md:absolute md:right-0 md:top-1/2 md:-translate-y-1/2">
+            <button
+              type="button"
+              onClick={() => setShowConsolidatedModal(true)}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#E38B52] to-[#F5A572] hover:from-[#d17a42] hover:to-[#e38b52] text-white font-semibold text-xs md:text-sm shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 border border-white/30 backdrop-blur-sm cursor-pointer"
+              title="Generate Multi-Disciplinary Consolidated Report"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              <span>Consolidated Report (6-Month)</span>
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -14761,6 +14879,199 @@ const StudentPage = () => {
           </div>
         </div>
       )}
+
+      {/* Consolidated 6-Month Report Modal */}
+      {showConsolidatedModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 md:p-8 border border-[#E38B52]/20 relative my-8 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#E38B52] to-[#F5A572] flex items-center justify-center text-white shadow-md">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl md:text-2xl font-bold text-[#170F49] font-baskervville">
+                    Multi-Disciplinary Consolidated Report
+                  </h2>
+                  <p className="text-xs md:text-sm text-[#6F6C90]">
+                    Consolidating 6-month progress across Therapies, Academics, ADL & Functional Skills
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowConsolidatedModal(false)}
+                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 flex items-center justify-center transition-colors cursor-pointer"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto flex-1 py-4 space-y-5 pr-1">
+              {/* Student quick info banner */}
+              <div className="bg-[#FFF8F4] border border-[#E38B52]/20 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+                <div>
+                  <span className="text-gray-500 text-xs uppercase tracking-wider block">Student</span>
+                  <span className="font-bold text-[#170F49] text-base">{student?.name || "Student"}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 text-xs uppercase tracking-wider block">Class / Division</span>
+                  <span className="font-semibold text-gray-700">{student?.class_name || "N/A"} - {student?.division || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 text-xs uppercase tracking-wider block">Roll / ID</span>
+                  <span className="font-semibold text-gray-700">{student?.roll_no || student?.student_id || "N/A"}</span>
+                </div>
+              </div>
+
+              {/* Evaluation Span Selection */}
+              <div>
+                <label className="block text-sm font-bold text-[#170F49] mb-2">
+                  Select Evaluation Period:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: "term_1", label: "Term 1 (Jun - Nov)", desc: "Semester 1" },
+                    { id: "term_2", label: "Term 2 (Dec - May)", desc: "Semester 2" },
+                    { id: "full_year", label: "Full Year (Jun - May)", desc: "Academic Year" },
+                    { id: "custom", label: "Custom Range", desc: "Select dates" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setConsolidatedPeriodPreset(opt.id)}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        consolidatedPeriodPreset === opt.id
+                          ? "border-[#E38B52] bg-[#E38B52]/10 ring-2 ring-[#E38B52]/30 shadow-sm"
+                          : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <div className="font-bold text-xs md:text-sm text-[#170F49]">{opt.label}</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Date Pickers if custom selected */}
+              {consolidatedPeriodPreset === "custom" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">From Date:</label>
+                    <input
+                      type="date"
+                      value={consolidatedCustomFrom}
+                      onChange={(e) => setConsolidatedCustomFrom(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">To Date:</label>
+                    <input
+                      type="date"
+                      value={consolidatedCustomTo}
+                      onChange={(e) => setConsolidatedCustomTo(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Data Inventory & Dynamic Support Overview */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Records Detected for {consolidatedPeriodInfo.title}:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                    <span className="text-xl font-bold text-[#170F49] block">{consolidatedStats.therapiesCount}</span>
+                    <span className="text-[11px] text-gray-600">Therapy Sessions</span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                    <span className="text-xl font-bold text-[#170F49] block">{consolidatedStats.monthlyIepCount}</span>
+                    <span className="text-[11px] text-gray-600">Monthly Evaluations</span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                    <span className="text-xl font-bold text-[#170F49] block">{consolidatedStats.iepProgramCount}</span>
+                    <span className="text-[11px] text-gray-600">IEP Goal Programs</span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                    <span className="text-xl font-bold text-[#170F49] block">{consolidatedStats.facpCount}</span>
+                    <span className="text-[11px] text-gray-600">FACP Skill Domains</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Graceful Consolidation Notice */}
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-800">
+                <svg className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <span className="font-bold block text-emerald-900">Seamless Partial-Span Intelligence:</span>
+                  Even if only 1, 2, or 3 months are presently recorded, the generator automatically adapts and synthesizes all available multi-disciplinary data into a unified, publication-grade document without gaps or blank pages.
+                </div>
+              </div>
+
+              {/* Report Structure Checklist */}
+              <div className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-1">
+                <div className="font-semibold text-gray-800 mb-1">The generated PDF will include:</div>
+                <div className="flex items-center gap-1.5">✓ Official St. Martha's Institution Banner & Student Demographics</div>
+                <div className="flex items-center gap-1.5">✓ Multi-Disciplinary Therapy Progress (Physiotherapy, Speech, OT, Behavioral)</div>
+                <div className="flex items-center gap-1.5">✓ Activities of Daily Living (ADL), Academic & Behavioral Trimester Summaries</div>
+                <div className="flex items-center gap-1.5">✓ IEP Milestone Objectives Status & Functional FACP Masteries</div>
+                <div className="flex items-center gap-1.5">✓ Signatures: Class Teacher, Special Educator, Head of Therapy, Principal</div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowConsolidatedModal(false)}
+                className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium text-sm transition-all cursor-pointer"
+                disabled={generatingConsolidated}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateConsolidatedReport}
+                disabled={generatingConsolidated}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#E38B52] to-[#F5A572] hover:from-[#d17a42] hover:to-[#e38b52] text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {generatingConsolidated ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Generating Report...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Download Consolidated PDF</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Move the button component INSIDE the main div */}
       <DynamicScrollButtons />{" "}
     
