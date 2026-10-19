@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useContext, useMemo } from "react";
 import { jsPDF } from "jspdf";
+import { sanitizeText, PdfBuilder } from "../utils/pdfBuilder";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { formatAadhaar } from "../utils/validation";
@@ -1519,46 +1520,60 @@ const StudentPage = () => {
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const margin = 30;
+    const bottomMargin = 40; // leave room at page bottom
+    const contentW = pageW - margin * 2;
 
+    const cellPadding = 8;
+    const lineHeight = 14;
+    const headerH = 32;
+    const minRowH = 36;
+    const colWidth = Math.floor(contentW / 3);
+    const usableColW = colWidth - cellPadding * 2;
+
+    let y = margin;
+
+    const ensureSpace = (needed) => {
+      if (y + needed > pageH - bottomMargin) {
+        doc.addPage();
+        y = margin;
+        return true;
+      }
+      return false;
+    };
+
+    // ── Title ──
     const titleTopPadding = 18;
-    const titleY = margin + titleTopPadding;
-
+    y += titleTopPadding;
     doc.setFontSize(14);
     doc.setFont("times", "bold");
     doc.text(
       `TRIMESTER REPORT OF ${String(iepSource?.selectedMonth || "").toUpperCase()}`,
       pageW / 2,
-      titleY,
+      y,
       { align: "center" }
     );
 
     doc.setFontSize(11);
     doc.setFont("times", "normal");
-    doc.text(`Name : ${student?.name || ""}`, margin, titleY + 20);
+    doc.text(`Name : ${student?.name || ""}`, margin, y + 20);
+    y += 50;
 
-    const tableTop = titleY + 50;
-    const tableLeft = margin;
-    const tableWidth = pageW - margin * 2;
-    const colWidth = Math.floor(tableWidth / 3);
-
-    const cellPadding = 8;
-    const usableColW = colWidth - cellPadding * 2;
-    const lineHeight = 14;
-    const headerH = 32;
-    const minRowH = 36;
-
+    // ── Prepare table data ──
     const adl = iepSource?.sections?.adlSkills || [];
     const academic = iepSource?.sections?.academic || [];
     const behavioural = iepSource?.sections?.behaviouralSkills || [];
-    const rowsCount = Math.max(adl.length, academic.length, behavioural.length, 3); // ensure some rows
+    const rowsCount = Math.max(adl.length, academic.length, behavioural.length, 3);
 
-    const rowHeights = [];
-    const rowTextLines = [];
+    const headerTitles = ["ADL SKILLS", "ACADEMIC SKILLS", "BEHAVIOURAL SKILLS"];
 
+    // Pre-compute row heights and wrapped lines
+    doc.setFontSize(11);
+    doc.setFont("times", "normal");
+    const rowData = [];
     for (let r = 0; r < rowsCount; r++) {
-      const c0 = String(adl[r]?.text ?? "");
-      const c1 = String(academic[r]?.text ?? "");
-      const c2 = String(behavioural[r]?.text ?? "");
+      const c0 = sanitizeText(adl[r]?.text ?? "");
+      const c1 = sanitizeText(academic[r]?.text ?? "");
+      const c2 = sanitizeText(behavioural[r]?.text ?? "");
 
       const l0 = doc.splitTextToSize(c0, usableColW);
       const l1 = doc.splitTextToSize(c1, usableColW);
@@ -1568,112 +1583,183 @@ const StudentPage = () => {
         Math.max(l0.length, l1.length, l2.length) * lineHeight + cellPadding * 2,
         minRowH
       );
-      rowHeights.push(rh);
-      rowTextLines.push([l0, l1, l2]);
+      rowData.push({ height: rh, lines: [l0, l1, l2] });
     }
 
-    const tableBodyHeight = rowHeights.reduce((a, b) => a + b, 0);
-    const tableHeight = headerH + tableBodyHeight;
+    // ── Draw table header ──
+    const drawTableHeader = () => {
+      doc.setFontSize(11);
+      doc.setFont("times", "bold");
+      doc.setLineWidth(0.7);
 
-    // draw outer table border (bigger table)
-    doc.setLineWidth(0.8);
-    doc.rect(tableLeft, tableTop, tableWidth, tableHeight, "S");
+      for (let i = 0; i < 3; i++) {
+        doc.rect(margin + i * colWidth, y, colWidth, headerH, "S");
+        doc.text(headerTitles[i], margin + i * colWidth + cellPadding, y + headerH / 2 + 4);
+      }
+      y += headerH;
+    };
 
-    // draw vertical dividers
-    const x1 = tableLeft + colWidth;
-    const x2 = tableLeft + colWidth * 2;
-    doc.line(x1, tableTop, x1, tableTop + tableHeight);
-    doc.line(x2, tableTop, x2, tableTop + tableHeight);
+    // Draw initial header
+    drawTableHeader();
 
-    // header
-    doc.setFontSize(11);
-    doc.setFont("times", "bold");
-    const headerTitles = ["ADL SKILLS", "ACADEMIC SKILLS", "BEHAVIOURAL SKILLS"];
-    for (let i = 0; i < 3; i++) {
-      const hx = tableLeft + i * colWidth + cellPadding;
-      const hy = tableTop + headerH / 2 + 4;
-      doc.text(headerTitles[i], hx, hy);
-    }
-
-    // draw horizontal line under header
-    doc.setLineWidth(0.7);
-    doc.line(tableLeft, tableTop + headerH, tableLeft + tableWidth, tableTop + headerH);
-
-    // render rows
     doc.setFontSize(11);
     doc.setFont("times", "normal");
-    let y = tableTop + headerH;
-    for (let r = 0; r < rowsCount; r++) {
-      const rh = rowHeights[r];
-      const lines = rowTextLines[r];
 
-      for (let c = 0; c < 3; c++) {
-        const x = tableLeft + c * colWidth + cellPadding;
-        doc.text(lines[c], x, y + cellPadding + 7);
+    for (let r = 0; r < rowsCount; r++) {
+      const rd = rowData[r];
+
+      // Check available space on current page
+      const availableSpace = pageH - bottomMargin - y;
+
+      // If the row fits on the current page, draw it directly
+      if (rd.height <= availableSpace) {
+        for (let c = 0; c < 3; c++) {
+          const x = margin + c * colWidth;
+          doc.setLineWidth(0.7);
+          doc.rect(x, y, colWidth, rd.height, "S");
+          doc.text(rd.lines[c], x + cellPadding, y + cellPadding + 7);
+        }
+        y += rd.height;
+      } else if (availableSpace >= minRowH + 10) {
+        // Row is long and doesn't completely fit, but there IS space on the current page to start it!
+        // Calculate how many text lines fit on the current page
+        const linesFit = Math.max(1, Math.floor((availableSpace - cellPadding * 2) / lineHeight));
+        const chunk1H = linesFit * lineHeight + cellPadding * 2;
+
+        // Draw first chunk on current page
+        for (let c = 0; c < 3; c++) {
+          const x = margin + c * colWidth;
+          const slice1 = rd.lines[c].slice(0, linesFit);
+          doc.setLineWidth(0.7);
+          doc.rect(x, y, colWidth, chunk1H, "S");
+          if (slice1.length > 0) {
+            doc.text(slice1, x + cellPadding, y + cellPadding + 7);
+          }
+        }
+        y += chunk1H;
+
+        // Remaining lines move to next page
+        const remainingLinesMax = Math.max(
+          rd.lines[0].slice(linesFit).length,
+          rd.lines[1].slice(linesFit).length,
+          rd.lines[2].slice(linesFit).length
+        );
+
+        if (remainingLinesMax > 0) {
+          doc.addPage();
+          y = margin;
+          drawTableHeader();
+          doc.setFontSize(11);
+          doc.setFont("times", "normal");
+
+          const chunk2H = Math.max(minRowH, remainingLinesMax * lineHeight + cellPadding * 2);
+          for (let c = 0; c < 3; c++) {
+            const x = margin + c * colWidth;
+            const slice2 = rd.lines[c].slice(linesFit);
+            doc.setLineWidth(0.7);
+            doc.rect(x, y, colWidth, chunk2H, "S");
+            if (slice2.length > 0) {
+              doc.text(slice2, x + cellPadding, y + cellPadding + 7);
+            }
+          }
+          y += chunk2H;
+        }
+      } else {
+        // Not enough space even for a minimal chunk, start fresh page
+        doc.addPage();
+        y = margin;
+        drawTableHeader();
+        doc.setFontSize(11);
+        doc.setFont("times", "normal");
+
+        for (let c = 0; c < 3; c++) {
+          const x = margin + c * colWidth;
+          doc.setLineWidth(0.7);
+          doc.rect(x, y, colWidth, rd.height, "S");
+          doc.text(rd.lines[c], x + cellPadding, y + cellPadding + 7);
+        }
+        y += rd.height;
       }
-      y += rh;
     }
 
-    // gap after table
+    // ── IEP OF THE STUDENT section (flows after table) ──
     y += 18;
+    ensureSpace(50);
 
-    // IEP label + REMARKS (moved accordingly)
     doc.setFontSize(12);
     doc.setFont("times", "bold");
     doc.text("IEP OF THE STUDENT :", margin, y);
 
-    // render IEP textbox content (from saved source)
     doc.setFontSize(10);
     doc.setFont("times", "normal");
-    const iepText = String(iepSource?.iepStudent || "");
+    const iepText = sanitizeText(iepSource?.iepStudent || "");
     if (iepText.trim()) {
-      const iepLines = doc.splitTextToSize(iepText, tableWidth - cellPadding * 2);
-      doc.text(iepLines, margin + cellPadding, y + 14);
-      y += Math.max(iepLines.length * lineHeight + 20, 28);
+      const iepLines = doc.splitTextToSize(iepText, contentW - cellPadding * 2);
+      // Write each line with page-break awareness
+      let textY = y + 14;
+      iepLines.forEach((line) => {
+        if (textY > pageH - bottomMargin) {
+          doc.addPage();
+          textY = margin;
+        }
+        doc.text(line, margin + cellPadding, textY);
+        textY += lineHeight;
+      });
+      y = textY + 6;
     } else {
       y += 28;
     }
 
-    y += 28;
+    // ── REMARKS section (dynamic height) ──
+    y += 14;
+    ensureSpace(60);
 
     doc.setFontSize(11);
     doc.setFont("times", "bold");
     doc.text("REMARKS :", margin, y);
     y += 14;
 
-    // increased remarks box height
-    const remarksBoxHeight = 100; // adjust as needed
-    const remarksBoxWidth = tableWidth;
-    doc.rect(margin, y, remarksBoxWidth, remarksBoxHeight);
-
-    // write remarks text inside box with small left padding
     doc.setFontSize(10);
     doc.setFont("times", "normal");
-    const remarksText = String(iepSource?.remarks || "");
-    const remarksLines = doc.splitTextToSize(remarksText, remarksBoxWidth - cellPadding * 2);
-    doc.text(remarksLines, margin + cellPadding, y + 12);
+    const remarksText = sanitizeText(iepSource?.remarks || "");
+    const remarksLines = doc.splitTextToSize(remarksText, contentW - cellPadding * 2);
+    const remarksBoxHeight = Math.max(60, remarksLines.length * lineHeight + cellPadding * 2 + 8);
 
-    y += remarksBoxHeight + 26; // move cursor below box
+    // If the remarks box won't fit, start a new page
+    if (y + remarksBoxHeight > pageH - bottomMargin - 60) {
+      doc.addPage();
+      y = margin;
+    }
 
-    // signatures (computed after remarks box so they sit beneath it)
-    const sigBottomMargin = 55;
-    const sigLineY = pageH - sigBottomMargin;
-    const sigW = Math.floor(tableWidth / 3);
+    doc.rect(margin, y, contentW, remarksBoxHeight);
+    // Write remarks text inside the box with page-awareness
+    let ry = y + 12;
+    remarksLines.forEach((line) => {
+      doc.text(line, margin + cellPadding, ry);
+      ry += lineHeight;
+    });
+
+    y += remarksBoxHeight + 26;
+
+    // ── Signatures (flow after content, push to new page if needed) ──
+    ensureSpace(60);
+
+    const sigW = Math.floor(contentW / 3);
     const sigX0 = margin;
     const sigX1 = margin + sigW;
     const sigX2 = margin + sigW * 2;
     const sigLineLength = sigW - 40;
 
     doc.setLineWidth(0.7);
-    doc.line(sigX0 + 20, sigLineY, sigX0 + 20 + sigLineLength, sigLineY);
-    doc.line(sigX1 + 20, sigLineY, sigX1 + 20 + sigLineLength, sigLineY);
-    doc.line(sigX2 + 20, sigLineY, sigX2 + 20 + sigLineLength, sigLineY);
+    doc.line(sigX0 + 20, y, sigX0 + 20 + sigLineLength, y);
+    doc.line(sigX1 + 20, y, sigX1 + 20 + sigLineLength, y);
+    doc.line(sigX2 + 20, y, sigX2 + 20 + sigLineLength, y);
 
     doc.setFontSize(10);
     doc.setFont("times", "normal");
-    doc.text("Principal", sigX0 + 20, sigLineY + 14);
-    doc.text("Class Teacher", sigX1 + 20, sigLineY + 14);
-    doc.text("Parent / Guardian", sigX2 + 20, sigLineY + 14);
+    doc.text("Principal", sigX0 + 20, y + 14);
+    doc.text("Class Teacher", sigX1 + 20, y + 14);
+    doc.text("Parent / Guardian", sigX2 + 20, y + 14);
 
     // Save PDF
     doc.save(`${(student?.name || "student").replace(/\s+/g, "_")}-iep.pdf`);
@@ -1699,6 +1785,7 @@ const StudentPage = () => {
     annualGoal: "",
     firstTerm: createEmptyIepTerm(8),
     secondTerm: createEmptyIepTerm(7),
+    extraTerms: [], // array of { title, term }
     signatures: { teacher: "", parent: "" },
     createdAt: null,
     updatedAt: null,
@@ -1718,17 +1805,27 @@ const StudentPage = () => {
     return { headers, rows, remarks: term.remarks ?? "", shortTermGoal: term.shortTermGoal ?? "" };
   };
 
-  const normalizeIepRecord = (rec = {}) => ({
-    ...createEmptyIepForm(),
-    ...rec,
-    annualGoal: rec.annualGoal ?? "",
-    firstTerm: normalizeIepTerm(rec.firstTerm, 8),
-    secondTerm: normalizeIepTerm(rec.secondTerm, 7),
-    signatures: {
-      teacher: rec.signatures?.teacher ?? "",
-      parent: rec.signatures?.parent ?? "",
-    },
-  });
+  const normalizeIepRecord = (rec = {}) => {
+    const extraTerms = Array.isArray(rec.extraTerms)
+      ? rec.extraTerms.map((et, idx) => ({
+          title: et?.title || `TERM ${idx + 3}`,
+          term: normalizeIepTerm(et?.term, 7),
+        }))
+      : [];
+
+    return {
+      ...createEmptyIepForm(),
+      ...rec,
+      annualGoal: rec.annualGoal ?? "",
+      firstTerm: normalizeIepTerm(rec.firstTerm, 8),
+      secondTerm: normalizeIepTerm(rec.secondTerm, 7),
+      extraTerms,
+      signatures: {
+        teacher: rec.signatures?.teacher ?? "",
+        parent: rec.signatures?.parent ?? "",
+      },
+    };
+  };
 
   const loadIepFormRecords = () => {
     try {
@@ -1813,70 +1910,113 @@ const StudentPage = () => {
     setIepFormMode("list");
   };
 
-  // Draft mutation helpers (term = "firstTerm" | "secondTerm")
+  // Draft mutation helpers (term can be "firstTerm", "secondTerm", or "extra_0", "extra_1", etc.)
   const updateIepDraft = (updater) =>
     setIepFormDraft((prev) => (prev ? updater({ ...prev }) : prev));
 
-  const updateIepTermStep = (term, rowIdx, value) =>
+  const getTermFromDraft = (draft, termKey) => {
+    if (termKey.startsWith("extra_")) {
+      const idx = parseInt(termKey.replace("extra_", ""), 10);
+      return draft.extraTerms?.[idx]?.term;
+    }
+    return draft[termKey];
+  };
+
+  const setTermInDraft = (draft, termKey, newTerm) => {
+    if (termKey.startsWith("extra_")) {
+      const idx = parseInt(termKey.replace("extra_", ""), 10);
+      const list = [...(draft.extraTerms || [])];
+      if (list[idx]) {
+        list[idx] = { ...list[idx], term: newTerm };
+      }
+      draft.extraTerms = list;
+    } else {
+      draft[termKey] = newTerm;
+    }
+    return draft;
+  };
+
+  const updateIepTermStep = (termKey, rowIdx, value) =>
     updateIepDraft((draft) => {
-      const t = { ...draft[term] };
+      const t = { ...getTermFromDraft(draft, termKey) };
       t.rows = t.rows.map((r, i) => (i === rowIdx ? { ...r, step: value } : r));
-      draft[term] = t;
-      return draft;
+      return setTermInDraft(draft, termKey, t);
     });
 
-  const updateIepTermCell = (term, rowIdx, colIdx, value) =>
+  const updateIepTermCell = (termKey, rowIdx, colIdx, value) =>
     updateIepDraft((draft) => {
-      const t = { ...draft[term] };
+      const t = { ...getTermFromDraft(draft, termKey) };
       t.rows = t.rows.map((r, i) =>
         i === rowIdx
           ? { ...r, cols: r.cols.map((c, ci) => (ci === colIdx ? value : c)) }
           : r
       );
-      draft[term] = t;
-      return draft;
+      return setTermInDraft(draft, termKey, t);
     });
 
-  const updateIepTermHeader = (term, colIdx, value) =>
+  const updateIepTermHeader = (termKey, colIdx, value) =>
     updateIepDraft((draft) => {
-      const t = { ...draft[term] };
+      const t = { ...getTermFromDraft(draft, termKey) };
       t.headers = t.headers.map((h, i) => (i === colIdx ? value : h));
-      draft[term] = t;
+      return setTermInDraft(draft, termKey, t);
+    });
+
+  const updateIepTermRemarks = (termKey, value) =>
+    updateIepDraft((draft) => {
+      const t = { ...getTermFromDraft(draft, termKey), remarks: value };
+      return setTermInDraft(draft, termKey, t);
+    });
+
+  const updateIepTermShortTermGoal = (termKey, value) =>
+    updateIepDraft((draft) => {
+      const t = { ...getTermFromDraft(draft, termKey), shortTermGoal: value };
+      return setTermInDraft(draft, termKey, t);
+    });
+
+  const updateExtraTermTitle = (idx, value) =>
+    updateIepDraft((draft) => {
+      const list = [...(draft.extraTerms || [])];
+      if (list[idx]) {
+        list[idx] = { ...list[idx], title: value };
+      }
+      draft.extraTerms = list;
       return draft;
     });
 
-  const updateIepTermRemarks = (term, value) =>
+  const addIepTermRow = (termKey) =>
     updateIepDraft((draft) => {
-      draft[term] = { ...draft[term], remarks: value };
-      return draft;
-    });
-
-  const updateIepTermShortTermGoal = (term, value) =>
-    updateIepDraft((draft) => {
-      draft[term] = { ...draft[term], shortTermGoal: value };
-      return draft;
-    });
-
-  const addIepTermRow = (term) =>
-    updateIepDraft((draft) => {
-      const t = { ...draft[term] };
+      const t = { ...getTermFromDraft(draft, termKey) };
       const nextId = (t.rows[t.rows.length - 1]?.id || 0) + 1;
       t.rows = [
         ...t.rows,
         { id: nextId, step: "", cols: Array.from({ length: IEP_TASK_COLS }, () => "") },
       ];
-      draft[term] = t;
-      return draft;
+      return setTermInDraft(draft, termKey, t);
     });
 
-  const removeIepTermRow = (term, rowIdx) =>
+  const removeIepTermRow = (termKey, rowIdx) =>
     updateIepDraft((draft) => {
-      const t = { ...draft[term] };
+      const t = { ...getTermFromDraft(draft, termKey) };
       t.rows = t.rows.filter((_, i) => i !== rowIdx);
       if (t.rows.length === 0) {
         t.rows = [{ id: 1, step: "", cols: Array.from({ length: IEP_TASK_COLS }, () => "") }];
       }
-      draft[term] = t;
+      return setTermInDraft(draft, termKey, t);
+    });
+
+  const addExtraIepTerm = () =>
+    updateIepDraft((draft) => {
+      const count = (draft.extraTerms || []).length;
+      const termNumber = count + 3;
+      const newTitle = `TERM ${termNumber}`;
+      const newTerm = createEmptyIepTerm(7);
+      draft.extraTerms = [...(draft.extraTerms || []), { title: newTitle, term: newTerm }];
+      return draft;
+    });
+
+  const removeExtraIepTerm = (idx) =>
+    updateIepDraft((draft) => {
+      draft.extraTerms = (draft.extraTerms || []).filter((_, i) => i !== idx);
       return draft;
     });
 
@@ -1930,7 +2070,22 @@ const StudentPage = () => {
       if (y + needed > pageH - margin) {
         doc.addPage();
         y = margin;
+        return true;
       }
+      return false;
+    };
+
+    const writeFlowText = (text, maxWidth = contentW, lineH = 12, fontSize = 10, fontStyle = "normal") => {
+      const clean = sanitizeText(text);
+      if (!clean) return;
+      doc.setFontSize(fontSize);
+      doc.setFont("times", fontStyle);
+      const lines = doc.splitTextToSize(clean, maxWidth);
+      lines.forEach((line) => {
+        ensureSpace(lineH);
+        doc.text(line, margin, y);
+        y += lineH;
+      });
     };
 
     // Title
@@ -1942,9 +2097,9 @@ const StudentPage = () => {
     // Student details
     doc.setFontSize(11);
     doc.setFont("times", "normal");
-    doc.text(`Name : ${student?.name || ""}`, margin, y);
+    doc.text(`Name : ${sanitizeText(student?.name || "")}`, margin, y);
     if (rec.academicYear) {
-      doc.text(`Academic Year : ${rec.academicYear}`, pageW - margin, y, { align: "right" });
+      doc.text(`Academic Year : ${sanitizeText(rec.academicYear)}`, pageW - margin, y, { align: "right" });
     }
     y += 14;
     const stamp = rec.updatedAt || rec.createdAt;
@@ -1958,15 +2113,13 @@ const StudentPage = () => {
     y += 6;
 
     if (rec.annualGoal) {
-      ensureSpace(40);
+      ensureSpace(28);
       doc.setFontSize(10);
       doc.setFont("times", "bold");
       doc.text("Annual Goal :", margin, y + 2);
-      y += 12;
-      doc.setFont("times", "normal");
-      const annualGoalLines = doc.splitTextToSize(String(rec.annualGoal), contentW);
-      doc.text(annualGoalLines, margin, y);
-      y += annualGoalLines.length * 12 + 10;
+      y += 14;
+      writeFlowText(rec.annualGoal, contentW, 12, 10, "normal");
+      y += 8;
     }
 
     const lineHeight = 11;
@@ -1975,29 +2128,21 @@ const StudentPage = () => {
     const otherColW = (contentW - stepColW) / IEP_TASK_COLS;
 
     const drawTerm = (title, term) => {
-      ensureSpace(60);
+      ensureSpace(40);
       doc.setFontSize(12);
       doc.setFont("times", "bold");
       doc.text(title, margin, y + 4);
       y += 16;
 
       if (term.shortTermGoal) {
-        ensureSpace(35);
+        ensureSpace(28);
         doc.setFontSize(10);
         doc.setFont("times", "bold");
         doc.text("Short Term Goal :", margin, y + 2);
-        y += 12;
-        doc.setFont("times", "normal");
-        const goalLines = doc.splitTextToSize(String(term.shortTermGoal), contentW);
-        doc.text(goalLines, margin, y);
-        y += goalLines.length * 12 + 10;
+        y += 14;
+        writeFlowText(term.shortTermGoal, contentW, 12, 10, "normal");
+        y += 8;
       }
-
-      ensureSpace(30);
-      doc.setFontSize(10);
-      doc.setFont("times", "bold");
-      doc.text("Task Analysis", margin, y + 2);
-      y += 12;
 
       // Pre-compute column x positions
       const colX = [margin];
@@ -2006,16 +2151,80 @@ const StudentPage = () => {
 
       // Header row
       doc.setFontSize(9);
-      const headerLabels = ["Steps", ...term.headers.map((h) => h || "")];
-      const drawRow = (cells, isHeader) => {
-        doc.setFont("times", isHeader ? "bold" : "normal");
+      const headerLabels = ["Steps", ...term.headers.map((h) => sanitizeText(h || ""))];
+
+      const getHeaderRowHeight = () => {
+        doc.setFont("times", "bold");
+        doc.setFontSize(9);
+        const wrapped = headerLabels.map((txt, i) => {
+          const w = (i === 0 ? stepColW : otherColW) - cellPad * 2;
+          return doc.splitTextToSize(sanitizeText(txt || ""), w);
+        });
+        const maxLines = Math.max(1, ...wrapped.map((l) => l.length));
+        return maxLines * lineHeight + cellPad * 2;
+      };
+
+      const getRowHeight = (cells) => {
+        doc.setFont("times", "normal");
+        doc.setFontSize(9);
         const wrapped = cells.map((txt, i) => {
           const w = (i === 0 ? stepColW : otherColW) - cellPad * 2;
-          return doc.splitTextToSize(String(txt || ""), w);
+          return doc.splitTextToSize(sanitizeText(txt || ""), w);
+        });
+        const maxLines = Math.max(1, ...wrapped.map((l) => l.length));
+        return maxLines * lineHeight + cellPad * 2;
+      };
+
+      const drawHeaderRow = () => {
+        doc.setFont("times", "bold");
+        doc.setFontSize(9);
+        const wrapped = headerLabels.map((txt, i) => {
+          const w = (i === 0 ? stepColW : otherColW) - cellPad * 2;
+          return doc.splitTextToSize(sanitizeText(txt || ""), w);
         });
         const maxLines = Math.max(1, ...wrapped.map((l) => l.length));
         const rowH = maxLines * lineHeight + cellPad * 2;
-        ensureSpace(rowH);
+        doc.setLineWidth(0.5);
+        doc.rect(margin, y, contentW, rowH, "S");
+        for (let i = 1; i <= IEP_TASK_COLS; i++) {
+          doc.line(colX[i], y, colX[i], y + rowH);
+        }
+        wrapped.forEach((lines, i) => {
+          doc.text(lines, colX[i] + cellPad, y + cellPad + 8);
+        });
+        y += rowH;
+        return rowH;
+      };
+
+      const headerH = getHeaderRowHeight();
+      const firstRowH = term.rows && term.rows.length > 0 ? getRowHeight([term.rows[0].step, ...term.rows[0].cols]) : 24;
+      // Ensure Task Analysis title + table header + at least 1 row fit together on the page!
+      ensureSpace(24 + headerH + firstRowH);
+
+      doc.setFontSize(10);
+      doc.setFont("times", "bold");
+      doc.text("Task Analysis", margin, y + 2);
+      y += 14;
+
+      const drawRow = (cells) => {
+        doc.setFont("times", "normal");
+        doc.setFontSize(9);
+        const wrapped = cells.map((txt, i) => {
+          const w = (i === 0 ? stepColW : otherColW) - cellPad * 2;
+          return doc.splitTextToSize(sanitizeText(txt || ""), w);
+        });
+        const maxLines = Math.max(1, ...wrapped.map((l) => l.length));
+        const rowH = maxLines * lineHeight + cellPad * 2;
+        
+        // If this row doesn't fit on the current page, move to next page and repeat header
+        if (y + rowH > pageH - margin) {
+          doc.addPage();
+          y = margin;
+          drawHeaderRow();
+          doc.setFont("times", "normal");
+          doc.setFontSize(9);
+        }
+
         // borders
         doc.setLineWidth(0.5);
         doc.rect(margin, y, contentW, rowH, "S");
@@ -2029,8 +2238,8 @@ const StudentPage = () => {
         y += rowH;
       };
 
-      drawRow(headerLabels, true);
-      term.rows.forEach((r) => drawRow([r.step, ...r.cols], false));
+      drawHeaderRow();
+      term.rows.forEach((r) => drawRow([r.step, ...r.cols]));
 
       // Remarks
       y += 8;
@@ -2039,32 +2248,45 @@ const StudentPage = () => {
       doc.setFont("times", "bold");
       doc.text("Remarks :", margin, y + 2);
       y += 12;
-      doc.setFont("times", "normal");
-      const remarksLines = doc.splitTextToSize(String(term.remarks || ""), contentW - cellPad * 2);
-      const boxH = Math.max(36, remarksLines.length * lineHeight + cellPad * 2);
-      ensureSpace(boxH);
-      doc.setLineWidth(0.5);
-      doc.rect(margin, y, contentW, boxH, "S");
-      doc.text(remarksLines, margin + cellPad, y + cellPad + 8);
-      y += boxH + 14;
+
+      const cleanRemarks = sanitizeText(term.remarks || "");
+      const remarksLines = doc.splitTextToSize(cleanRemarks, contentW - cellPad * 2);
+      const neededBoxH = Math.max(36, remarksLines.length * lineHeight + cellPad * 2);
+
+      // If the box fits on the page (or on a fresh page)
+      if (neededBoxH <= pageH - margin * 2) {
+        ensureSpace(neededBoxH);
+        doc.setLineWidth(0.5);
+        doc.rect(margin, y, contentW, neededBoxH, "S");
+        doc.setFont("times", "normal");
+        doc.text(remarksLines, margin + cellPad, y + cellPad + 8);
+        y += neededBoxH + 14;
+      } else {
+        // Very long remarks spanning multiple pages
+        writeFlowText(cleanRemarks, contentW, lineHeight, 10, "normal");
+        y += 14;
+      }
     };
 
     drawTerm("FIRST TERM", rec.firstTerm);
     drawTerm("SECOND TERM", rec.secondTerm);
+    (rec.extraTerms || []).forEach((et, idx) => {
+      drawTerm(et.title || `TERM ${idx + 3}`, et.term);
+    });
 
     // Signatures
-    ensureSpace(60);
+    ensureSpace(50);
     y += 10;
     const sigColW = contentW / 2;
     doc.setFontSize(10);
     doc.setFont("times", "normal");
     doc.text(
-      `Signature Of The Teacher : ${rec.signatures.teacher || ""}`,
+      `Signature Of The Teacher : ${sanitizeText(rec.signatures.teacher || "")}`,
       margin,
       y
     );
     doc.text(
-      `Signature Of The Parent : ${rec.signatures.parent || ""}`,
+      `Signature Of The Parent : ${sanitizeText(rec.signatures.parent || "")}`,
       margin + sigColW,
       y
     );
@@ -2073,12 +2295,33 @@ const StudentPage = () => {
   };
 
   // Editable Task Analysis grid + remarks for one term in the IEP draft
-  const renderIepTermEditor = (termKey, label) => {
-    const term = iepFormDraft?.[termKey];
+  const renderIepTermEditor = (termKey, label, canDelete = false, onRemoveTerm = null, onTitleChange = null) => {
+    const term = getTermFromDraft(iepFormDraft, termKey);
     if (!term) return null;
     return (
       <div className="mb-8 max-md:mb-5 p-5 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-md">
-        <h3 className="text-lg font-bold text-[#170F49] mb-4">{label}</h3>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          {onTitleChange ? (
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => onTitleChange(e.target.value)}
+              className="text-lg font-bold text-[#170F49] px-2 py-1 rounded-lg border border-[#E38B52]/30 bg-white focus:outline-none focus:border-[#E38B52]"
+              placeholder="Term Title"
+            />
+          ) : (
+            <h3 className="text-lg font-bold text-[#170F49]">{label}</h3>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={onRemoveTerm}
+              className="px-3 py-1 text-xs font-semibold rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
+            >
+              Remove Term
+            </button>
+          )}
+        </div>
 
         <div className="mb-4">
           <label className="block text-sm font-semibold text-[#170F49] mb-1">Short Term Goal</label>
@@ -2504,7 +2747,46 @@ const StudentPage = () => {
     const pageHeight = pdf.internal.pageSize.getHeight();
     const marginLeft = 15;
     const marginRight = 15;
+    const contentWidth = pageWidth - marginLeft - marginRight;
     let yPosition = 20;
+
+    const ensureSpace = (needed) => {
+      if (yPosition + needed > pageHeight - 20) {
+        pdf.addPage();
+        yPosition = 20;
+        return true;
+      }
+      return false;
+    };
+
+    const writeSectionHeader = (label, indent = 0) => {
+      ensureSpace(16);
+      pdf.setFont("times", "bold");
+      pdf.setFontSize(10);
+      pdf.text(`${label}:`, marginLeft + indent, yPosition);
+      yPosition += 5.5;
+    };
+
+    const writeWrappedLines = (rawText, maxWidth = contentWidth - 5, indent = 5, lineH = 5.5) => {
+      const clean = sanitizeText(rawText).trim();
+      if (!clean) return;
+      pdf.setFont("times", "normal");
+      pdf.setFontSize(10);
+      const lines = pdf.splitTextToSize(clean, maxWidth);
+      lines.forEach((line) => {
+        ensureSpace(lineH);
+        pdf.text(line, marginLeft + indent, yPosition);
+        yPosition += lineH;
+      });
+    };
+
+    const writeBlock = (label, rawText, indent = 0, innerIndent = 5) => {
+      const clean = sanitizeText(rawText).trim();
+      if (!clean) return;
+      writeSectionHeader(label, indent);
+      writeWrappedLines(clean, contentWidth - innerIndent, innerIndent, 5.5);
+      yPosition += 2.5;
+    };
 
     // Add school logo to top-right
     const logoWidth = 30;
@@ -2514,12 +2796,10 @@ const StudentPage = () => {
     try {
       pdf.addImage(schoolLogo, "JPEG", logoX, logoY, logoWidth, logoHeight);
     } catch (logoError) {
-      console.error("Error adding logo to PDF:", logoError);
-      // Try again without format specification
       try {
         pdf.addImage(schoolLogo, logoX, logoY, logoWidth, logoHeight);
       } catch (e2) {
-        console.error("Second attempt to add logo failed:", e2);
+        console.error("Failed to add logo:", e2);
       }
     }
 
@@ -2527,7 +2807,7 @@ const StudentPage = () => {
     pdf.setFontSize(18);
     pdf.setFont("times", "bold");
     pdf.text(
-      `Therapy Reports - ${student?.name || "Student"}`,
+      `Therapy Reports - ${sanitizeText(student?.name || "Student")}`,
       marginLeft,
       yPosition,
     );
@@ -2541,16 +2821,16 @@ const StudentPage = () => {
       ? `Date Range: ${new Date(Math.min(...dates)).toLocaleDateString()} to ${new Date(Math.max(...dates)).toLocaleDateString()}`
       : "All Reports";
     pdf.text(dateRangeText, marginLeft, yPosition);
-    yPosition += 5;
+    yPosition += 5.5;
 
     const therapyTypes = [...new Set(reportsToDownload.map((r) => r.therapy_type).filter(Boolean))];
     if (therapyTypes.length === 1) {
       pdf.text(
-        `Therapy Type: ${therapyTypes[0]}`,
+        `Therapy Type: ${sanitizeText(therapyTypes[0])}`,
         marginLeft,
         yPosition,
       );
-      yPosition += 5;
+      yPosition += 5.5;
     }
 
     pdf.text(
@@ -2562,10 +2842,7 @@ const StudentPage = () => {
 
     // Reports
     reportsToDownload.forEach((report, index) => {
-      if (yPosition > pageHeight - 40) {
-        pdf.addPage();
-        yPosition = 20;
-      }
+      ensureSpace(35);
 
       pdf.setFontSize(14);
       pdf.setFont("times", "bold");
@@ -2584,29 +2861,29 @@ const StudentPage = () => {
         marginLeft,
         yPosition,
       );
-      yPosition += 5;
+      yPosition += 5.5;
 
       pdf.text(
-        `Therapy Type: ${report.therapy_type || "N/A"}`,
+        `Therapy Type: ${sanitizeText(report.therapy_type || "N/A")}`,
         marginLeft,
         yPosition,
       );
-      yPosition += 5;
+      yPosition += 5.5;
 
       pdf.text(
-        `Therapist: ${report.therapist_name || "N/A"}`,
+        `Therapist: ${sanitizeText(report.therapist_name || "N/A")}`,
         marginLeft,
         yPosition,
       );
-      yPosition += 5;
+      yPosition += 5.5;
 
       if (report.progress_level) {
         pdf.text(
-          `Progress Level: ${report.progress_level}`,
+          `Progress Level: ${sanitizeText(report.progress_level)}`,
           marginLeft,
           yPosition,
         );
-        yPosition += 5;
+        yPosition += 5.5;
       }
 
       yPosition += 3;
@@ -2619,77 +2896,17 @@ const StudentPage = () => {
       ];
 
       clinicalFields.forEach(([label, value]) => {
-        const text = typeof value === "string" ? value.trim() : value;
-        if (!text) {
-          return;
-        }
-
-        if (yPosition > pageHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        pdf.setFont("times", "bold");
-        pdf.text(`${label}:`, marginLeft, yPosition);
-        yPosition += 5;
-        pdf.setFont("times", "normal");
-        const lines = pdf.splitTextToSize(
-          String(value),
-          pageWidth - marginLeft - marginRight,
-        );
-        lines.forEach((line) => {
-          if (yPosition > pageHeight - 20) {
-            pdf.addPage();
-            yPosition = 20;
-          }
-          pdf.text(line, marginLeft + 5, yPosition);
-          yPosition += 5;
-        });
-        yPosition += 3;
+        writeBlock(label, value, 0, 5);
       });
 
       // Progress Notes
       if (report.progress_notes) {
-        if (yPosition > pageHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        pdf.setFont("times", "bold");
-        pdf.text(
-          "Progress Notes:",
-          marginLeft,
-          yPosition,
-        );
-        yPosition += 5;
-        pdf.setFont("times", "normal");
-        const progressLines = pdf.splitTextToSize(
-          report.progress_notes,
-          pageWidth - marginLeft - marginRight,
-        );
-        progressLines.forEach((line) => {
-          if (yPosition > pageHeight - 20) {
-            pdf.addPage();
-            yPosition = 20;
-          }
-          pdf.text(line, marginLeft + 5, yPosition);
-          yPosition += 5;
-        });
-        yPosition += 3;
+        writeBlock("Progress Notes", report.progress_notes, 0, 5);
       }
 
       // Goals Achieved - detailed breakdown of all sections
       if (report.goals_achieved) {
-        if (yPosition > pageHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        pdf.setFont("times", "bold");
-        pdf.text(
-          "Goals Addressed:",
-          marginLeft,
-          yPosition,
-        );
-        yPosition += 5;
-        pdf.setFont("times", "normal");
+        writeSectionHeader("Goals Addressed", 0);
 
         if (
           typeof report.goals_achieved === "object" &&
@@ -2702,12 +2919,8 @@ const StudentPage = () => {
           if (activeSections.length > 0) {
             activeSections.forEach(
               ([sectionKey, sectionData]) => {
-                if (yPosition > pageHeight - 20) {
-                  pdf.addPage();
-                  yPosition = 20;
-                }
+                ensureSpace(14);
 
-                // Format section title (e.g., "receptive_language" -> "Receptive Language")
                 const sectionTitle = (sectionData && sectionData.label) || sectionKey
                   .split("_")
                   .map(
@@ -2718,185 +2931,80 @@ const StudentPage = () => {
                   .join(" ");
 
                 pdf.setFont("times", "bold");
+                pdf.setFontSize(10);
                 pdf.text(
                   ` ${sectionTitle}:`,
                   marginLeft + 5,
                   yPosition,
                 );
-                yPosition += 5;
-                pdf.setFont("times", "normal");
+                yPosition += 5.5;
 
-                // If it has notes or response, display them
                 if (sectionData && (sectionData.notes || sectionData.response)) {
                   if (sectionData.notes) {
-                    const noteLines = pdf.splitTextToSize(
-                      `Goal: ${sectionData.notes}`,
-                      pageWidth - marginLeft - marginRight - 15,
-                    );
-                    noteLines.forEach((line) => {
-                      if (yPosition > pageHeight - 20) {
-                        pdf.addPage();
-                        yPosition = 20;
-                      }
-                      pdf.text(
-                        line,
-                        marginLeft + 10,
-                        yPosition,
-                      );
-                      yPosition += 5;
-                    });
+                    writeWrappedLines(`Goal: ${sectionData.notes}`, contentWidth - 15, 10, 5.5);
                   }
                   if (sectionData.response) {
-                    const respLines = pdf.splitTextToSize(
-                      `Response: ${sectionData.response}`,
-                      pageWidth - marginLeft - marginRight - 15,
-                    );
-                    respLines.forEach((line) => {
-                      if (yPosition > pageHeight - 20) {
-                        pdf.addPage();
-                        yPosition = 20;
-                      }
-                      pdf.text(
-                        line,
-                        marginLeft + 10,
-                        yPosition,
-                      );
-                      yPosition += 5;
-                    });
+                    writeWrappedLines(`Response: ${sectionData.response}`, contentWidth - 15, 10, 5.5);
                   }
                 } else {
-                  // Checked but no notes or response
+                  pdf.setFont("times", "normal");
+                  pdf.setFontSize(10);
                   pdf.text(
                     "Addressed",
                     marginLeft + 10,
                     yPosition,
                   );
-                  yPosition += 5;
+                  yPosition += 5.5;
                 }
 
                 yPosition += 2;
               },
             );
           } else {
+            pdf.setFont("times", "normal");
+            pdf.setFontSize(10);
             pdf.text(
               "No goals addressed",
               marginLeft + 5,
               yPosition,
             );
-            yPosition += 5;
+            yPosition += 5.5;
           }
         } else if (
           typeof report.goals_achieved === "string" &&
           report.goals_achieved.trim()
         ) {
-          // If goals_achieved is just a string
-          const goalLines = pdf.splitTextToSize(
-            report.goals_achieved,
-            pageWidth - marginLeft - marginRight - 5,
-          );
-          goalLines.forEach((line) => {
-            if (yPosition > pageHeight - 20) {
-              pdf.addPage();
-              yPosition = 20;
-            }
-            pdf.text(line, marginLeft + 5, yPosition);
-            yPosition += 5;
-          });
+          writeWrappedLines(report.goals_achieved, contentWidth - 5, 5, 5.5);
         } else {
+          pdf.setFont("times", "normal");
+          pdf.setFontSize(10);
           pdf.text(
             "No goals addressed",
             marginLeft + 5,
             yPosition,
           );
-          yPosition += 5;
+          yPosition += 5.5;
         }
         yPosition += 3;
       }
 
       // Challenges
       if (report.challenges) {
-        if (yPosition > pageHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        pdf.setFont("times", "bold");
-        pdf.text("Challenges:", marginLeft, yPosition);
-        yPosition += 5;
-        pdf.setFont("times", "normal");
-        const challengeLines = pdf.splitTextToSize(
-          report.challenges,
-          pageWidth - marginLeft - marginRight,
-        );
-        challengeLines.forEach((line) => {
-          if (yPosition > pageHeight - 20) {
-            pdf.addPage();
-            yPosition = 20;
-          }
-          pdf.text(line, marginLeft + 5, yPosition);
-          yPosition += 5;
-        });
-        yPosition += 3;
+        writeBlock("Challenges", report.challenges, 0, 5);
       }
 
-      // Recommendations (if available)
+      // Recommendations
       if (report.recommendations) {
-        if (yPosition > pageHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        pdf.setFont("times", "bold");
-        pdf.text(
-          "Recommendations:",
-          marginLeft,
-          yPosition,
-        );
-        yPosition += 5;
-        pdf.setFont("times", "normal");
-        const recLines = pdf.splitTextToSize(
-          report.recommendations,
-          pageWidth - marginLeft - marginRight,
-        );
-        recLines.forEach((line) => {
-          if (yPosition > pageHeight - 20) {
-            pdf.addPage();
-            yPosition = 20;
-          }
-          pdf.text(line, marginLeft + 5, yPosition);
-          yPosition += 5;
-        });
-        yPosition += 3;
+        writeBlock("Recommendations", report.recommendations, 0, 5);
       }
 
-      // Next Goals (if available)
+      // Next Goals
       if (report.next_goals) {
-        if (yPosition > pageHeight - 20) {
-          pdf.addPage();
-          yPosition = 20;
-        }
-        pdf.setFont("times", "bold");
-        pdf.text("Next Goals:", marginLeft, yPosition);
-        yPosition += 5;
-        pdf.setFont("times", "normal");
-        const nextGoalLines = pdf.splitTextToSize(
-          report.next_goals,
-          pageWidth - marginLeft - marginRight,
-        );
-        nextGoalLines.forEach((line) => {
-          if (yPosition > pageHeight - 20) {
-            pdf.addPage();
-            yPosition = 20;
-          }
-          pdf.text(line, marginLeft + 5, yPosition);
-          yPosition += 5;
-        });
-        yPosition += 3;
+        writeBlock("Next Goals", report.next_goals, 0, 5);
       }
 
       // Add a separator line between reports
-      if (yPosition > pageHeight - 20) {
-        pdf.addPage();
-        yPosition = 20;
-      }
+      ensureSpace(12);
       pdf.setDrawColor(200, 200, 200);
       pdf.line(
         marginLeft,
@@ -2908,7 +3016,7 @@ const StudentPage = () => {
     });
 
     pdf.save(
-      `therapy_reports_${student?.name || "student"}_${new Date().toISOString().split("T")[0]}.pdf`,
+      `therapy_reports_${(student?.name || "student").replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`,
     );
   };
 
@@ -3026,17 +3134,20 @@ const StudentPage = () => {
     }
 
     const pdf = new jsPDF();
-    const pageWidth = pdf.internal.pageSize.width;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
     const marginLeft = 20;
     const marginRight = 20;
     const contentWidth = pageWidth - marginLeft - marginRight;
     let yPosition = 20;
 
-    // Helper function to add text with word wrapping
-    const addWrappedText = (text, x, y, maxWidth, lineHeight = 5) => {
-      const lines = pdf.splitTextToSize(text, maxWidth);
-      pdf.text(lines, x, y);
-      return y + lines.length * lineHeight;
+    const ensureSpace = (needed = 10) => {
+      if (yPosition + needed > pageHeight - 20) {
+        pdf.addPage();
+        yPosition = 20;
+        return true;
+      }
+      return false;
     };
 
     // Header
@@ -3048,16 +3159,16 @@ const StudentPage = () => {
     // Student Information
     pdf.setFontSize(12);
     pdf.setFont("times", "normal");
-    pdf.text(`Student: ${student.name || "N/A"}`, marginLeft, yPosition);
+    pdf.text(`Student: ${sanitizeText(student.name || "N/A")}`, marginLeft, yPosition);
     yPosition += 7;
     pdf.text(
-      `Student ID: ${student.student_id || "N/A"}`,
+      `Student ID: ${sanitizeText(student.student_id || "N/A")}`,
       marginLeft,
       yPosition,
     );
     yPosition += 7;
     if (student.class_name) {
-      pdf.text(`Class: ${student.class_name}`, marginLeft, yPosition);
+      pdf.text(`Class: ${sanitizeText(student.class_name)}`, marginLeft, yPosition);
       yPosition += 7;
     }
     pdf.text(
@@ -3068,7 +3179,7 @@ const StudentPage = () => {
     yPosition += 7;
     if (aiAnalysis.date_range) {
       pdf.text(
-        `Analysis Period: ${aiAnalysis.date_range.start_date || "N/A"} to ${aiAnalysis.date_range.end_date || "N/A"}`,
+        `Analysis Period: ${sanitizeText(aiAnalysis.date_range.start_date || "N/A")} to ${sanitizeText(aiAnalysis.date_range.end_date || "N/A")}`,
         marginLeft,
         yPosition,
       );
@@ -3077,6 +3188,7 @@ const StudentPage = () => {
 
     // PROGRESS SUMMARY - Main consolidated report
     if (aiAnalysis.summary) {
+      ensureSpace(16);
       pdf.setFontSize(16);
       pdf.setFont("times", "bold");
       pdf.text("PROGRESS SUMMARY", marginLeft, yPosition);
@@ -3085,17 +3197,12 @@ const StudentPage = () => {
       pdf.setFont("times", "normal");
 
       // Split the summary text and handle page breaks
-      const summaryLines = pdf.splitTextToSize(
-        aiAnalysis.summary,
-        contentWidth,
-      );
+      const cleanSummary = sanitizeText(aiAnalysis.summary);
+      const summaryLines = pdf.splitTextToSize(cleanSummary, contentWidth);
       summaryLines.forEach((line) => {
-        if (yPosition > 270) {
-          pdf.addPage();
-          yPosition = 20;
-        }
+        ensureSpace(5.5);
         pdf.text(line, marginLeft, yPosition);
-        yPosition += 5;
+        yPosition += 5.5;
       });
       yPosition += 5;
     }
@@ -3105,12 +3212,13 @@ const StudentPage = () => {
     for (let i = 1; i <= totalPages; i++) {
       pdf.setPage(i);
       pdf.setFontSize(8);
-      pdf.text(`Generated on: ${new Date().toLocaleString()}`, marginLeft, 285);
-      pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 40, 285);
+      pdf.text(`Generated on: ${new Date().toLocaleString()}`, marginLeft, pageHeight - 12);
+      pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 40, pageHeight - 12);
     }
 
     // Save the PDF
-    const fileName = `AI_Analysis_Report_${student.student_id || "Unknown"}_${new Date().toISOString().split("T")[0]}.pdf`;
+    const safeStudentId = sanitizeText(student.student_id || "Unknown").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const fileName = `AI_Analysis_Report_${safeStudentId}_${new Date().toISOString().split("T")[0]}.pdf`;
     pdf.save(fileName);
   };
 
@@ -3119,14 +3227,20 @@ const StudentPage = () => {
     if (!summaryData || !student) return;
 
     const pdf = new jsPDF();
-    const pageWidth = pdf.internal.pageSize.width;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
     const marginLeft = 20;
     const marginRight = 20;
     const contentWidth = pageWidth - marginLeft - marginRight;
     let yPos = 20;
 
     const checkPageBreak = (needed = 10) => {
-      if (yPos + needed > 275) { pdf.addPage(); yPos = 20; }
+      if (yPos + needed > pageHeight - 20) {
+        pdf.addPage();
+        yPos = 20;
+        return true;
+      }
+      return false;
     };
 
     // Header
@@ -3138,16 +3252,16 @@ const StudentPage = () => {
     // Meta
     pdf.setFontSize(10);
     pdf.setFont("times", "normal");
-    pdf.text(`Student: ${student.name || "N/A"}`, marginLeft, yPos); yPos += 6;
-    pdf.text(`Student ID: ${student.student_id || "N/A"}`, marginLeft, yPos); yPos += 6;
-    if (student.class_name) { pdf.text(`Class: ${student.class_name}`, marginLeft, yPos); yPos += 6; }
-    pdf.text(`Therapy Type: ${summaryData.therapyType || "N/A"}`, marginLeft, yPos); yPos += 6;
+    pdf.text(`Student: ${sanitizeText(student.name || "N/A")}`, marginLeft, yPos); yPos += 6;
+    pdf.text(`Student ID: ${sanitizeText(student.student_id || "N/A")}`, marginLeft, yPos); yPos += 6;
+    if (student.class_name) { pdf.text(`Class: ${sanitizeText(student.class_name)}`, marginLeft, yPos); yPos += 6; }
+    pdf.text(`Therapy Type: ${sanitizeText(summaryData.therapyType || "N/A")}`, marginLeft, yPos); yPos += 6;
     pdf.text(`Reports Analyzed: ${summaryData.reportCount || 0}`, marginLeft, yPos); yPos += 6;
     if (summaryData.dateRange) {
-      pdf.text(`Analysis Period: ${summaryData.dateRange.start || "N/A"} to ${summaryData.dateRange.end || "N/A"}`, marginLeft, yPos); yPos += 6;
+      pdf.text(`Analysis Period: ${sanitizeText(summaryData.dateRange.start || "N/A")} to ${sanitizeText(summaryData.dateRange.end || "N/A")}`, marginLeft, yPos); yPos += 6;
     }
     if (summaryData.generatedAt) {
-      pdf.text(`Generated: ${summaryData.generatedAt}`, marginLeft, yPos); yPos += 6;
+      pdf.text(`Generated: ${sanitizeText(summaryData.generatedAt)}`, marginLeft, yPos); yPos += 6;
     }
     yPos += 4;
 
@@ -3155,21 +3269,30 @@ const StudentPage = () => {
     const summariesDict = summaryData.summaries;
     if (summariesDict && typeof summariesDict === "object") {
       Object.entries(summariesDict).forEach(([heading, content]) => {
-        checkPageBreak(12);
+        checkPageBreak(14);
         pdf.setFontSize(11);
         pdf.setFont("times", "bold");
-        pdf.text(heading, marginLeft, yPos);
+        pdf.text(sanitizeText(heading), marginLeft, yPos);
         yPos += 6;
         pdf.setFontSize(10);
         pdf.setFont("times", "normal");
-        const lines = pdf.splitTextToSize(String(content || ""), contentWidth);
-        lines.forEach((line) => { checkPageBreak(6); pdf.text(line, marginLeft + 4, yPos); yPos += 5; });
+        const cleanContent = sanitizeText(content || "");
+        const lines = pdf.splitTextToSize(cleanContent, contentWidth);
+        lines.forEach((line) => {
+          checkPageBreak(5.5);
+          pdf.text(line, marginLeft + 4, yPos);
+          yPos += 5.5;
+        });
         yPos += 4;
       });
     } else {
-      const fallbackText = summaryData.summary || getUnifiedSummaryText(summaryData);
+      const fallbackText = sanitizeText(summaryData.summary || getUnifiedSummaryText(summaryData));
       const lines = pdf.splitTextToSize(fallbackText, contentWidth);
-      lines.forEach((line) => { checkPageBreak(6); pdf.text(line, marginLeft, yPos); yPos += 5; });
+      lines.forEach((line) => {
+        checkPageBreak(5.5);
+        pdf.text(line, marginLeft, yPos);
+        yPos += 5.5;
+      });
     }
 
     // Footer
@@ -3177,12 +3300,13 @@ const StudentPage = () => {
     for (let i = 1; i <= totalPages; i++) {
       pdf.setPage(i);
       pdf.setFontSize(8);
-      pdf.text(`Generated on: ${new Date().toLocaleString()}`, marginLeft, 287);
-      pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 40, 287);
+      pdf.text(`Generated on: ${new Date().toLocaleString()}`, marginLeft, pageHeight - 10);
+      pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 40, pageHeight - 10);
     }
 
+    const safeStudentId = sanitizeText(student.student_id || "student").replace(/[^a-zA-Z0-9_-]/g, "_");
     const safeDate = (summaryData.generatedAt || new Date().toISOString()).replace(/[/:, ]/g, "-").slice(0, 19);
-    pdf.save(`AI_Summary_${student.student_id || "student"}_${safeDate}.pdf`);
+    pdf.save(`AI_Summary_${safeStudentId}_${safeDate}.pdf`);
   };
 
   const [editMode, setEditMode] = useState(false);
@@ -5737,6 +5861,11 @@ const StudentPage = () => {
       };
 
       rows.forEach((row, rowIdx) => {
+        if (y + rowHeight > pageHeight - marginBottom) {
+          doc.addPage();
+          y = marginTop;
+          drawGroupedHeader();
+        }
         let x = marginLeft;
 
         visibleColumns.forEach((col, colIdx) => {
@@ -5995,7 +6124,7 @@ const StudentPage = () => {
       doc.setFontSize(12);
       doc.setFont("times", "normal");
 
-      const text = String(value || "");
+      const text = sanitizeText(value);
       const maxTextWidth = boxWidth - 4; // padding inside box
       const lines = text ? doc.splitTextToSize(text, maxTextWidth) : [""];
       const lineHeight = 6;
@@ -6138,7 +6267,7 @@ const StudentPage = () => {
     };
 
     const drawField = (label, value) => {
-      const text = String(value || "N/A");
+      const text = sanitizeText(value || "N/A");
       const lines = doc.splitTextToSize(text, valueColumnWidth - 4);
       const neededHeight = Math.max(
         defaultBoxHeight,
@@ -6449,10 +6578,11 @@ const StudentPage = () => {
       };
 
       const addText = (text, fontSize = 10, isBold = false) => {
+        const clean = sanitizeText(text);
         checkPageBreak(lineHeight + 2);
         doc.setFontSize(fontSize);
         doc.setFont("times", isBold ? "bold" : "normal");
-        const lines = doc.splitTextToSize(text, contentWidth);
+        const lines = doc.splitTextToSize(clean, contentWidth);
         lines.forEach((line) => {
           checkPageBreak(lineHeight);
           doc.text(line, leftMargin, y);
@@ -9670,6 +9800,26 @@ const StudentPage = () => {
                   {renderIepTermEditor("firstTerm", "FIRST TERM")}
                   {renderIepTermEditor("secondTerm", "SECOND TERM")}
 
+                  {(iepFormDraft.extraTerms || []).map((et, idx) =>
+                    renderIepTermEditor(
+                      `extra_${idx}`,
+                      et.title || `TERM ${idx + 3}`,
+                      true,
+                      () => removeExtraIepTerm(idx),
+                      (newTitle) => updateExtraTermTitle(idx, newTitle)
+                    )
+                  )}
+
+                  <div className="mb-8 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={addExtraIepTerm}
+                      className="px-6 py-2.5 rounded-xl bg-white text-[#E38B52] border-2 border-dashed border-[#E38B52] hover:bg-[#FFF3E8] font-semibold text-sm flex items-center gap-2 shadow-sm transition-all"
+                    >
+                      <span className="text-lg leading-none font-bold">+</span> Add Another Term (3rd Term, 4th Term, etc.)
+                    </button>
+                  </div>
+
                   <div className="mb-8 max-md:mb-5 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-[#170F49] mb-1">
@@ -9774,6 +9924,9 @@ const StudentPage = () => {
 
                   {renderIepTermView(iepFormViewRecord.firstTerm, "FIRST TERM")}
                   {renderIepTermView(iepFormViewRecord.secondTerm, "SECOND TERM")}
+                  {(iepFormViewRecord.extraTerms || []).map((et, idx) =>
+                    renderIepTermView(et.term, et.title || `TERM ${idx + 3}`)
+                  )}
 
                   <div className="mb-4 p-5 border-2 border-[#E38B52]/20 rounded-2xl bg-white/60 shadow-sm grid md:grid-cols-2 gap-4">
                     <div>
