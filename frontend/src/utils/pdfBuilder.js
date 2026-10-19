@@ -25,8 +25,8 @@ export const sanitizeText = (text) => {
     .replace(/\r/g, "\n")
     .replace(/\t/g, "    ")
     
-    // 2. Zero-width and invisible formatting characters
-    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, " ")
+    // 2. Zero-width, variation selectors and invisible formatting characters
+    .replace(/[\u200B-\u200D\uFEFF\u00A0\uFE00-\uFE0F]/g, "")
     
     // 3. Smart quotes & apostrophes (Word, Google Docs, iOS, Mac)
     .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
@@ -38,8 +38,8 @@ export const sanitizeText = (text) => {
     // 4. Dashes, hyphens & minus signs
     .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]/g, "-")
     
-    // 5. Bullets, list markers & corrupted bullet sequences (e.g. Word mojibake %ªþ or â€¢ or stray þ/ª)
-    .replace(/(?:\*|\s)*(?:%ªþ|%ª\s*þ|â€¢|Â·|[\u00FE\u00AA\uF0B7\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25CF\u25CB])+(?:\*|\s)*/g, "* ")
+    // 5. Bullets, list markers & corrupted bullet sequences (e.g. Word mojibake %ªþ or â€¢ or stray þ/ª or ▪️/•)
+    .replace(/(?:\*|\s)*(?:%ªþ|%ª\s*þ|â€¢|Â·|[\u00FE\u00DE\u00AA\uF0B7\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25CF\u25CB])+(?:\*|\s)*/g, "* ")
     .replace(/^(\s*\*)+/gm, "* ")
     .replace(/\*(\s*\*)+/g, "* ")
     .replace(/[\u2026]/g, "...")
