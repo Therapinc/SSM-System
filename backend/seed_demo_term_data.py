@@ -32,8 +32,8 @@ def seed_demo_data(target_student_id=None):
             print(f"Using existing Demo Test Student (ID: {student_id})")
         else:
             cur.execute("""
-                INSERT INTO students (name, roll_no, class_name, division, diagnosis, admission_number, academic_year)
-                VALUES ('Demo Test Student', 'DTS-01', 'Primary 1', 'A', 'Autism Spectrum Disorder with Mild ID', 'ADM-2026-99', '2026-2027')
+                INSERT INTO students (student_id, name, roll_no, class_name, division, diagnosis, admission_number, academic_year)
+                VALUES ('STU0038', 'Demo Test Student', 'DTS-01', 'Primary 1', 'A', 'Autism Spectrum Disorder with Mild ID', 'ADM-2026-99', '2026-2027')
                 RETURNING id, name;
             """)
             student_id, student_name = cur.fetchone()

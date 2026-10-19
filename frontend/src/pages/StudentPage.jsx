@@ -960,49 +960,119 @@ const StudentPage = () => {
 
   // Consolidated 6-Month / Semester Report Modal States
   const [showConsolidatedModal, setShowConsolidatedModal] = useState(false);
-  const [consolidatedPeriodPreset, setConsolidatedPeriodPreset] = useState("term_1"); // "term_1" | "term_2" | "full_year" | "custom"
-  const [consolidatedCustomFrom, setConsolidatedCustomFrom] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 6);
-    return d.toISOString().split("T")[0];
-  });
-  const [consolidatedCustomTo, setConsolidatedCustomTo] = useState(() => {
-    return new Date().toISOString().split("T")[0];
-  });
   const [generatingConsolidated, setGeneratingConsolidated] = useState(false);
+  const [showConsolidatedInfo, setShowConsolidatedInfo] = useState(false);
+  const [includeConsolidatedAi, setIncludeConsolidatedAi] = useState(true);
+  const [consolidatedAiStatus, setConsolidatedAiStatus] = useState("");
+
+  const academicMonthsList = useMemo(() => {
+    const y = Number(selectedYear || new Date().getFullYear());
+    return [
+      { key: `June ${y}`, name: "June", monthNum: 6, year: y, label: `June ${y}`, term: 1 },
+      { key: `July ${y}`, name: "July", monthNum: 7, year: y, label: `July ${y}`, term: 1 },
+      { key: `August ${y}`, name: "August", monthNum: 8, year: y, label: `August ${y}`, term: 1 },
+      { key: `September ${y}`, name: "September", monthNum: 9, year: y, label: `September ${y}`, term: 1 },
+      { key: `October ${y}`, name: "October", monthNum: 10, year: y, label: `October ${y}`, term: 1 },
+      { key: `November ${y}`, name: "November", monthNum: 11, year: y, label: `November ${y}`, term: 1 },
+      { key: `December ${y}`, name: "December", monthNum: 12, year: y, label: `December ${y}`, term: 2 },
+      { key: `January ${y + 1}`, name: "January", monthNum: 1, year: y + 1, label: `January ${y + 1}`, term: 2 },
+      { key: `February ${y + 1}`, name: "February", monthNum: 2, year: y + 1, label: `February ${y + 1}`, term: 2 },
+      { key: `March ${y + 1}`, name: "March", monthNum: 3, year: y + 1, label: `March ${y + 1}`, term: 2 },
+      { key: `April ${y + 1}`, name: "April", monthNum: 4, year: y + 1, label: `April ${y + 1}`, term: 2 },
+      { key: `May ${y + 1}`, name: "May", monthNum: 5, year: y + 1, label: `May ${y + 1}`, term: 2 },
+    ];
+  }, [selectedYear]);
+
+  // Indices into academicMonthsList: 0 = June, 5 = Nov, 6 = Dec, 11 = May
+  const [startMonthIdx, setStartMonthIdx] = useState(0);
+  const [endMonthIdx, setEndMonthIdx] = useState(5);
+
+  const handleSelectTermPreset = (termNumber) => {
+    if (termNumber === 1) {
+      setStartMonthIdx(0);
+      setEndMonthIdx(5);
+    } else {
+      setStartMonthIdx(6);
+      setEndMonthIdx(11);
+    }
+  };
+
+  const handleStartMonthChange = (idx) => {
+    const s = Math.max(0, Math.min(11, idx));
+    setStartMonthIdx(s);
+    if (endMonthIdx < s) {
+      setEndMonthIdx(Math.min(11, s + 5));
+    } else if (endMonthIdx - s > 5) {
+      setEndMonthIdx(s + 5);
+    }
+  };
+
+  const handleEndMonthChange = (idx) => {
+    const e = Math.max(0, Math.min(11, idx));
+    setEndMonthIdx(e);
+    if (startMonthIdx > e) {
+      setStartMonthIdx(Math.max(0, e - 5));
+    } else if (e - startMonthIdx > 5) {
+      setStartMonthIdx(e - 5);
+    }
+  };
+
+  const handleMonthChipClick = (idx) => {
+    if (idx < startMonthIdx) {
+      handleStartMonthChange(idx);
+    } else if (idx > endMonthIdx) {
+      handleEndMonthChange(idx);
+    } else {
+      const distToStart = idx - startMonthIdx;
+      const distToEnd = endMonthIdx - idx;
+      if (distToStart < distToEnd && (endMonthIdx - idx) <= 5) {
+        setStartMonthIdx(idx);
+      } else {
+        setEndMonthIdx(idx);
+      }
+    }
+  };
+
+  const isTerm1Preset = startMonthIdx === 0 && endMonthIdx === 5;
+  const isTerm2Preset = startMonthIdx === 6 && endMonthIdx === 11;
+  const selectedMonthsCount = endMonthIdx - startMonthIdx + 1;
+
+  const hasMonthData = (mItem) => {
+    if (!mItem) return false;
+    const hasIep = Boolean(savedIepByMonth?.[mItem.key]);
+    const hasTherapy = (rawReports || []).some((r) => {
+      if (!r.report_date) return false;
+      const d = new Date(r.report_date);
+      return d.getFullYear() === mItem.year && (d.getMonth() + 1) === mItem.monthNum;
+    });
+    return hasIep || hasTherapy;
+  };
 
   const consolidatedPeriodInfo = useMemo(() => {
-    const cYear = selectedYear || new Date().getFullYear();
-    if (consolidatedPeriodPreset === "term_1") {
-      return {
-        title: `Term 1 / Semester 1 (${cYear})`,
-        fromDate: `${cYear}-06-01`,
-        toDate: `${cYear}-11-30`,
-        academicYear: `${cYear}-${Number(cYear) + 1}`,
-      };
-    } else if (consolidatedPeriodPreset === "term_2") {
-      return {
-        title: `Term 2 / Semester 2 (${Number(cYear) + 1})`,
-        fromDate: `${cYear}-12-01`,
-        toDate: `${Number(cYear) + 1}-05-31`,
-        academicYear: `${cYear}-${Number(cYear) + 1}`,
-      };
-    } else if (consolidatedPeriodPreset === "full_year") {
-      return {
-        title: `Full Academic Year (${cYear}-${Number(cYear) + 1})`,
-        fromDate: `${cYear}-06-01`,
-        toDate: `${Number(cYear) + 1}-05-31`,
-        academicYear: `${cYear}-${Number(cYear) + 1}`,
-      };
-    } else {
-      return {
-        title: `Consolidated Evaluation (${consolidatedCustomFrom || "Start"} to ${consolidatedCustomTo || "End"})`,
-        fromDate: consolidatedCustomFrom,
-        toDate: consolidatedCustomTo,
-        academicYear: `${cYear}-${Number(cYear) + 1}`,
-      };
+    const sMonth = academicMonthsList[startMonthIdx] || academicMonthsList[0];
+    const eMonth = academicMonthsList[endMonthIdx] || academicMonthsList[5];
+    const sYear = sMonth.year;
+    const eYear = eMonth.year;
+
+    const lastDay = new Date(eYear, eMonth.monthNum, 0).getDate();
+    const fromDate = `${sYear}-${String(sMonth.monthNum).padStart(2, "0")}-01`;
+    const toDate = `${eYear}-${String(eMonth.monthNum).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+    let titleLabel = `${sMonth.name} ${sYear} to ${eMonth.name} ${eYear}`;
+    if (startMonthIdx === 0 && endMonthIdx === 5) {
+      titleLabel = `Term 1 / Semester 1 (${sMonth.name} – ${eMonth.name} ${sYear})`;
+    } else if (startMonthIdx === 6 && endMonthIdx === 11) {
+      titleLabel = `Term 2 / Semester 2 (${sMonth.name} ${sYear} – ${eMonth.name} ${eYear})`;
     }
-  }, [consolidatedPeriodPreset, selectedYear, consolidatedCustomFrom, consolidatedCustomTo]);
+
+    const cYear = selectedYear || new Date().getFullYear();
+    return {
+      title: titleLabel,
+      fromDate,
+      toDate,
+      academicYear: `${cYear}-${Number(cYear) + 1}`,
+    };
+  }, [startMonthIdx, endMonthIdx, academicMonthsList, selectedYear]);
 
   const consolidatedStats = useMemo(() => {
     const fromD = consolidatedPeriodInfo.fromDate ? new Date(consolidatedPeriodInfo.fromDate) : null;
@@ -1040,6 +1110,44 @@ const StudentPage = () => {
   const handleGenerateConsolidatedReport = async () => {
     try {
       setGeneratingConsolidated(true);
+      let aiSummary = null;
+
+      if (includeConsolidatedAi) {
+        setConsolidatedAiStatus("Synthesizing multi-disciplinary data with AI...");
+        try {
+          const baseUrl = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+          const token = localStorage.getItem("token");
+          const payload = {
+            student_id: String(student?.studentId || student?.id || id),
+            from_date: consolidatedPeriodInfo.fromDate,
+            to_date: consolidatedPeriodInfo.toDate,
+            period_title: consolidatedPeriodInfo.title,
+            therapy_reports: rawReports || [],
+            monthly_iep_data: savedIepByMonth || {},
+            iep_goals: iepFormRecords || [],
+            facp_summary: savedTables || [],
+          };
+          const res = await fetch(`${baseUrl}/api/v1/therapy-reports/consolidated-summary/ai`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            aiSummary = await res.json();
+            console.log("AI Multi-Disciplinary Summary received successfully:", aiSummary);
+          } else {
+            const errText = await res.text();
+            console.error("AI synthesis returned error:", res.status, errText);
+          }
+        } catch (aiErr) {
+          console.error("AI synthesis request failed:", aiErr);
+        }
+      }
+
+      setConsolidatedAiStatus("Rendering publication-grade PDF...");
       await generateConsolidatedReportPDF({
         student,
         period: consolidatedPeriodInfo,
@@ -1047,6 +1155,7 @@ const StudentPage = () => {
         savedIepByMonth: savedIepByMonth || {},
         iepProgramRecords: iepFormRecords || [],
         savedTables: savedTables || [],
+        aiSummary,
       });
       showToast("Consolidated report generated and downloaded successfully!", "success");
       setShowConsolidatedModal(false);
@@ -1055,6 +1164,7 @@ const StudentPage = () => {
       showToast("Failed to generate consolidated report. Please try again.", "error");
     } finally {
       setGeneratingConsolidated(false);
+      setConsolidatedAiStatus("");
     }
   };
 
@@ -14935,55 +15045,138 @@ const StudentPage = () => {
               {/* Evaluation Span Selection */}
               <div>
                 <label className="block text-sm font-bold text-[#170F49] mb-2">
-                  Select Evaluation Period:
+                  1. Quick Choose Term (6-Month Semester):
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { id: "term_1", label: "Term 1 (Jun - Nov)", desc: "Semester 1" },
-                    { id: "term_2", label: "Term 2 (Dec - May)", desc: "Semester 2" },
-                    { id: "full_year", label: "Full Year (Jun - May)", desc: "Academic Year" },
-                    { id: "custom", label: "Custom Range", desc: "Select dates" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setConsolidatedPeriodPreset(opt.id)}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                        consolidatedPeriodPreset === opt.id
-                          ? "border-[#E38B52] bg-[#E38B52]/10 ring-2 ring-[#E38B52]/30 shadow-sm"
-                          : "border-gray-200 bg-white hover:border-gray-300"
-                      }`}
-                    >
-                      <div className="font-bold text-xs md:text-sm text-[#170F49]">{opt.label}</div>
-                      <div className="text-[11px] text-gray-500 mt-0.5">{opt.desc}</div>
-                    </button>
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTermPreset(1)}
+                    className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                      isTerm1Preset
+                        ? "border-[#E38B52] bg-[#FFF5EE] shadow-md ring-2 ring-[#E38B52]/20"
+                        : "border-gray-200 bg-white hover:border-[#E38B52]/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-[#170F49]">⭐️ Term 1 (June – November)</span>
+                      {isTerm1Preset && (
+                        <span className="text-[10px] bg-[#E38B52] text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                          Selected
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Semester 1 (6 Months)</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTermPreset(2)}
+                    className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                      isTerm2Preset
+                        ? "border-[#E38B52] bg-[#FFF5EE] shadow-md ring-2 ring-[#E38B52]/20"
+                        : "border-gray-200 bg-white hover:border-[#E38B52]/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-[#170F49]">⭐️ Term 2 (December – May)</span>
+                      {isTerm2Preset && (
+                        <span className="text-[10px] bg-[#E38B52] text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                          Selected
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Semester 2 (6 Months)</p>
+                  </button>
+                </div>
+
+                {/* Fine-tune Months: Dropdowns & Month Pills */}
+                <div className="bg-[#FAF9F6] border border-gray-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-[#170F49] uppercase tracking-wider">
+                      2. Included Months ({selectedMonthsCount} / 6 Max):
+                    </span>
+                    <span className="text-[11px] text-[#6F6C90]">
+                      Adjust months below if your term dates differ (up to 6 months)
+                    </span>
+                  </div>
+
+                  {/* Dropdowns */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Starting Month:</label>
+                      <select
+                        value={startMonthIdx}
+                        onChange={(e) => handleStartMonthChange(Number(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-sm font-medium text-[#170F49] focus:ring-2 focus:ring-[#E38B52]"
+                      >
+                        {academicMonthsList.map((m, idx) => (
+                          <option key={m.key} value={idx}>
+                            {m.label} {hasMonthData(m) ? "✓ (Data Saved)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Ending Month:</label>
+                      <select
+                        value={endMonthIdx}
+                        onChange={(e) => handleEndMonthChange(Number(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-sm font-medium text-[#170F49] focus:ring-2 focus:ring-[#E38B52]"
+                      >
+                        {academicMonthsList.map((m, idx) => {
+                          const tooFar = idx - startMonthIdx > 5;
+                          const tooEarly = idx < startMonthIdx;
+                          return (
+                            <option key={m.key} value={idx} disabled={tooEarly || tooFar}>
+                              {m.label} {hasMonthData(m) ? "✓ (Data Saved)" : ""} {tooFar ? "(Exceeds 6 mo limit)" : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Visual Month Pills */}
+                  <div>
+                    <div className="text-[11px] text-gray-500 mb-1.5 font-medium flex items-center justify-between">
+                      <span>Click any month to include or remove it:</span>
+                      <span className="text-emerald-700 font-semibold flex items-center gap-1 text-[10px]">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Green badge = reports saved for this student
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                      {academicMonthsList.map((m, idx) => {
+                        const inRange = idx >= startMonthIdx && idx <= endMonthIdx;
+                        const hasData = hasMonthData(m);
+                        return (
+                          <button
+                            key={m.key}
+                            type="button"
+                            onClick={() => handleMonthChipClick(idx)}
+                            className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all flex flex-col items-center justify-center relative cursor-pointer border ${
+                              inRange
+                                ? "bg-gradient-to-r from-[#E38B52] to-[#f29359] text-white shadow-sm border-transparent scale-[1.02]"
+                                : "bg-white text-gray-700 border-gray-200 hover:border-[#E38B52]/50"
+                            }`}
+                            title={`${m.label}${hasData ? ' - Records found' : ''}`}
+                          >
+                            <span>{m.name}</span>
+                            {hasData ? (
+                              <span className={`text-[9px] mt-0.5 px-1 rounded font-bold ${
+                                inRange ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
+                              }`}>
+                                ✓ Data
+                              </span>
+                            ) : (
+                              <span className="text-[9px] mt-0.5 opacity-0">-</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* Custom Date Pickers if custom selected */}
-              {consolidatedPeriodPreset === "custom" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">From Date:</label>
-                    <input
-                      type="date"
-                      value={consolidatedCustomFrom}
-                      onChange={(e) => setConsolidatedCustomFrom(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">To Date:</label>
-                    <input
-                      type="date"
-                      value={consolidatedCustomTo}
-                      onChange={(e) => setConsolidatedCustomTo(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                    />
-                  </div>
-                </div>
-              )}
 
               {/* Data Inventory & Dynamic Support Overview */}
               <div>
@@ -15010,25 +15203,63 @@ const StudentPage = () => {
                 </div>
               </div>
 
-              {/* Graceful Consolidation Notice */}
-              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-800">
-                <svg className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <span className="font-bold block text-emerald-900">Seamless Partial-Span Intelligence:</span>
-                  Even if only 1, 2, or 3 months are presently recorded, the generator automatically adapts and synthesizes all available multi-disciplinary data into a unified, publication-grade document without gaps or blank pages.
+              {/* AI Multi-Disciplinary Synthesis Toggle */}
+              <div className="p-3 bg-gradient-to-r from-orange-50/70 to-amber-50/70 border border-orange-200/80 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#E38B52] text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+                    ✨
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                      AI Multi-Disciplinary Clinical Synthesis
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">Gemini Powered</span>
+                    </div>
+                    <div className="text-[11px] text-gray-500">
+                      Synthesizes 6-month therapy progress, interdisciplinary synergy, and next term targets.
+                    </div>
+                  </div>
                 </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeConsolidatedAi}
+                    onChange={(e) => setIncludeConsolidatedAi(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#E38B52]"></div>
+                </label>
               </div>
 
-              {/* Report Structure Checklist */}
-              <div className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-xl p-3 space-y-1">
-                <div className="font-semibold text-gray-800 mb-1">The generated PDF will include:</div>
-                <div className="flex items-center gap-1.5">✓ Official St. Martha's Institution Banner & Student Demographics</div>
-                <div className="flex items-center gap-1.5">✓ Multi-Disciplinary Therapy Progress (Physiotherapy, Speech, OT, Behavioral)</div>
-                <div className="flex items-center gap-1.5">✓ Activities of Daily Living (ADL), Academic & Behavioral Trimester Summaries</div>
-                <div className="flex items-center gap-1.5">✓ IEP Milestone Objectives Status & Functional FACP Masteries</div>
-                <div className="flex items-center gap-1.5">✓ Signatures: Class Teacher, Special Educator, Head of Therapy, Principal</div>
+              {/* Expandable Information (Small "i" Toggle) */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowConsolidatedInfo((prev) => !prev)}
+                  className="inline-flex items-center gap-2 text-xs font-semibold text-[#E38B52] hover:text-[#c46f38] transition-colors cursor-pointer bg-[#FFF5EE] px-3 py-1.5 rounded-xl border border-[#E38B52]/20 shadow-sm"
+                >
+                  <span className="w-4 h-4 rounded-full bg-[#E38B52] text-white flex items-center justify-center text-[10px] font-bold">
+                    i
+                  </span>
+                  <span>{showConsolidatedInfo ? "Hide report details & structure" : "What is included in this report? (Click for info)"}</span>
+                </button>
+
+                {showConsolidatedInfo && (
+                  <div className="mt-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-3 animate-in fade-in duration-150">
+                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 flex items-start gap-2">
+                      <span className="font-bold text-emerald-800 shrink-0">✓ Partial-Span Intelligence:</span>
+                      <span>Even if only 1, 2, or 3 months are presently recorded, the generator automatically adapts and synthesizes all available multi-disciplinary data into a unified, publication-grade document without gaps or blank pages.</span>
+                    </div>
+
+                    <div className="space-y-1 text-gray-700 pl-0.5">
+                      <div className="font-bold text-gray-900 mb-1">The generated PDF will include:</div>
+                      <div className="flex items-center gap-1.5">✓ Official St. Martha's Institution Banner & Student Demographics</div>
+                      <div className="flex items-center gap-1.5">✓ Multi-Disciplinary Therapy Progress (Physiotherapy, Speech, OT, Behavioral)</div>
+                      <div className="flex items-center gap-1.5">✓ Activities of Daily Living (ADL), Academic & Behavioral Trimester Summaries</div>
+                      <div className="flex items-center gap-1.5">✓ IEP Milestone Objectives Status & Functional FACP Masteries</div>
+                      <div className="flex items-center gap-1.5">✓ Signatures: Class Teacher, Special Educator, Head of Therapy, Principal</div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -15054,7 +15285,7 @@ const StudentPage = () => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    <span>Generating Report...</span>
+                    <span>{consolidatedAiStatus || "Generating Report..."}</span>
                   </>
                 ) : (
                   <>

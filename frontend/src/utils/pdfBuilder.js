@@ -66,12 +66,17 @@ export const sanitizeText = (text) => {
     
     // 8. Emojis and surrogate pairs (convert or strip so jsPDF doesn't render garbage/crash)
     .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, "")
-    
+
     // 9. Non-printable control characters (except newline \n)
     // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, "")
-    
-    // 10. Collapse excessive blank lines
+
+    // 10. Non-Latin Indic scripts (Malayalam, Devanagari, Tamil, etc.) that corrupt into WinAnsi mojibake (e.g. Ø5Ý×) in standard jsPDF fonts
+    .replace(/[\u0900-\u0D7F]+/g, "")
+    .replace(/^[ \t]*:[ \t]*/gm, "")
+    .replace(/\n[ \t]*:[ \t]*/g, "\n")
+
+    // 11. Collapse excessive blank lines
     .replace(/\n{4,}/g, "\n\n\n");
 };
 
@@ -172,15 +177,16 @@ export class PdfBuilder {
   addHeading(title, opts = {}) {
     const fontSize = opts.fontSize ?? this.fontSize + 3;
     const gapBefore = opts.gapBefore ?? this.lineHeight;
-    const gapAfter = opts.gapAfter ?? this.lineHeight * 0.8;
+    const gapAfter = opts.gapAfter ?? (this.lineHeight * 0.6);
 
-    this.ensureSpace(gapBefore + fontSize * 0.5 + gapAfter);
+    this.ensureSpace(gapBefore + fontSize + gapAfter);
     this.y += gapBefore;
 
     this.doc.setFontSize(fontSize);
     this.doc.setFont(this.fontFamily, "bold");
     this.doc.text(sanitizeText(title), this.margins.left, this.y);
-    this.y += gapAfter;
+    // Crucial: advance y past the heading font height plus the bottom gap
+    this.y += fontSize + gapAfter;
   }
 
   /**
@@ -188,12 +194,16 @@ export class PdfBuilder {
    */
   addSubHeading(title, opts = {}) {
     const fontSize = opts.fontSize ?? this.fontSize + 1;
-    this.ensureSpace(this.lineHeight * 2);
-    this.y += 4;
+    const gapBefore = opts.gapBefore ?? 8;
+    const gapAfter = opts.gapAfter ?? 5;
+
+    this.ensureSpace(gapBefore + fontSize + gapAfter);
+    this.y += gapBefore;
+
     this.doc.setFontSize(fontSize);
     this.doc.setFont(this.fontFamily, "bold");
     this.doc.text(sanitizeText(title), this.margins.left, this.y);
-    this.y += this.lineHeight + 1;
+    this.y += fontSize + gapAfter;
     this.doc.setFont(this.fontFamily, "normal");
   }
 
@@ -351,12 +361,15 @@ export class PdfBuilder {
       this.doc.setFont(this.fontFamily, "normal");
       this.doc.setTextColor(120, 120, 120);
       const footerY = this.pageH - this.margins.bottom * 0.5;
-      if (leftText) {
+      if (leftText && typeof leftText === "string") {
         this.doc.text(leftText, this.margins.left, footerY);
       }
       if (rightText !== false) {
+        const pageLabel = (typeof rightText === "string" && rightText)
+          ? rightText
+          : `Page ${i} of ${totalPages}`;
         this.doc.text(
-          rightText ?? `Page ${i} of ${totalPages}`,
+          pageLabel,
           this.pageW - this.margins.right,
           footerY,
           { align: "right" }

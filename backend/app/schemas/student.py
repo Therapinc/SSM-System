@@ -181,7 +181,7 @@ class StudentUpdate(StudentBase):
 # Lightweight schema for list / dashboard endpoints (no photo bytes, no wide fields).
 class StudentListItem(BaseModel):
     id: int
-    student_id: str
+    student_id: Optional[str] = None
     name: Optional[str] = None
     age: Optional[int] = None
     class_name: Optional[str] = None
