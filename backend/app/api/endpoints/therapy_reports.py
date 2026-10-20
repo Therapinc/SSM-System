@@ -133,8 +133,8 @@ def _populate_therapist_names(db: Session, reports: List[Any]):
 def _get_therapist_specialization(db: Session, email: str) -> Optional[str]:
     from app.models.therapist import Therapist
     from sqlalchemy import func
-    therapist = db.query(Therapist).filter(func.lower(Therapist.email) == email.lower()).first()
-    return therapist.specialization if therapist else None
+    row = db.query(Therapist.specialization).filter(func.lower(Therapist.email) == email.lower()).first()
+    return row[0] if row else None
 
 
 def _normalize_therapy_type(t_type: Optional[str]) -> str:
@@ -999,13 +999,19 @@ async def consolidated_ai_summary(
     # 1. Fetch student
     db_student = (
         db.query(Student)
+        .options(load_only(Student.id, Student.name, Student.disability_type))
         .filter(Student.student_id == payload.student_id)
         .first()
     )
     if not db_student:
         try:
             s_id = int(payload.student_id)
-            db_student = db.query(Student).filter(Student.id == s_id).first()
+            db_student = (
+                db.query(Student)
+                .options(load_only(Student.id, Student.name, Student.disability_type))
+                .filter(Student.id == s_id)
+                .first()
+            )
         except ValueError:
             pass
 

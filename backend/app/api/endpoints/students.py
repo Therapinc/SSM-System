@@ -47,20 +47,40 @@ def _serialize_student_with_photo(student_obj) -> Dict[str, Any]:
 
 def _get_student_documents_metadata(db: Session, student_id: int) -> List[Dict[str, Any]]:
     from app.models.student import StudentDocument
-    from sqlalchemy.orm import defer
-    docs = db.query(StudentDocument).options(defer(StudentDocument.file_data)).filter(StudentDocument.student_id == student_id).all()
+    from sqlalchemy import case, literal
+
+    direct_url = case(
+        (StudentDocument.file_data.like("http%"), StudentDocument.file_data),
+        else_=literal(None),
+    ).label("direct_url")
+
+    rows = (
+        db.query(
+            StudentDocument.id,
+            StudentDocument.name,
+            StudentDocument.document_type,
+            StudentDocument.document_label,
+            StudentDocument.content_type,
+            StudentDocument.upload_date,
+            StudentDocument.file_size,
+            direct_url,
+        )
+        .filter(StudentDocument.student_id == student_id)
+        .all()
+    )
+
     return [
         {
-            "id": doc.id,
-            "name": doc.name,
-            "documentType": doc.document_type,
-            "documentLabel": doc.document_label,
-            "content_type": doc.content_type,
-            "file_url": doc.file_data if (doc.file_data and (doc.file_data.startswith("http://") or doc.file_data.startswith("https://"))) else f"/api/v1/students/{student_id}/documents/{doc.id}",
-            "upload_date": doc.upload_date.isoformat() if doc.upload_date else None,
-            "file_size": doc.file_size
+            "id": row.id,
+            "name": row.name,
+            "documentType": row.document_type,
+            "documentLabel": row.document_label,
+            "content_type": row.content_type,
+            "file_url": row.direct_url if row.direct_url else f"/api/v1/students/{student_id}/documents/{row.id}",
+            "upload_date": row.upload_date.isoformat() if row.upload_date else None,
+            "file_size": row.file_size,
         }
-        for doc in docs
+        for row in rows
     ]
 
 # --------------------------------------------------------------------
@@ -189,7 +209,7 @@ def upsert_case_record(
     """
     Create/update a student's case record.
     """
-    db_student = crud_student.get(db, id=student_id)
+    db_student = crud_student.get_deferred(db, id=student_id, defer_columns=["photo", "documents"])
     if db_student is None:
         raise HTTPException(status_code=404, detail="Student not found")
     updated = crud_student.update_case_record(db=db, db_obj=db_student, case_record=case_record)
@@ -204,7 +224,7 @@ def read_student(
     """
     Get a specific student by ID, including a photo URL if available.
     """
-    db_student = crud_student.get_deferred(db, id=student_id, defer_columns=["documents"])
+    db_student = crud_student.get_deferred(db, id=student_id, defer_columns=["photo", "documents"])
     if db_student is None:
         raise HTTPException(status_code=404, detail="Student not found")
 
@@ -225,7 +245,7 @@ def upload_student_photo(
     """
     Upload and update a student's photo.
     """
-    db_student = crud_student.get(db, id=student_id)
+    db_student = crud_student.get_deferred(db, id=student_id, defer_columns=["photo", "documents"])
     if not db_student:
         raise HTTPException(status_code=404, detail="Student not found")
 
@@ -265,7 +285,7 @@ def delete_student_photo(
     """
     Remove/delete a student's photo.
     """
-    db_student = crud_student.get(db, id=student_id)
+    db_student = crud_student.get_deferred(db, id=student_id, defer_columns=["photo", "documents"])
     if not db_student:
         raise HTTPException(status_code=404, detail="Student not found")
 
@@ -295,7 +315,7 @@ def update_student(
     """
     Update a student's information.
     """
-    db_student = crud_student.get(db, id=student_id)
+    db_student = crud_student.get_deferred(db, id=student_id, defer_columns=["photo", "documents"])
     if db_student is None:
         raise HTTPException(status_code=404, detail="Student not found")
 

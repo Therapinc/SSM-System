@@ -28,5 +28,5 @@ class Therapist(Base):
     assigned_students = relationship(
         "Student",
         secondary=therapist_student_assignments,
-        lazy="selectin",
+        lazy="noload",
     )

@@ -5042,7 +5042,7 @@ const StudentPage = () => {
       if (Array.isArray(finalSpecTables)) {
         const normalized = finalSpecTables.map((t) => ({
           ...t,
-          isEditable: t.isEditable === true,
+          isEditable: false,
           assessment_phase: t.assessment_phase || getHighestFilledPhase(t),
           last_edited_at: t.last_edited_at || null,
           table_year: t.table_year || (t.report_date ? new Date(t.report_date).getFullYear() : null),
@@ -10298,14 +10298,6 @@ const StudentPage = () => {
                             e.preventDefault();
                             e.stopPropagation();
 
-                            // Block opening another table when a different table has unsaved edits
-                            if (warnIfUnsavedOther(tableIndex, "opening this table")) return;
-
-                            if (table.isEditable) {
-                              showToast("Save the table before closing it", "warning");
-                              return;
-                            }
-
                             setShowTableDetails((prev) => ({
                               ...prev,
                               [tableIndex]: !prev[tableIndex],
@@ -10328,27 +10320,6 @@ const StudentPage = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-
-                                if (warnIfUnsavedOther(tableIndex, "opening this table")) return;
-
-                               if (table.isEditable) {
-                                 if (!tableHasModifications) {
-                                   handleSetTableEditable(table, false);
-                                   setShowTableDetails((prev) => ({
-                                     ...prev,
-                                     [tableIndex]: !prev[tableIndex],
-                                   }));
-                                   return;
-                                 }
-                                 setPulsatingEditButton({ [tableIndex]: true });
-                                 setTimeout(() => setPulsatingEditButton({}), 3500);
-                                 const saveBtn = document.getElementById(`spec-table-save-btn-${tableIndex}`);
-                                 if (saveBtn) {
-                                   saveBtn.scrollIntoView({ behavior: "smooth", block: "center" });
-                                 }
-                                 showToast("Click the Save button below to save your changes!", "warning");
-                                 return;
-                               }
 
                                 setShowTableDetails((prev) => ({
                                   ...prev,
