@@ -131,6 +131,33 @@ const AddStudent = () => {
   const [activeEducationSubsection, setActiveEducationSubsection] =
     useState("self-help");
 
+  // Auto-center active pills on mobile when switching sections or subsections
+  useEffect(() => {
+    const pill = document.querySelector(`[data-pill-id="${activeCaseSection}"]`);
+    if (pill) {
+      const container = pill.closest('[data-pills-container]');
+      if (container) {
+        const btnLeft = pill.offsetLeft;
+        const btnWidth = pill.offsetWidth;
+        const containerWidth = container.offsetWidth;
+        container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+      }
+    }
+  }, [activeCaseSection]);
+
+  useEffect(() => {
+    const pill = document.querySelector(`[data-subpill-id="${activeEducationSubsection}"]`);
+    if (pill) {
+      const container = pill.closest('[data-subpills-container]');
+      if (container) {
+        const btnLeft = pill.offsetLeft;
+        const btnWidth = pill.offsetWidth;
+        const containerWidth = container.offsetWidth;
+        container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+      }
+    }
+  }, [activeEducationSubsection]);
+
   const [isSaving, setIsSaving] = useState(false);
   const [savedStudent, setSavedStudent] = useState(null); // store created/selected student
   // eslint-disable-next-line
@@ -989,19 +1016,84 @@ const AddStudent = () => {
     "Physical Deformity": "physical_deformity",
   };
 
+  const handleNextSection = (targetSectionId) => {
+    setActiveCaseSection(targetSectionId);
+    setTimeout(() => {
+      if (mainContentRef.current) {
+        mainContentRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        window.scrollTo({ top: 350, behavior: "smooth" });
+      }
+    }, 50);
+  };
+
+  const renderSectionNav = (currentSectionId) => {
+    const sections = [
+      { id: "identification", label: "Identification Data" },
+      { id: "demographic", label: "Demographic Data" },
+      { id: "contact", label: "Contact Information" },
+      { id: "family", label: "Family History" },
+      { id: "additional", label: "Additional Information" },
+      { id: "education", label: "Educational History" },
+      { id: "medical", label: "Medical History" },
+    ];
+    const currentIndex = sections.findIndex((s) => s.id === currentSectionId);
+    const prevSection = currentIndex > 0 ? sections[currentIndex - 1] : null;
+    const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex + 1] : null;
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 mt-8 border-t border-[#E38B52]/20">
+        {prevSection ? (
+          <button
+            type="button"
+            onClick={() => handleNextSection(prevSection.id)}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-[#E38B52]/40 bg-white/70 hover:bg-orange-50 text-[#170F49] font-medium text-xs sm:text-sm transition-all shadow-sm hover:shadow active:scale-95"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back: {prevSection.label}</span>
+          </button>
+        ) : (
+          <div className="hidden sm:block" />
+        )}
+
+        {nextSection ? (
+          <button
+            type="button"
+            onClick={() => handleNextSection(nextSection.id)}
+            className="w-full sm:w-auto ml-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#E38B52] to-[#F58540] hover:from-[#d27a43] hover:to-[#e07532] text-white font-semibold text-xs sm:text-sm transition-all shadow-md hover:shadow-lg active:scale-95"
+          >
+            <span>Next: {nextSection.label}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        ) : (
+          <div className="w-full sm:w-auto ml-auto flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-[#E38B52] bg-orange-50/80 px-4 py-2.5 rounded-xl border border-[#E38B52]/20">
+            <span>Completed all sections — Save below</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen w-full flex flex-col items-center bg-[#f7f7f7] relative py-20">
       {showPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-          <div className="bg-white px-8 py-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-fade-in min-w-[350px]">
+          <div className="bg-white p-6 sm:px-8 sm:py-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 animate-fade-in w-full max-w-sm mx-4 md:min-w-[350px]">
             <div className="text-green-600 text-2xl font-bold">Success!</div>
             <div className="text-gray-700 text-lg text-center">
               Student details have been saved.
             </div>
-            <div className="flex gap-4 mt-4">
+            <div className="flex flex-col sm:flex-row gap-3 mt-4 w-full sm:w-auto">
               {/* Button to Fill Case Record */}
               <button
-                className="bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold text-lg hover:bg-blue-600 transition-all duration-200 shadow-md"
+                className="w-full sm:w-auto bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold text-base sm:text-lg hover:bg-blue-600 transition-all duration-200 shadow-md text-center"
                 onClick={() => {
                   setShowPopup(false);
                   setActiveTab("case-record");
@@ -1011,7 +1103,7 @@ const AddStudent = () => {
               </button>
               {/* Button to Go to List */}
               <button
-                className="bg-[#E38B52] text-white px-6 py-3 rounded-xl font-semibold text-lg hover:bg-[#C8742F] transition-all duration-200 shadow-md"
+                className="w-full sm:w-auto bg-[#E38B52] text-white px-6 py-3 rounded-xl font-semibold text-base sm:text-lg hover:bg-[#C8742F] transition-all duration-200 shadow-md text-center"
                 onClick={() => {
                   setShowPopup(false);
                   navigate("/headmaster");
@@ -2025,19 +2117,37 @@ const AddStudent = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Next Tab Navigation */}
+                <div className="flex justify-end pt-6 mt-8 border-t border-[#E38B52]/20">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("case-record");
+                      window.scrollTo({ top: 350, behavior: "smooth" });
+                    }}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#E38B52] to-[#F58540] hover:from-[#d27a43] hover:to-[#e07532] text-white font-semibold text-sm transition-all shadow-md hover:shadow-lg active:scale-95"
+                  >
+                    <span>Proceed to Case Record</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
             <div className="flex flex-col md:flex-row gap-6 items-start justify-center relative max-w-[1600px] mx-auto w-full" ref={mainContentRef}>
               {/* Left Sidebar Navigation */}
-              <aside className="w-full md:w-64 flex-shrink-0 sticky top-5 self-start z-30">
+              {/* Left Sidebar Navigation - Desktop Only */}
+              <aside className="hidden md:block w-64 flex-shrink-0 sticky top-5 self-start z-30">
                 <div
-                  className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-4 md:p-6 border border-white/20 w-full md:w-64 max-h-[45vh] md:max-h-[calc(100vh-40px)] overflow-y-auto overflow-x-auto"
+                  className="bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-6 border border-white/20 w-64 max-h-[calc(100vh-40px)] overflow-y-auto"
                 >
-                  <h3 className="text-base md:text-lg font-bold text-[#170F49] mb-3 md:mb-6 pb-2 md:pb-3 border-b border-[#E38B52]/20">
+                  <h3 className="text-lg font-bold text-[#170F49] mb-6 pb-3 border-b border-[#E38B52]/20">
                     Case Record Sections
                   </h3>
-                  <nav className="flex flex-row md:flex-col overflow-x-auto gap-2 pb-2 md:pb-0 md:space-y-2 no-scrollbar">
+                  <nav className="flex flex-col space-y-2">
                     {[
                       {
                         id: "identification",
@@ -2183,7 +2293,7 @@ const AddStudent = () => {
                       <button
                         key={section.id}
                         onClick={() => setActiveCaseSection(section.id)}
-                        className={`w-auto md:w-full flex-shrink-0 text-left px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-3 whitespace-nowrap ${
+                        className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-300 flex items-center gap-3 whitespace-nowrap ${
                           activeCaseSection === section.id
                             ? "bg-[#E38B52] text-white shadow-lg"
                             : "bg-white/50 text-[#170F49] hover:bg-white/80"
@@ -2206,6 +2316,44 @@ const AddStudent = () => {
                   </nav>
                 </div>
               </aside>
+
+              {/* Mobile Case Record Section Selector Pills */}
+              <div className="md:hidden w-full overflow-x-auto pb-2 hide-scrollbar mb-2" data-pills-container>
+                <div className="flex gap-2 min-w-max px-1">
+                  {[
+                    { id: "identification", label: "Identification" },
+                    { id: "demographic", label: "Demographic" },
+                    { id: "contact", label: "Contact Info" },
+                    { id: "family", label: "Family History" },
+                    { id: "additional", label: "Additional Info" },
+                    { id: "education", label: "Special Ed." },
+                    { id: "medical", label: "Medical Info" },
+                  ].map((section) => (
+                    <button
+                      key={section.id}
+                      data-pill-id={section.id}
+                      onClick={(e) => {
+                        setActiveCaseSection(section.id);
+                        const btn = e.currentTarget;
+                        const container = btn.closest('[data-pills-container]');
+                        if (container) {
+                          const btnLeft = btn.offsetLeft;
+                          const btnWidth = btn.offsetWidth;
+                          const containerWidth = container.offsetWidth;
+                          container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+                        }
+                      }}
+                      className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+                        activeCaseSection === section.id
+                          ? "bg-[#E38B52] text-white shadow-md"
+                          : "bg-white/70 text-[#170F49] border border-gray-200"
+                      }`}
+                    >
+                      {section.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Right Content Area */}
               <div className="flex-1 w-full max-w-[1100px]" ref={mainContentRef}>
@@ -2403,6 +2551,7 @@ const AddStudent = () => {
                         ))}
                       </div>
                     </div>
+                    {renderSectionNav("identification")}
                   </div>
                 )}
                 {/* Demographic Data */}
@@ -2588,7 +2737,7 @@ const AddStudent = () => {
                       </div>
                     </div>
 
-                    {/* Present Complaints & Previous Treatments (moved to Contact Information) */}
+                    {renderSectionNav("demographic")}
                   </div>
                 )}{" "}
                 {/* Contact Information */}
@@ -2680,6 +2829,7 @@ const AddStudent = () => {
                         ></textarea>
                       </div>
                     </div>
+                    {renderSectionNav("contact")}
                   </div>
                 )}
                 {/* Family History Container */}
@@ -3023,6 +3173,7 @@ const AddStudent = () => {
                         )}
                       </div>
                     </div>
+                    {renderSectionNav("family")}
                   </div>
                 )}
                 {/* Additional Information */}
@@ -3157,6 +3308,7 @@ const AddStudent = () => {
                         </div>
                       </div>
                     </div>
+                    {renderSectionNav("additional")}
                   </div>
                 )}
                 {/* Special Education Assessment */}
@@ -3181,7 +3333,7 @@ const AddStudent = () => {
                     </h2>
 
                     {/* Horizontal Navigation for Subsections */}
-                    <div className="mb-8 overflow-x-auto">
+                    <div className="mb-8 overflow-x-auto hide-scrollbar" data-subpills-container>
                       <div className="flex gap-2 min-w-max pb-2">
                         {[
                           { id: "self-help", label: "Self Help" },
@@ -3195,10 +3347,19 @@ const AddStudent = () => {
                         ].map((subsection) => (
                           <button
                             key={subsection.id}
-                            onClick={() =>
-                              setActiveEducationSubsection(subsection.id)
-                            }
-                            className={`px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300 whitespace-nowrap ${
+                            data-subpill-id={subsection.id}
+                            onClick={(e) => {
+                              setActiveEducationSubsection(subsection.id);
+                              const btn = e.currentTarget;
+                              const container = btn.closest('[data-subpills-container]');
+                              if (container) {
+                                const btnLeft = btn.offsetLeft;
+                                const btnWidth = btn.offsetWidth;
+                                const containerWidth = container.offsetWidth;
+                                container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+                              }
+                            }}
+                            className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 whitespace-nowrap ${
                               activeEducationSubsection === subsection.id
                                 ? "bg-[#E38B52] text-white shadow-lg"
                                 : "bg-white/50 text-[#170F49] hover:bg-white/80"
@@ -3779,6 +3940,7 @@ const AddStudent = () => {
                         </div>
                       </div>
                     )}
+                    {renderSectionNav("education")}
                   </div>
                 )}
                 {/* Medical Information Container */}
@@ -4008,28 +4170,32 @@ const AddStudent = () => {
                         </div>
                       </div>
                     </div>
+                    {renderSectionNav("medical")}
                   </div>
                 )}
               </div>
             </div>
           )}
-          {/* Action Buttons */}         {" "}
-          <div className="flex justify-between w-full mt-8">
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 w-full mt-8">
             <button
               onClick={handleSaveAll}
               disabled={isSaving || !studentForm.name}
-              className={`w-[48%] px-6 py-3 ${isSaving ? "bg-gray-400" : "bg-[#E38B52]"} text-white rounded-xl hover:bg-[#E38B40] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105`}
+              className={`w-full sm:w-[48%] py-3.5 px-6 font-semibold text-sm sm:text-base ${
+                isSaving ? "bg-gray-400" : "bg-[#E38B52]"
+              } text-white rounded-xl hover:bg-[#E38B40] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 hover:shadow-lg active:scale-98 flex items-center justify-center gap-2`}
             >
-              {isSaving ? "Saving..." : "Save Student & Case Record"}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              <span>{isSaving ? "Saving..." : "Save Student & Case Record"}</span>
             </button>
-                       {" "}
             <button
               onClick={() => navigate(-1)}
-              className="w-[48%] px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105"
+              className="w-full sm:w-[48%] py-3.5 px-6 font-semibold text-sm sm:text-base bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 hover:shadow-lg active:scale-98 flex items-center justify-center gap-2"
             >
-                            Cancel            {" "}
+              Cancel
             </button>
-                     {" "}
           </div>
         </div>
       </div>

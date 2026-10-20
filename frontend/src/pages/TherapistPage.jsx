@@ -495,7 +495,7 @@ const TherapistPage = () => {
                 </div>
 
                 {/* Therapist Details */}
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-md:gap-4 pl-8 md:pl-12">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-md:gap-4 pl-0 md:pl-12">
                   <div>
                     <p className="text-sm text-[#6F6C90]">Full Name</p>
                     {isEditing ? (

@@ -10,6 +10,47 @@ const StudentViewPage = () => {
   const [activeTab, setActiveTab] = useState("student-details");
   const [activeCaseSection, setActiveCaseSection] = useState("identification");
   const [activeEducationSubsection, setActiveEducationSubsection] = useState("self-help");
+
+  // Auto-center active pills / tabs on mobile
+  useEffect(() => {
+    const tabBtn = document.querySelector(`[data-tab-id="${activeTab}"]`);
+    if (tabBtn) {
+      const container = tabBtn.closest('[data-main-tabs-container]');
+      if (container) {
+        const btnLeft = tabBtn.offsetLeft;
+        const btnWidth = tabBtn.offsetWidth;
+        const containerWidth = container.offsetWidth;
+        container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+      }
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const pill = document.querySelector(`[data-pill-id="${activeCaseSection}"]`);
+    if (pill) {
+      const container = pill.closest('[data-pills-container]');
+      if (container) {
+        const btnLeft = pill.offsetLeft;
+        const btnWidth = pill.offsetWidth;
+        const containerWidth = container.offsetWidth;
+        container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+      }
+    }
+  }, [activeCaseSection]);
+
+  useEffect(() => {
+    const pill = document.querySelector(`[data-subpill-id="${activeEducationSubsection}"]`);
+    if (pill) {
+      const container = pill.closest('[data-subpills-container]');
+      if (container) {
+        const btnLeft = pill.offsetLeft;
+        const btnWidth = pill.offsetWidth;
+        const containerWidth = container.offsetWidth;
+        container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+      }
+    }
+  }, [activeEducationSubsection]);
+
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [expandedReports, setExpandedReports] = useState({});
@@ -149,7 +190,6 @@ const StudentViewPage = () => {
         category: data.category,
         ud_id: data.ud_id,
         bloodGroup: data.blood_group,
-        category: data.category,
         class: data.class_name,
         division: data.division,
         rollNo: data.roll_no,
@@ -328,10 +368,10 @@ const StudentViewPage = () => {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center bg-[#f7f7f7] relative overflow-hidden py-20">
-      {/* Logout button (top-right) */}
+      {/* Logout button */}
       <button
         onClick={handleLogout}
-        className="absolute top-8 right-8 bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl px-6 py-3 border border-white/20 hover:-translate-y-1 transition-all duration-200 flex items-center gap-2 z-10 text-[#170F49] font-medium"
+        className="max-md:self-end max-md:mr-4 max-md:mb-4 md:absolute md:top-8 md:right-8 bg-white/30 backdrop-blur-xl rounded-2xl shadow-xl px-6 py-3 border border-white/20 hover:-translate-y-1 transition-all duration-200 flex items-center gap-2 z-10 text-[#170F49] font-medium"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -353,7 +393,7 @@ const StudentViewPage = () => {
         </h1>
 
         {/* Tabs */}
-        <div className="w-full max-w-[100vw] overflow-x-auto pb-4 px-4 flex justify-start md:justify-center mb-8 hidden-scrollbar custom-scrollbar">
+        <div className="w-full max-w-[100vw] overflow-x-auto pb-4 px-4 flex justify-start md:justify-center mb-8 hidden-scrollbar custom-scrollbar" data-main-tabs-container>
           <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative">
             {/* Active Tab Background */}
             <div
@@ -367,6 +407,7 @@ const StudentViewPage = () => {
             
             {/* Student Details Tab */}
             <button
+              data-tab-id="student-details"
               onClick={() => setActiveTab("student-details")}
               className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
                 activeTab === "student-details"
@@ -379,6 +420,7 @@ const StudentViewPage = () => {
             
             {/* Case Record Tab */}
             <button
+              data-tab-id="case-record"
               onClick={() => setActiveTab("case-record")}
               className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
                 activeTab === "case-record"
@@ -391,6 +433,7 @@ const StudentViewPage = () => {
             
             {/* Reports Tab */}
             <button
+              data-tab-id="reports"
               onClick={() => setActiveTab("reports")}
               className={`w-[180px] px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${
                 activeTab === "reports"
@@ -409,7 +452,7 @@ const StudentViewPage = () => {
         </div>
         
         {/* Main content container */}
-        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-8 md:p-12 border border-white/20">
+        <div className="relative bg-white/30 backdrop-blur-xl rounded-3xl shadow-xl p-4 sm:p-8 md:p-12 border border-white/20">
           {activeTab === "student-details" && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               {/* Basic Information Section */}
@@ -428,7 +471,7 @@ const StudentViewPage = () => {
                   </div>
 
                   {/* Student Details */}
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pl-8 md:pl-12">
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pl-0 md:pl-12">
                     <div>
                       <p className="text-sm text-[#6F6C90]">Full Name</p>
                       <p className="text-[#170F49] font-medium">{student?.name || "N/A"}</p>
@@ -614,7 +657,8 @@ const StudentViewPage = () => {
             /* Case Record Tab */
             <div className="flex gap-6 flex-col md:flex-row">
               {/* Left Sidebar Navigation */}
-              <aside className="w-full md:w-64 flex-shrink-0">
+              {/* Left Sidebar Navigation - Desktop Only */}
+              <aside className="hidden md:block w-64 flex-shrink-0">
                 <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-4 border border-white/20 sticky top-4">
                   <nav className="space-y-2">
                     {[
@@ -677,6 +721,45 @@ const StudentViewPage = () => {
                   </nav>
                 </div>
               </aside>
+
+              {/* Mobile Case Record Section Selector Pills */}
+              <div className="md:hidden w-full overflow-x-auto pb-2 hide-scrollbar mb-4" data-pills-container>
+                <div className="flex gap-2 min-w-max px-1">
+                  {[
+                    { id: 'identification', label: 'Identification' },
+                    { id: 'demographic', label: 'Demographic' },
+                    { id: 'contact', label: 'Contact & Medical' },
+                    { id: 'family', label: 'Family History' },
+                    { id: 'development', label: 'Development' },
+                    { id: 'education', label: 'Special Ed.' },
+                    { id: 'medical', label: 'Medical Info' },
+                    { id: 'documents', label: 'Documents' },
+                  ].map((section) => (
+                    <button
+                      key={section.id}
+                      data-pill-id={section.id}
+                      onClick={(e) => {
+                        setActiveCaseSection(section.id);
+                        const btn = e.currentTarget;
+                        const container = btn.closest('[data-pills-container]');
+                        if (container) {
+                          const btnLeft = btn.offsetLeft;
+                          const btnWidth = btn.offsetWidth;
+                          const containerWidth = container.offsetWidth;
+                          container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+                        }
+                      }}
+                      className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+                        activeCaseSection === section.id
+                          ? 'bg-[#E38B52] text-white shadow-md'
+                          : 'bg-white/70 text-[#170F49] border border-gray-200'
+                      }`}
+                    >
+                      {section.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Right Content Area */}
               <div className="flex-1 max-w-[1100px]">
@@ -1059,7 +1142,7 @@ const StudentViewPage = () => {
                     </h2>
 
                     {/* Horizontal Navigation for Subsections */}
-                    <div className="mb-8 overflow-x-auto">
+                    <div className="mb-8 overflow-x-auto hide-scrollbar" data-subpills-container>
                       <div className="flex gap-2 min-w-max pb-2">
                         {[
                           { id: 'self-help', label: 'Self Help' },
@@ -1073,8 +1156,19 @@ const StudentViewPage = () => {
                         ].map((subsection) => (
                           <button
                             key={subsection.id}
-                            onClick={() => setActiveEducationSubsection(subsection.id)}
-                            className={`px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300 whitespace-nowrap ${
+                            data-subpill-id={subsection.id}
+                            onClick={(e) => {
+                              setActiveEducationSubsection(subsection.id);
+                              const btn = e.currentTarget;
+                              const container = btn.closest('[data-subpills-container]');
+                              if (container) {
+                                const btnLeft = btn.offsetLeft;
+                                const btnWidth = btn.offsetWidth;
+                                const containerWidth = container.offsetWidth;
+                                container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+                              }
+                            }}
+                            className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 whitespace-nowrap ${
                               activeEducationSubsection === subsection.id
                                 ? 'bg-[#E38B52] text-white shadow-lg'
                                 : 'bg-white/50 text-[#170F49] hover:bg-white/80'

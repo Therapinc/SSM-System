@@ -695,6 +695,70 @@ const StudentPage = () => {
   const [activeCaseSection, setActiveCaseSection] = useState("identification");
   const [activeEducationSubsection, setActiveEducationSubsection] =
     useState("self-help");
+
+  const [canTabsScrollLeft, setCanTabsScrollLeft] = useState(false);
+  const [canTabsScrollRight, setCanTabsScrollRight] = useState(true);
+
+  // Auto-center active pills / tabs on mobile
+  useEffect(() => {
+    const tabBtn = document.querySelector(`[data-tab-id="${activeTab}"]`);
+    if (tabBtn) {
+      const container = tabBtn.closest('[data-main-tabs-container]');
+      if (container) {
+        const btnRect = tabBtn.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const scrollDiff = (btnRect.left - containerRect.left) + container.scrollLeft - (container.clientWidth / 2) + (btnRect.width / 2);
+        container.scrollTo({ left: Math.max(0, scrollDiff), behavior: 'smooth' });
+      }
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const pill = document.querySelector(`[data-pill-id="${activeCaseSection}"]`);
+    if (pill) {
+      const container = pill.closest('[data-pills-container]');
+      if (container) {
+        const btnRect = pill.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const scrollDiff = (btnRect.left - containerRect.left) + container.scrollLeft - (container.clientWidth / 2) + (btnRect.width / 2);
+        container.scrollTo({ left: Math.max(0, scrollDiff), behavior: 'smooth' });
+      }
+    }
+  }, [activeCaseSection]);
+
+  useEffect(() => {
+    const pill = document.querySelector(`[data-subpill-id="${activeEducationSubsection}"]`);
+    if (pill) {
+      const container = pill.closest('[data-subpills-container]');
+      if (container) {
+        const btnRect = pill.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const scrollDiff = (btnRect.left - containerRect.left) + container.scrollLeft - (container.clientWidth / 2) + (btnRect.width / 2);
+        container.scrollTo({ left: Math.max(0, scrollDiff), behavior: 'smooth' });
+      }
+    }
+  }, [activeEducationSubsection]);
+
+  // Monitor main tabs scroll for indicators
+  useEffect(() => {
+    const container = document.querySelector('[data-main-tabs-container]');
+    if (!container) return;
+
+    const updateScroll = () => {
+      setCanTabsScrollLeft(container.scrollLeft > 10);
+      setCanTabsScrollRight(container.scrollLeft < container.scrollWidth - container.clientWidth - 15);
+    };
+
+    updateScroll();
+    container.addEventListener('scroll', updateScroll, { passive: true });
+    window.addEventListener('resize', updateScroll);
+
+    return () => {
+      container.removeEventListener('scroll', updateScroll);
+      window.removeEventListener('resize', updateScroll);
+    };
+  }, []);
+
   const { id } = useParams();
   const { user } = useContext(AuthContext);
   const [student, setStudent] = useState(null);
@@ -822,7 +886,7 @@ const StudentPage = () => {
   const [phaseSavedStatus, setPhaseSavedStatus] = useState({}); // Track which phases are saved per table
   const [savedTables, setSavedTables] = useState([]);
   const [unsavedTableIndex, setUnsavedTableIndex] = useState(null); // Track which table has unsaved edits
-  const [reportDate, setReportDate] = useState("");
+  const [reportDate, setReportDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [showTableDetails, setShowTableDetails] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePendingIndex, setDeletePendingIndex] = useState(null);
@@ -830,6 +894,7 @@ const StudentPage = () => {
   const [questionsOpenByTable, setQuestionsOpenByTable] = useState({});
   const [activeSkillByTable, setActiveSkillByTable] = useState({});
   const [activeQuestionByTable, setActiveQuestionByTable] = useState({});
+  const [specialEduViewModeByTable, setSpecialEduViewModeByTable] = useState({}); // 'questions' | 'matrix'
   const [pulsatingEditButton, setPulsatingEditButton] = useState({});
   const [tableHasModifications, setTableHasModifications] = useState(false);
   const questionRefs = useRef({});
@@ -5226,8 +5291,9 @@ const StudentPage = () => {
         ...prevDetails,
         [newIndex]: true,
       }));
-      setQuestionsOpenByTable((prev) => ({ ...(prev || {}), [newIndex]: false }));
-      setActiveSkillByTable((prev) => ({ ...(prev || {}), [newIndex]: null }));
+      setQuestionsOpenByTable((prev) => ({ ...(prev || {}), [newIndex]: true }));
+      setActiveSkillByTable((prev) => ({ ...(prev || {}), [newIndex]: SPECIAL_EDU_SKILLS[0]?.key || "grossmotor" }));
+      setSpecialEduViewModeByTable((prev) => ({ ...(prev || {}), [newIndex]: "questions" }));
       setUnsavedTableIndex(newIndex);
       return updated;
     });
@@ -5293,23 +5359,32 @@ const StudentPage = () => {
     const rowCount = Math.max(adlItems.length, academicItems.length, behaviouralItems.length);
 
     return (
-      <div className="mb-6 max-md:mb-4 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-4 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
-        <div className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-[#E38B52]/10 to-transparent rounded-t-xl -mx-6 -mt-6 mb-6 max-md:mb-4">
-          <div className="text-left flex-1 text-base font-semibold text-[#170F49]">
+      <div className="mb-6 p-4 sm:p-6 rounded-2xl border border-[#E38B52]/30 md:border-2 bg-gradient-to-br from-white via-orange-50/30 to-white shadow-md md:shadow-xl">
+        <div className="w-full p-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-gradient-to-r from-[#E38B52]/10 to-transparent rounded-t-xl -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-4 sm:mb-6 border-b border-[#E38B52]/20">
+          <div className="text-left flex-1 text-sm sm:text-base font-bold text-[#170F49]">
             DRAFT REPORT FOR {monthYearKey.toUpperCase()}
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={(e) => { e.stopPropagation(); saveIepData(); }} className="px-3 py-1.5 rounded-md bg-green-600 text-white text-sm hover:bg-green-700">
-              Save
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); saveIepData(); }}
+              className="px-4 py-1.5 rounded-lg bg-green-600 text-white text-xs sm:text-sm font-semibold hover:bg-green-700 shadow-sm cursor-pointer"
+            >
+              Save Draft
             </button>
-            <button type="button" onClick={(e) => { e.stopPropagation(); discardIepDraft(); }} className="px-3 py-1.5 rounded-md bg-red-100 text-red-700 text-sm hover:bg-red-200">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); discardIepDraft(); }}
+              className="px-3.5 py-1.5 rounded-lg bg-red-100 text-red-700 text-xs sm:text-sm font-semibold hover:bg-red-200 cursor-pointer"
+            >
               Remove Draft
             </button>
           </div>
         </div>
 
-        <div className="px-0 py-0 border-t border-[#E38B52]/20 space-y-6 max-md:space-y-4 bg-white/50">
-          <div className="overflow-x-auto border border-gray-200 rounded-lg">
+        <div className="space-y-4 sm:space-y-6">
+          {/* Desktop View: Traditional 3-Column Table (hidden on mobile) */}
+          <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-lg">
             <table className="w-full table-fixed border-collapse">
               <colgroup>
                 <col style={{ width: "34%" }} />
@@ -5392,17 +5467,76 @@ const StudentPage = () => {
             </table>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-[#170F49] mb-2">IEP OF THE STUDENT:</label>
-            <textarea value={iepData.iepStudent} onChange={(e) => handleIepInputChange("iepStudent", e.target.value)} placeholder="Enter the IEP details of the student..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] resize-none" rows={4} />
+          {/* Mobile View: Stacked Category Cards (hidden on desktop) */}
+          <div className="md:hidden space-y-3.5">
+            {[
+              { key: "adlSkills", title: "ADL Skills", color: "from-orange-500/10 to-transparent", borderColor: "border-orange-200" },
+              { key: "academic", title: "Academic", color: "from-amber-500/10 to-transparent", borderColor: "border-amber-200" },
+              { key: "behaviouralSkills", title: "Behavioural Skills", color: "from-rose-500/10 to-transparent", borderColor: "border-rose-200" },
+            ].map(({ key, title, color, borderColor }) => {
+              const items = Array.isArray(iepData.sections?.[key]) ? iepData.sections[key] : [];
+              return (
+                <div key={key} className={`border ${borderColor} rounded-xl bg-white shadow-xs overflow-hidden`}>
+                  <div className={`px-3 py-2 bg-gradient-to-r ${color} flex items-center justify-between border-b ${borderColor}`}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-[#170F49] uppercase tracking-wide">{title}</span>
+                      <span className="text-[10px] bg-white text-gray-600 px-1.5 py-0.2 rounded-full font-bold border border-gray-200">
+                        {items.length}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#E38B52] text-white text-[11px] font-semibold shadow-xs hover:bg-[#C8742F] cursor-pointer"
+                      onClick={() => addIepSectionItem(key)}
+                    >
+                      <span>+ Add Row</span>
+                    </button>
+                  </div>
+                  <div className="p-2.5 space-y-2">
+                    {items.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic py-2 text-center">No entries yet.</p>
+                    ) : (
+                      items.map((item, idx) => (
+                        <div key={item.id || idx} className="flex items-start gap-2 bg-gray-50/70 p-2 rounded-lg border border-gray-100">
+                          <span className="text-[11px] font-bold text-gray-400 mt-1 shrink-0 w-4 text-center">
+                            {idx + 1}.
+                          </span>
+                          <textarea
+                            value={item.text}
+                            onChange={(e) => handleIepSectionChange(key, item.id, e.target.value)}
+                            placeholder={`Enter ${title} entry...`}
+                            className="input-edit text-xs min-h-[58px] resize-none flex-1 p-2 bg-white rounded-lg border border-gray-200 font-medium"
+                          />
+                          <button
+                            type="button"
+                            className="text-red-500 hover:text-red-700 p-1 mt-1 shrink-0 cursor-pointer"
+                            onClick={() => removeIepSectionItem(key, item.id)}
+                            aria-label="Remove entry"
+                          >
+                            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-[#170F49] mb-2">Remarks:</label>
-            <textarea value={iepData.remarks} onChange={(e) => handleIepInputChange("remarks", e.target.value)} placeholder="Enter additional remarks..." className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] resize-none" rows={4} />
+          <div className="space-y-3.5 pt-2">
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-[#170F49] mb-1.5">IEP OF THE STUDENT:</label>
+              <textarea value={iepData.iepStudent} onChange={(e) => handleIepInputChange("iepStudent", e.target.value)} placeholder="Enter the IEP details of the student..." className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#E38B52] resize-none text-xs sm:text-sm bg-white" rows={3} />
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-[#170F49] mb-1.5">Remarks:</label>
+              <textarea value={iepData.remarks} onChange={(e) => handleIepInputChange("remarks", e.target.value)} placeholder="Enter additional remarks..." className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#E38B52] resize-none text-xs sm:text-sm bg-white" rows={3} />
+            </div>
           </div>
-
-
         </div>
       </div>
     );
@@ -6918,6 +7052,76 @@ const StudentPage = () => {
     }
   };
 
+  const handleCaseNextSection = (targetSectionId) => {
+    setActiveCaseSection(targetSectionId);
+    setTimeout(() => {
+      // Scroll active pill into view if on mobile
+      const pill = document.querySelector(`[data-pill-id="${targetSectionId}"]`);
+      if (pill) {
+        const container = pill.closest('[data-pills-container]');
+        if (container) {
+          const btnLeft = pill.offsetLeft;
+          const btnWidth = pill.offsetWidth;
+          const containerWidth = container.offsetWidth;
+          container.scrollTo({ left: btnLeft - containerWidth / 2 + btnWidth / 2, behavior: 'smooth' });
+        }
+      }
+      window.scrollTo({ top: 350, behavior: "smooth" });
+    }, 50);
+  };
+
+  const renderCaseSectionNav = (currentSectionId) => {
+    const sections = [
+      { id: "identification", label: "Identification" },
+      { id: "demographic", label: "Demographic" },
+      { id: "contact", label: "Contact & Medical" },
+      { id: "family", label: "Family History" },
+      { id: "development", label: "Development" },
+      { id: "education", label: "Special Ed." },
+      { id: "medical", label: "Medical Info" },
+      { id: "documents", label: "Documents" },
+    ];
+    const currentIndex = sections.findIndex((s) => s.id === currentSectionId);
+    const prevSection = currentIndex > 0 ? sections[currentIndex - 1] : null;
+    const nextSection = currentIndex < sections.length - 1 ? sections[currentIndex + 1] : null;
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 mt-8 border-t border-[#E38B52]/20">
+        {prevSection ? (
+          <button
+            type="button"
+            onClick={() => handleCaseNextSection(prevSection.id)}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-[#E38B52]/40 bg-white/70 hover:bg-orange-50 text-[#170F49] font-medium text-xs sm:text-sm transition-all shadow-sm hover:shadow active:scale-95"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back: {prevSection.label}</span>
+          </button>
+        ) : (
+          <div className="hidden sm:block" />
+        )}
+
+        {nextSection ? (
+          <button
+            type="button"
+            onClick={() => handleCaseNextSection(nextSection.id)}
+            className="w-full sm:w-auto ml-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#E38B52] to-[#F58540] hover:from-[#d27a43] hover:to-[#e07532] text-white font-semibold text-xs sm:text-sm transition-all shadow-md hover:shadow-lg active:scale-95"
+          >
+            <span>Next: {nextSection.label}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        ) : (
+          <div className="w-full sm:w-auto ml-auto flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold text-[#E38B52] bg-orange-50/80 px-4 py-2.5 rounded-xl border border-[#E38B52]/20">
+            <span>Completed all sections</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen max-lg:min-h-[100dvh] w-full flex flex-col items-center justify-center bg-[#f7f7f7]">
@@ -7241,156 +7445,203 @@ const StudentPage = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex justify-center mb-8 max-md:overflow-x-auto max-md:whitespace-nowrap max-md:w-screen max-md:-mx-4 max-md:px-4 hide-scrollbar max-md:justify-start max-md:snap-x max-md:snap-mandatory">
-          <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative w-[1136px]">
-            {/* Active Tab Background */}
-            <div
-              className="absolute h-[calc(100%-8px)] top-[4px] transition-all duration-300 ease-in-out rounded-xl bg-[#E38B52] shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
-              style={{
-                left:
-                  activeTab === "student-details"
-                    ? "8px"
-                    : activeTab === "case-record"
-                      ? "196px"
-                      : activeTab === "therapy-reports"
-                        ? "384px"
-                        : activeTab === "iep"
-                          ? "572px"
-                          : activeTab === "iep-form"
-                            ? "760px"
-                            : "948px",
-                width: "180px",
-                background: "linear-gradient(135deg, #E38B52 0%, #E38B52 100%)",
-              }}
-            >
-              {/* Animated particles */}
-              <div className="absolute inset-0 overflow-hidden rounded-xl">
-                <div className="particle-1"></div>
-                <div className="particle-2"></div>
-                <div className="particle-3"></div>
+        <div className="relative w-full max-w-full mb-8">
+          {/* Scrollable Tabs */}
+          <div
+            className="flex justify-center max-md:overflow-x-auto max-md:whitespace-nowrap max-md:w-screen max-md:-mx-4 max-md:px-4 hide-scrollbar max-md:justify-start scroll-smooth"
+            data-main-tabs-container
+          >
+            <div className="bg-white/30 backdrop-blur-xl rounded-2xl p-2 inline-flex gap-2 shadow-lg relative w-[1136px]">
+              {/* Active Tab Background */}
+              <div
+                className="absolute h-[calc(100%-8px)] top-[4px] transition-all duration-300 ease-in-out rounded-xl bg-[#E38B52] shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)]"
+                style={{
+                  left:
+                    activeTab === "student-details"
+                      ? "8px"
+                      : activeTab === "case-record"
+                        ? "196px"
+                        : activeTab === "therapy-reports"
+                          ? "384px"
+                          : activeTab === "iep"
+                            ? "572px"
+                            : activeTab === "iep-form"
+                              ? "760px"
+                              : "948px",
+                  width: "180px",
+                  background: "linear-gradient(135deg, #E38B52 0%, #E38B52 100%)",
+                }}
+              >
+                {/* Animated particles */}
+                <div className="absolute inset-0 overflow-hidden rounded-xl">
+                  <div className="particle-1"></div>
+                  <div className="particle-2"></div>
+                  <div className="particle-3"></div>
+                </div>
               </div>
-            </div>
 
-            {/* Student Details Tab */}
-            <button
-              onClick={() => {
-                if (warnIfEditingIep()) return;
-                if (unsavedTableIndex !== null) {
-                  const editingTable = savedTables[unsavedTableIndex];
-                  if (editingTable) {
-                    const phaseToSave = editingTable.assessment_phase || "1st assmt";
-                    if (phaseToSave !== "1st assmt") {
-                      const dateVal = (editingTable.quarterEditDates || {})[phaseToSave];
-                      if (!dateVal) {
-                        showToast("Please enter the date before saving this quarter", "warning");
-                        return;
+              {/* Student Details Tab */}
+              <button
+                data-tab-id="student-details"
+                onClick={() => {
+                  if (warnIfEditingIep()) return;
+                  if (unsavedTableIndex !== null) {
+                    const editingTable = savedTables[unsavedTableIndex];
+                    if (editingTable) {
+                      const phaseToSave = editingTable.assessment_phase || "1st assmt";
+                      if (phaseToSave !== "1st assmt") {
+                        const dateVal = (editingTable.quarterEditDates || {})[phaseToSave];
+                        if (!dateVal) {
+                          showToast("Please enter the date before saving this quarter", "warning");
+                          return;
+                        }
                       }
+
+                      handleSetTableEditable(editingTable, false);
+                      setUnsavedTableIndex(null);
                     }
-
-                    handleSetTableEditable(editingTable, false);
-                    setUnsavedTableIndex(null);
                   }
-                }
 
-                setActiveTab("student-details"); // or case-record / therapy-reports / iep / special-education
-              }}
-              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "student-details"
-                ? "text-white"
-                : "text-[#170F49] hover:text-[#E38B52]"
-                }`}
-            >
-              Student Details
-            </button>
+                  setActiveTab("student-details");
+                }}
+                className={`w-[180px] max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap cursor-pointer ${activeTab === "student-details"
+                  ? "text-white"
+                  : "text-[#170F49] hover:text-[#E38B52]"
+                  }`}
+              >
+                Student Details
+              </button>
 
-            {/* Case Record Tab */}
-            <button
-              onClick={() => {
-                if (warnIfEditingIep()) return;
-                if (unsavedTableIndex !== null) {
-                  showToast("Save the current table before changing tabs", "warning");
-                  return;
-                }
-                setActiveTab("case-record");
-              }}
-              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "case-record"
-                ? "text-white"
-                : "text-[#170F49] hover:text-[#E38B52]"
-                }`}
-            >
-              Case Record
-            </button>
+              {/* Case Record Tab */}
+              <button
+                data-tab-id="case-record"
+                onClick={() => {
+                  if (warnIfEditingIep()) return;
+                  if (unsavedTableIndex !== null) {
+                    showToast("Save the current table before changing tabs", "warning");
+                    return;
+                  }
+                  setActiveTab("case-record");
+                }}
+                className={`w-[180px] max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap cursor-pointer ${activeTab === "case-record"
+                  ? "text-white"
+                  : "text-[#170F49] hover:text-[#E38B52]"
+                  }`}
+              >
+                Case Record
+              </button>
 
-            {/* Therapy Reports Tab */}
-            <button
-              onClick={() => {
-                if (warnIfEditingIep()) return;
-                if (unsavedTableIndex !== null) {
-                  showToast("Save the current table before changing tabs", "warning");
-                  return;
-                }
-                setActiveTab("therapy-reports");
-              }}
-              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "therapy-reports"
-                ? "text-white"
-                : "text-[#170F49] hover:text-[#E38B52]"
-                }`}
-            >
-              Therapy Reports
-            </button>
-            {/* Term Report Tab (formerly IEP) */}
-            <button
-              onClick={() => {
-                if (warnIfEditingIep()) return;
-                if (unsavedTableIndex !== null) {
-                  showToast("Save the current table before changing tabs", "warning");
-                  return;
-                }
-                setActiveTab("iep");
-              }}
-              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "iep"
-                ? "text-white"
-                : "text-[#170F49] hover:text-[#E38B52]"
-                }`}
-            >
-              Term Report
-            </button>
+              {/* Therapy Reports Tab */}
+              <button
+                data-tab-id="therapy-reports"
+                onClick={() => {
+                  if (warnIfEditingIep()) return;
+                  if (unsavedTableIndex !== null) {
+                    showToast("Save the current table before changing tabs", "warning");
+                    return;
+                  }
+                  setActiveTab("therapy-reports");
+                }}
+                className={`w-[180px] max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap cursor-pointer ${activeTab === "therapy-reports"
+                  ? "text-white"
+                  : "text-[#170F49] hover:text-[#E38B52]"
+                  }`}
+              >
+                Therapy Reports
+              </button>
 
-            {/* IEP Tab */}
-            <button
-              onClick={() => {
-                if (warnIfEditingIep()) return;
-                if (unsavedTableIndex !== null) {
-                  showToast("Save the current table before changing tabs", "warning");
-                  return;
-                }
-                setActiveTab("iep-form");
-              }}
-              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "iep-form"
-                ? "text-white"
-                : "text-[#170F49] hover:text-[#E38B52]"
-                }`}
-            >
-              IEP
-            </button>
+              {/* Term Report Tab (formerly IEP) */}
+              <button
+                data-tab-id="iep"
+                onClick={() => {
+                  if (warnIfEditingIep()) return;
+                  if (unsavedTableIndex !== null) {
+                    showToast("Save the current table before changing tabs", "warning");
+                    return;
+                  }
+                  setActiveTab("iep");
+                }}
+                className={`w-[180px] max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap cursor-pointer ${activeTab === "iep"
+                  ? "text-white"
+                  : "text-[#170F49] hover:text-[#E38B52]"
+                  }`}
+              >
+                Term Report
+              </button>
 
-            {/* Special Education Tab */}
-            <button
-              onClick={() => {
-                if (warnIfEditingIep()) return;
-                if (unsavedTableIndex !== null) {
-                  showToast("Save the current table before changing tabs", "warning");
-                  return;
-                }
-                setActiveTab("special-education");
-              }}
-              className={`w-[180px] max-md:snap-start max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap ${activeTab === "special-education"
-                ? "text-white"
-                : "text-[#170F49] hover:text-[#E38B52]"
-                }`}
-            >
-              Special Education
-            </button>
+              {/* IEP Tab */}
+              <button
+                data-tab-id="iep-form"
+                onClick={() => {
+                  if (warnIfEditingIep()) return;
+                  if (unsavedTableIndex !== null) {
+                    showToast("Save the current table before changing tabs", "warning");
+                    return;
+                  }
+                  setActiveTab("iep-form");
+                }}
+                className={`w-[180px] max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap cursor-pointer ${activeTab === "iep-form"
+                  ? "text-white"
+                  : "text-[#170F49] hover:text-[#E38B52]"
+                  }`}
+              >
+                IEP
+              </button>
+
+              {/* Special Education Tab */}
+              <button
+                data-tab-id="special-education"
+                onClick={() => {
+                  if (warnIfEditingIep()) return;
+                  if (unsavedTableIndex !== null) {
+                    showToast("Save the current table before changing tabs", "warning");
+                    return;
+                  }
+                  setActiveTab("special-education");
+                }}
+                className={`w-[180px] max-md:shrink-0 px-6 py-3 rounded-xl font-medium transition-all duration-300 relative z-10 text-center whitespace-nowrap cursor-pointer ${activeTab === "special-education"
+                  ? "text-white"
+                  : "text-[#170F49] hover:text-[#E38B52]"
+                  }`}
+              >
+                Special Education
+              </button>
+            </div>
           </div>
+
+          {/* Mobile Right Scroll Hint Button */}
+          {canTabsScrollRight && (
+            <button
+              type="button"
+              onClick={() => {
+                const container = document.querySelector('[data-main-tabs-container]');
+                if (container) container.scrollBy({ left: 188, behavior: 'smooth' });
+              }}
+              className="md:hidden absolute right-0 top-0 bottom-6 w-14 bg-gradient-to-l from-[#FFF8F4] via-[#FFF8F4]/80 to-transparent flex items-center justify-end pr-1 cursor-pointer z-20"
+              aria-label="Scroll right to see more tabs"
+            >
+              <div className="w-7 h-7 rounded-full bg-white shadow-md border border-[#E38B52]/40 flex items-center justify-center text-[#E38B52] text-sm font-bold animate-pulse">
+                ›
+              </div>
+            </button>
+          )}
+
+          {/* Mobile Left Scroll Hint Button */}
+          {canTabsScrollLeft && (
+            <button
+              type="button"
+              onClick={() => {
+                const container = document.querySelector('[data-main-tabs-container]');
+                if (container) container.scrollBy({ left: -188, behavior: 'smooth' });
+              }}
+              className="md:hidden absolute left-0 top-0 bottom-6 w-14 bg-gradient-to-r from-[#FFF8F4] via-[#FFF8F4]/80 to-transparent flex items-center justify-start pl-1 cursor-pointer z-20"
+              aria-label="Scroll left to see previous tabs"
+            >
+              <div className="w-7 h-7 rounded-full bg-white shadow-md border border-[#E38B52]/40 flex items-center justify-center text-[#E38B52] text-sm font-bold animate-pulse">
+                ‹
+              </div>
+            </button>
+          )}
         </div>
 
 
@@ -9330,36 +9581,32 @@ const StudentPage = () => {
               </div>
             </div>
           ) : activeTab === "iep" ? (
-
-            <div className="max-w-6xl mx-auto p-6 max-md:px-4 max-md:py-2">
-
-              <h2 className="text-2xl font-bold text-[#170F49] mb-6 max-md:mb-4 pb-4 border-b border-[#E38B52]/20 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="max-w-6xl mx-auto p-4 sm:p-6 max-md:px-2 max-md:py-3">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#170F49] mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-[#E38B52]/20 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 mr-2 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8m0-8l-3 3m3-3l3 3M4 6h16" />
                 </svg>
                 Term Report
               </h2>
 
-              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-4 flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#E38B52]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {/* Month/Year Setup Card */}
+              <div className="mb-6 p-4 sm:p-6 rounded-2xl border border-[#E38B52]/30 bg-white/70 backdrop-blur-md shadow-sm md:shadow-xl md:border-2 md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white">
+                <h3 className="text-base sm:text-lg font-bold text-[#170F49] mb-4 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#E38B52] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  Term Report of: <span className="font-semibold ml-1">{student?.name}</span>
+                  <span>Term Report of: <span className="font-bold text-[#E38B52] ml-1">{student?.name || "Student"}</span></span>
                 </h3>
 
-
-
                 {/* Month and Year selector */}
-
-                <div className="flex flex-col md:flex-row gap-4 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
                   {/* Month Selector */}
-                  <div className="flex items-center gap-3">
-                    <label className="block text-sm font-semibold text-[#170F49] whitespace-nowrap">Select Month</label>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#170F49] mb-1.5">Select Month</label>
                     <select
                       value={iepData.selectedMonth || ""}
                       onChange={(e) => handleIepMonthChange(e.target.value)}
-                      className="px-3 py-1.5 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] font-medium"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 bg-white text-[#170F49] text-sm font-medium focus:ring-2 focus:ring-[#E38B52]"
                     >
                       <option value="">Choose a month</option>
                       {MONTHS.map(m => (
@@ -9367,143 +9614,67 @@ const StudentPage = () => {
                       ))}
                     </select>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <label className="block text-sm font-semibold text-[#170F49] whitespace-nowrap">
-                      Year
-                    </label>
+
+                  {/* Year Selector */}
+                  <div>
+                    <label className="block text-xs font-semibold text-[#170F49] mb-1.5">Academic Year</label>
                     <input
                       type="number"
                       min="1900"
                       max="2100"
                       value={selectedYear}
                       onChange={(e) => setSelectedYear(e.target.value)}
-                      className="px-3 py-1.5 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] font-medium w-28"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 bg-white text-[#170F49] text-sm font-medium focus:ring-2 focus:ring-[#E38B52]"
                     />
                   </div>
 
-                </div>
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={createIepTable}
-                    disabled={!iepData.selectedMonth || !selectedYear || !isValidYear}
-                    className={`px-6 py-2.5 border rounded-lg transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap ${iepData.selectedMonth && selectedYear && isValidYear
-                      ? "bg-white text-[#E38B52] border-[#E38B52] hover:bg-[#FFF3E8]"
-                      : "bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed"
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <button
+                      type="button"
+                      onClick={createIepTable}
+                      disabled={!iepData.selectedMonth || !selectedYear || !isValidYear}
+                      className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 ${
+                        iepData.selectedMonth && selectedYear && isValidYear
+                          ? "bg-gradient-to-r from-[#E38B52] to-[#F5A572] hover:from-[#d17a42] hover:to-[#e38b52] text-white shadow-md hover:shadow-lg cursor-pointer active:scale-98"
+                          : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
                       }`}
-                  >
-                    + Create Report
-                  </button>
-                  {existingIepMonthKey && (
-                    <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
-                      <p className="text-sm text-amber-900">
-                        A report already exists for <strong>{existingIepMonthKey}</strong>.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIepFormVisible(false);
-                          setExpandedIepMonth(existingIepMonthKey);
-                          document
-                            .getElementById(`iep-report-${existingIepMonthKey}`)
-                            ?.scrollIntoView({ behavior: "smooth", block: "center" });
-                        }}
-                        className="px-4 py-2 rounded-lg bg-[#E38B52] text-white text-sm hover:bg-[#C8742F]"
-                      >
-                        Go to saved report
-                      </button>
-                    </div>
-                  )}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span>Create Report</span>
+                    </button>
+                  </div>
                 </div>
-                <p className="mt-3 text-xs text-[#6F6C90]">Select the month and year to prepare the IEP report.</p>
 
-
+                {existingIepMonthKey && (
+                  <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+                    <p className="text-xs sm:text-sm text-amber-900">
+                      A report already exists for <strong>{existingIepMonthKey}</strong>.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIepFormVisible(false);
+                        setExpandedIepMonth(existingIepMonthKey);
+                        document
+                          .getElementById(`iep-report-${existingIepMonthKey}`)
+                          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }}
+                      className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#E38B52] text-white text-xs sm:text-sm font-semibold hover:bg-[#C8742F] cursor-pointer text-center"
+                    >
+                      Go to saved report
+                    </button>
+                  </div>
+                )}
+                <p className="mt-3 text-xs text-[#6F6C90]">Select the month and year to prepare the Term / IEP report.</p>
               </div>
-              <tbody>
-                <tr>
-                  <td colSpan={3} className="p-4 align-top">
-                    {iepFormVisible ? (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {[
-                          { key: "adlSkills", title: "ADL Skills", addLabel: "Add ADL Skill" },
-                          { key: "academic", title: "Academic", addLabel: "Add Academic Entry" },
-                          { key: "behaviouralSkills", title: "Behavioural", addLabel: "Add Behavioural Skill" },
-                        ].map(({ key, title, addLabel }) => (
-                          <div key={key} className="bg-white p-3 rounded shadow-sm">
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-medium">{title}</h4>
-                              <button
-                                type="button"
-                                className="text-sm text-[#E38B52] hover:underline"
-                                onClick={() => addIepSectionItem(key)}
-                              >
-                                + {addLabel}
-                              </button>
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                              {(iepData.sections[key] || []).map((item) => (
-                                <div key={item.id} className="flex gap-2 items-start">
-                                  <textarea
-                                    value={item.text}
-                                    onChange={(e) =>
-                                      handleIepSectionChange(key, item.id, e.target.value)
-                                    }
-                                    placeholder="Enter item"
-                                    className="input-edit h-20 resize-none"
-                                  />
-                                  <button
-                                    type="button"
-                                    className="text-red-500 ml-1"
-                                    onClick={() => removeIepSectionItem(key, item.id)}
-                                    aria-label="Remove item"
-                                  >
-                                    <svg
-                                      viewBox="0 0 24 24"
-                                      className="w-4 h-4"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    >
-                                      <path d="M3 6h18" />
-                                      <path d="M8 6V4h8v2" />
-                                      <path d="M6 6l1 14h10l1-14" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              ))}
-                              {!(iepData.sections[key] || []).length && (
-                                <div className="text-sm text-gray-400">No items yet</div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <>
-                        {(() => {
-                          const adlItems = Array.isArray(iepData.sections?.adlSkills) ? iepData.sections.adlSkills : [];
-                          const academicItems = Array.isArray(iepData.sections?.academic) ? iepData.sections.academic : [];
-                          const behaviouralItems = Array.isArray(iepData.sections?.behaviouralSkills) ? iepData.sections.behaviouralSkills : [];
-                          const rowCount = Math.max(adlItems.length, academicItems.length, behaviouralItems.length);
-
-
-
-
-                        })()}
-                      </>
-                    )}
-                  </td>
-                </tr>
-              </tbody>
 
               {pendingNewIepMonth && editingIepMonth === pendingNewIepMonth && renderIepDraftCard()}
 
               {/* Saved IEP Reports List */}
-              <div className="mt-6 mb-6 max-md:mb-4 p-6 border-2 border-[#E38B52]/30 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-xl">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-4 flex items-center gap-2">Saved Reports</h3>
+              <div className="mt-6 mb-6 max-md:mb-4 p-4 sm:p-6 border border-[#E38B52]/30 md:border-2 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-md md:shadow-xl">
+                <h3 className="text-base sm:text-lg font-bold text-[#170F49] mb-4 flex items-center gap-2">Saved Reports</h3>
                 {(() => {
                   const keys = Object.keys(savedIepByMonth || {});
                   const sortedKeys = keys.sort((a, b) => parseMonthYearKey(b) - parseMonthYearKey(a)); // newest first
@@ -9514,28 +9685,29 @@ const StudentPage = () => {
                       <div
                         key={monthYearKey}
                         id={`iep-report-${monthYearKey}`}
-                        className="border border-[#E38B52]/30 rounded-xl bg-white shadow-md overflow-hidden"
+                        className="border border-[#E38B52]/30 rounded-xl sm:rounded-2xl bg-white shadow-sm hover:shadow-md overflow-hidden mb-4 transition-shadow"
                       >
-                        <div className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-[#E38B52]/10 to-transparent">
+                        <div className="w-full p-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-gradient-to-r from-[#E38B52]/10 to-transparent">
                           <button
                             onClick={() => {
                               if (warnIfEditingIep() && !isExpanded) return;
                               toggleIepExpand(monthYearKey);
                             }}
-                            className="text-left flex-1 text-base font-semibold text-[#170F49]"
+                            className="text-left flex items-center gap-2 text-sm sm:text-base font-bold text-[#170F49] cursor-pointer"
                             aria-expanded={isExpanded}
                           >
-                            TRIMESTER REPORT FOR {monthYearKey.toUpperCase()}
+                            <span className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-[#E38B52]/15 text-[#E38B52] flex items-center justify-center text-xs transition-transform duration-200 shrink-0 ${isExpanded ? "rotate-90" : ""}`}>
+                              ▶
+                            </span>
+                            <span>TRIMESTER REPORT FOR {monthYearKey.toUpperCase()}</span>
                           </button>
 
-                          <div className="flex items-center gap-2">
-
-
+                          <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
                             {isEditing ? (
                               <>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); saveIepData(); }}
-                                  className="px-3 py-1.5 rounded-md bg-green-600 text-white text-sm hover:bg-green-700"
+                                  className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs sm:text-sm font-semibold hover:bg-green-700 cursor-pointer shadow-xs"
                                 >
                                   Save
                                 </button>
@@ -9559,7 +9731,7 @@ const StudentPage = () => {
                                       setEditingIepMonth(null);
                                     }
                                   }}
-                                  className="px-3 py-1.5 rounded-md bg-gray-100 text-[#170F49] text-sm hover:bg-gray-200"
+                                  className="px-3 py-1.5 rounded-lg bg-gray-100 text-[#170F49] text-xs sm:text-sm font-semibold hover:bg-gray-200 cursor-pointer"
                                 >
                                   Cancel
                                 </button>
@@ -9573,7 +9745,7 @@ const StudentPage = () => {
                                   setEditingIepMonth(monthYearKey);
                                   setIepData(normalizeIepData(savedIepByMonth[monthYearKey]));
                                 }}
-                                className="px-3 py-1.5 rounded-md bg-[#E38B52] text-white text-sm hover:bg-[#C8742F]"
+                                className="px-3 py-1.5 rounded-lg bg-[#E38B52] text-white text-xs sm:text-sm font-semibold hover:bg-[#C8742F] cursor-pointer shadow-xs"
                               >
                                 Edit
                               </button>
@@ -9582,17 +9754,14 @@ const StudentPage = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Download the saved IEP for this month (uses existing helper)
                                 if (!savedIepByMonth?.[monthYearKey]) {
                                   showToast("No saved report to download.", "warning");
                                   return;
                                 }
-                                // If downloadIepAsPDF currently uses in-memory iepData, temporarily set it:
-
                                 downloadIepAsPDF(savedIepByMonth[monthYearKey]);
                               }}
                               title="Download report"
-                              className="p-2 rounded-md text-[#E38B52] hover:bg-[#FFF3E8]"
+                              className="p-1.5 sm:p-2 rounded-lg text-[#E38B52] hover:bg-[#FFF3E8] cursor-pointer"
                               aria-label="Download report"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -9603,7 +9772,7 @@ const StudentPage = () => {
                             <button
                               onClick={(e) => { e.stopPropagation(); confirmDeleteIepReport(monthYearKey); }}
                               title="Delete report"
-                              className="p-2 rounded-md text-red-600 hover:bg-red-50"
+                              className="p-1.5 sm:p-2 rounded-lg text-red-600 hover:bg-red-50 cursor-pointer"
                               aria-label="Delete report"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -9614,11 +9783,11 @@ const StudentPage = () => {
                         </div>
 
                         {isExpanded && (
-                          <div className="px-6 py-6 border-t border-[#E38B52]/20 space-y-6 max-md:space-y-4 bg-white/50">
-                            {/* Table Section */}
+                          <div className="p-3 sm:px-6 sm:py-6 border-t border-[#E38B52]/20 space-y-4 sm:space-y-6 bg-white/50">
+                            {/* Desktop View: Traditional 3-Column Table (hidden on mobile) */}
                             {isEditing ? (
-                              <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                                <table className="w-full table-fixed border-collapse">
+                              <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-lg">
+                                <table className="w-full min-w-[650px] md:min-w-0 table-fixed border-collapse">
                                   <colgroup>
                                     <col style={{ width: "34%" }} />
                                     <col style={{ width: "33%" }} />
@@ -9780,8 +9949,8 @@ const StudentPage = () => {
                                 </table>
                               </div>
                             ) : (
-                              <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                                <table className="w-full table-fixed border-collapse">
+                              <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-lg">
+                                <table className="w-full min-w-[650px] md:min-w-0 table-fixed border-collapse">
                                   <colgroup>
                                     <col style={{ width: "34%" }} />
                                     <col style={{ width: "33%" }} />
@@ -9830,36 +9999,102 @@ const StudentPage = () => {
                               </div>
                             )}
 
+                            {/* Mobile View: Stacked Category Cards (hidden on desktop) */}
+                            <div className="md:hidden space-y-3.5">
+                              {[
+                                { key: "adlSkills", title: "ADL Skills", color: "from-orange-500/10 to-transparent", borderColor: "border-orange-200" },
+                                { key: "academic", title: "Academic", color: "from-amber-500/10 to-transparent", borderColor: "border-amber-200" },
+                                { key: "behaviouralSkills", title: "Behavioural Skills", color: "from-rose-500/10 to-transparent", borderColor: "border-rose-200" },
+                              ].map(({ key, title, color, borderColor }) => {
+                                const items = Array.isArray(iepData.sections?.[key]) ? iepData.sections[key] : [];
+                                return (
+                                  <div key={key} className={`border ${borderColor} rounded-xl bg-white shadow-xs overflow-hidden`}>
+                                    <div className={`px-3 py-2 bg-gradient-to-r ${color} flex items-center justify-between border-b ${borderColor}`}>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-xs font-bold text-[#170F49] uppercase tracking-wide">{title}</span>
+                                        <span className="text-[10px] bg-white text-gray-600 px-1.5 py-0.2 rounded-full font-bold border border-gray-200">
+                                          {items.length}
+                                        </span>
+                                      </div>
+                                      {isEditing && (
+                                        <button
+                                          type="button"
+                                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#E38B52] text-white text-[11px] font-semibold shadow-xs hover:bg-[#C8742F] cursor-pointer"
+                                          onClick={() => addIepSectionItem(key)}
+                                        >
+                                          <span>+ Add Row</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                    <div className="p-2.5 space-y-2">
+                                      {items.length === 0 ? (
+                                        <p className="text-xs text-gray-400 italic py-2 text-center">No entries yet.</p>
+                                      ) : (
+                                        items.map((item, idx) => (
+                                          <div key={item.id || idx} className="flex items-start gap-2 bg-gray-50/70 p-2 rounded-lg border border-gray-100">
+                                            <span className="text-[11px] font-bold text-gray-400 mt-1 shrink-0 w-4 text-center">
+                                              {idx + 1}.
+                                            </span>
+                                            {isEditing ? (
+                                              <>
+                                                <textarea
+                                                  value={item.text}
+                                                  onChange={(e) => handleIepSectionChange(key, item.id, e.target.value)}
+                                                  placeholder={`Enter ${title} entry...`}
+                                                  className="input-edit text-xs min-h-[58px] resize-none flex-1 p-2 bg-white rounded-lg border border-gray-200 font-medium"
+                                                />
+                                                <button
+                                                  type="button"
+                                                  className="text-red-500 hover:text-red-700 p-1 mt-1 shrink-0 cursor-pointer"
+                                                  onClick={() => removeIepSectionItem(key, item.id)}
+                                                  aria-label="Remove entry"
+                                                >
+                                                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" />
+                                                  </svg>
+                                                </button>
+                                              </>
+                                            ) : (
+                                              <p className="text-xs text-gray-800 flex-1 py-0.5 leading-relaxed font-medium">
+                                                {item.text || "-"}
+                                              </p>
+                                            )}
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
                             {/* Remarks */}
-                            <div>
-                              <label className="block text-sm font-semibold text-[#170F49] mb-2">IEP OF THE STUDENT:</label>
-                              <textarea
-                                value={iepData.iepStudent}
-                                onChange={(e) => handleIepInputChange("iepStudent", e.target.value)}
-                                placeholder="Enter the IEP details of the student..."
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] resize-none"
-                                rows={4}
-                                readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
-                              />
+                            <div className="space-y-3.5 pt-2">
+                              <div>
+                                <label className="block text-xs sm:text-sm font-bold text-[#170F49] mb-1.5">IEP OF THE STUDENT:</label>
+                                <textarea
+                                  value={iepData.iepStudent}
+                                  onChange={(e) => handleIepInputChange("iepStudent", e.target.value)}
+                                  placeholder="Enter the IEP details of the student..."
+                                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#E38B52] resize-none text-xs sm:text-sm bg-white"
+                                  rows={3}
+                                  readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs sm:text-sm font-bold text-[#170F49] mb-1.5">Remarks:</label>
+                                <textarea
+                                  value={iepData.remarks}
+                                  onChange={(e) => handleIepInputChange("remarks", e.target.value)}
+                                  placeholder="Enter additional remarks..."
+                                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#E38B52] resize-none text-xs sm:text-sm bg-white"
+                                  rows={3}
+                                  readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
+                                />
+                              </div>
                             </div>
-
-                            <div>
-                              <label className="block text-sm font-semibold text-[#170F49] mb-2">Remarks:</label>
-                              <textarea
-                                value={iepData.remarks}
-                                onChange={(e) => handleIepInputChange("remarks", e.target.value)}
-                                placeholder="Enter additional remarks..."
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E38B52] resize-none"
-                                rows={4}
-                                readOnly={!editingIepMonth || editingIepMonth !== monthYearKey}
-                              />
-                            </div>
-
-
-
-
                           </div>
-
                         )}
                       </div>
                     );
@@ -10204,45 +10439,44 @@ const StudentPage = () => {
                 </svg>
                 Special Education Report
               </h2>
-              {/* Report Setup - Cylinder Container */}
-              <div className="mb-6 max-md:mb-0 md:p-6 p-0 md:border-2 md:border-[#E38B52]/30 border-b border-gray-100 max-md:pb-5 max-md:mb-5 md:rounded-2xl rounded-none md:bg-gradient-to-br md:from-white md:via-orange-50/30 md:to-white md:shadow-xl max-md:bg-transparent max-md:shadow-none">
-                <h3 className="text-lg font-semibold text-[#170F49] mb-6 max-md:mb-4 flex items-center gap-2">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-[#E38B52]"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                  Assessment of : {" "}
-                  <span>{student.name}</span>
-                </h3>
-
-                <div className="flex flex-col md:flex-row gap-6 max-md:gap-2 items-end">
-                  {/* Report Date */}
-                  <div className="flex items-center gap-3">
-                    <label className="block text-sm font-semibold text-[#170F49] whitespace-nowrap">
-                      Report Date
-                    </label>
-
-                    <div className="relative w-40 group">
-                      <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-[#E38B52]/40 to-[#F5A572]/40 blur-lg opacity-60 group-focus-within:opacity-100 transition-opacity duration-300" />
-
-                      <input
-                        type="date"
-                        value={reportDate}
-                        max={new Date().toISOString().slice(0, 10)}
-                        onChange={(e) => setReportDate(e.target.value)}
-                        className="relative w-full px-3 py-1.5 rounded-xl border border-[#E38B52]/25 bg-white/90 text-[#170F49] font-medium shadow-sm transition-all duration-300 hover:border-[#E38B52]/45 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#E38B52]/20 focus:border-[#E38B52]"
+              {/* Report Setup - Modern Card Container */}
+              <div className="mb-6 p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-white via-orange-50/30 to-white shadow-lg border border-[#E38B52]/30">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-[#E38B52]/15">
+                  <h3 className="text-base sm:text-lg font-bold text-[#170F49] flex items-center gap-2">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 text-[#E38B52] flex-shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                       />
-                    </div>
+                    </svg>
+                    Functional Assessment Checklist for Programming (FACP)
+                  </h3>
+                  <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#FFF3E8] text-[#E38B52] border border-[#E38B52]/20 self-start sm:self-auto">
+                    Student: {student?.name || "Student"}
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
+                  {/* Report Date */}
+                  <div className="flex-1 sm:max-w-xs">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#6F6C90] mb-1.5">
+                      Assessment Date
+                    </label>
+                    <input
+                      type="date"
+                      value={reportDate}
+                      max={new Date().toISOString().slice(0, 10)}
+                      onChange={(e) => setReportDate(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-[#E38B52]/30 bg-white text-[#170F49] font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-[#E38B52]/30 focus:border-[#E38B52]"
+                    />
                   </div>
 
                   {/* Create Table Button */}
@@ -10250,8 +10484,11 @@ const StudentPage = () => {
                     type="button"
                     onClick={handleAddManualTable}
                     disabled={!reportDate}
-                    className={`px-6 py-2.5 bg-white text-[#E38B52] border border-[#E38B52] rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap ${!reportDate ? "opacity-50 cursor-not-allowed hover:bg-white" : "hover:bg-[#FFF3E8]"
-                      }`}
+                    className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 shadow-md flex items-center justify-center gap-2 ${
+                      !reportDate
+                        ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400"
+                        : "bg-gradient-to-r from-[#E38B52] to-[#F5A572] text-white hover:shadow-lg hover:scale-[1.02] cursor-pointer"
+                    }`}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -10267,12 +10504,15 @@ const StudentPage = () => {
                         d="M12 6v12m6-6H6"
                       />
                     </svg>
-                    Create Table
+                    Create Assessment Table
                   </button>
                 </div>
 
-                <p className="mt-3 text-xs text-[#6F6C90]">
-                  Select a date and click Create Table to add a new assessment.
+                <p className="mt-3 text-xs text-[#6F6C90] flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-[#E38B52] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  Evaluates 18 functional skill areas (Gross Motor, Fine Motor, Language, Academics & more) across quarterly intervals.
                 </p>
               </div>
 
@@ -10286,7 +10526,10 @@ const StudentPage = () => {
                       const db = new Date(b.report_date || b.extracted_at || 0);
                       return db - da; // newest first
                     })
-                    .map((table, tableIndex) => (
+                    .map((table, tableIndex) => {
+                      const tableKey = tableIndex;
+                      const viewMode = specialEduViewModeByTable[tableKey] || "questions";
+                      return (
                       <details
                         key={tableIndex}
                         data-special-edu-table="true"
@@ -10303,68 +10546,28 @@ const StudentPage = () => {
                               [tableIndex]: !prev[tableIndex],
                             }));
                           }}
-                          className="bg-gradient-to-r from-[#E38B52] to-[#F5A572] px-6 py-4 flex items-center justify-between cursor-pointer list-none"
+                          className="bg-gradient-to-r from-[#E38B52] to-[#F5A572] p-4 sm:p-5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 cursor-pointer list-none select-none"
                         >
-                          <div className="flex-1">
-                            {/* Primary Info - Always Visible */}
-                            <h3 className="text-lg font-bold text-white">
-                              {table.table_year || (table.report_date ? new Date(table.report_date).getFullYear() : "Year")} Table
-                            </h3>
-                            <div className="text-sm text-white/90 mt-1.5 font-medium">
-                              Report Date:{" "}
-                              {table.report_date || "Not specified"}
-                            </div>
-
-                            {/* Details Toggle */}
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-
-                                setShowTableDetails((prev) => ({
-                                  ...prev,
-                                  [tableIndex]: !prev[tableIndex],
-                                }));
-                              }}
-                              className="mt-2 text-xs text-white/70 hover:text-white flex items-center gap-1 transition-colors"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-3.5 w-3.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
-                              {showTableDetails[tableIndex]
-                                ? "Hide Details"
-                                : "Show Details"}
-                            </button>
-
-                            {/* Secondary Info - Collapsible */}
-                            {showTableDetails[tableIndex] && (
-                              <div className="mt-3 pt-3 border-t border-white/20 text-xs text-white/70 space-y-1">
-                                <div>
-                                  Last edited:{" "}
-                                  {formatDate(table.last_edited_at) ||
-                                    "Not edited yet"}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 ml-auto">
-                            <div className="relative">
-                              <span className="text-[15px] text-white/70 rounded-full px-2 py-1">
+                          <div className="flex-1 min-w-[200px]">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-base sm:text-lg font-bold text-white tracking-wide">
+                                {table.table_year || (table.report_date ? new Date(table.report_date).getFullYear() : "Annual")} Evaluation Table
+                              </h3>
+                              <span className="text-xs bg-white/20 text-white font-semibold rounded-full px-2.5 py-0.5 border border-white/20">
                                 {table.assessment_phase || "1st assmt"}
                               </span>
                             </div>
+                            <div className="text-xs sm:text-sm text-white/90 mt-1 font-medium flex items-center gap-2">
+                              <span>📅 Date: {table.report_date || "Not specified"}</span>
+                              {table.last_edited_at && (
+                                <span className="text-white/70 text-[11px] hidden sm:inline">
+                                  • Edited: {formatDate(table.last_edited_at)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
 
+                          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                             {/* Export icon */}
                             <button
                               type="button"
@@ -10395,11 +10598,11 @@ const StudentPage = () => {
 
                                 handleExportToPDF(table, tableIndex);
                               }}
-                              className="w-11 h-11 rounded-full bg-white/95 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center text-[#E38B52]"
+                              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center text-[#E38B52]"
                             >
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5"
+                                className="h-4 w-4 sm:h-5 sm:w-5"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -10415,32 +10618,30 @@ const StudentPage = () => {
 
                             {/* Delete icon */}
                             <button
+                              type="button"
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Prevent deleting other table while there is an unsaved one open
                                 if (warnIfUnsavedOther(tableIndex, "deleting this table")) return;
                                 setDeletePendingIndex(tableIndex);
                                 setShowDeleteConfirm(true);
                               }}
                               title="Delete table"
-                              className="w-11 h-11 rounded-full bg-white/95 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center text-red-500"
+                              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 shadow-md hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center text-red-500"
                             >
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 viewBox="0 0 24 24"
-                                className="h-5 w-5"
+                                className="h-4 w-4 sm:h-5 sm:w-5"
                                 fill="none"
                                 stroke="currentColor"
                               >
-                                {/* lid */}
                                 <path
                                   d="M9 5h6l1 2H8l1-2z"
                                   strokeWidth="1.8"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                 />
-                                {/* body */}
                                 <rect
                                   x="8"
                                   y="7"
@@ -10449,7 +10650,6 @@ const StudentPage = () => {
                                   rx="1.5"
                                   strokeWidth="1.8"
                                 />
-                                {/* inner lines */}
                                 <line
                                   x1="11"
                                   y1="10"
@@ -10468,6 +10668,18 @@ const StudentPage = () => {
                                 />
                               </svg>
                             </button>
+
+                            {/* Chevron expand/collapse */}
+                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white text-xs">
+                              <svg
+                                className={`w-4 h-4 transition-transform duration-200 ${showTableDetails[tableIndex] ? "rotate-180" : ""}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
                           </div>
                         </summary>
 
@@ -10504,28 +10716,26 @@ const StudentPage = () => {
                           if (!sessionHeaders.length) return null;
 
                           // Only show skills that actually exist in this table
-                          const tableKey = tableIndex;
                           const activeKey =
-                            activeSkillByTable[tableKey] || null;
-                          const isQuestionsOpen =
-                            !!questionsOpenByTable[tableKey];
+                            activeSkillByTable[tableKey] || SPECIAL_EDU_SKILLS[0]?.key || "grossmotor";
 
-                          const currentSkillMeta = activeKey
-                            ? SPECIAL_EDU_SKILLS.find(
-                              (s) => s.key === activeKey,
-                            )
-                            : null;
+                          const currentSkillIndex = SPECIAL_EDU_SKILLS.findIndex(
+                            (s) => s.key === activeKey,
+                          );
+                          const currentSkillMeta =
+                            (currentSkillIndex >= 0 ? SPECIAL_EDU_SKILLS[currentSkillIndex] : null) ||
+                            SPECIAL_EDU_SKILLS[0];
 
-                          const questions = activeKey
-                            ? SPECIAL_EDU_QUESTIONS[activeKey] || []
+                          const questions = currentSkillMeta
+                            ? SPECIAL_EDU_QUESTIONS[currentSkillMeta.key] || []
                             : [];
 
                           const skillRowIndex = activeKey
                             ? table.rows.findIndex(
-                              (row) =>
-                                normalizeSectionKey(row[skillColumn]) ===
-                                activeKey,
-                            )
+                                (row) =>
+                                  normalizeSectionKey(row[skillColumn]) ===
+                                  activeKey,
+                              )
                             : -1;
 
                           const skillRow =
@@ -10533,49 +10743,75 @@ const StudentPage = () => {
                               ? table.rows[skillRowIndex]
                               : null;
                           const canEdit = !!table.isEditable;
+                          const phase = table.assessment_phase || "1st assmt";
+                          const snapshots = table.quarterSnapshots || {};
+
+                          const currentSkillCounts = skillRowIndex >= 0
+                            ? getPhaseCounts(skillRow, skillRowIndex, phase, sessionHeaders, snapshots)
+                            : { aCount: 0, bCount: 0 };
+
+                          const prevSkill = currentSkillIndex > 0 ? SPECIAL_EDU_SKILLS[currentSkillIndex - 1] : null;
+                          const nextSkill = currentSkillIndex < SPECIAL_EDU_SKILLS.length - 1 ? SPECIAL_EDU_SKILLS[currentSkillIndex + 1] : null;
+
+                          const handleSelectSkill = (newKey) => {
+                            if (isAnotherTableUnsaved(table)) {
+                              showToast("Save the current table before switching skills", "warning");
+                              return;
+                            }
+                            setActiveSkillByTable((prev) => ({ ...prev, [tableKey]: newKey }));
+                            setQuestionsOpenByTable((prev) => ({ ...prev, [tableKey]: true }));
+                            setActiveQuestionByTable((prev) => ({ ...prev, [tableKey]: undefined }));
+                          };
+
+                          const handlePrevSkill = () => {
+                            if (prevSkill) handleSelectSkill(prevSkill.key);
+                          };
+
+                          const handleNextSkill = () => {
+                            if (nextSkill) handleSelectSkill(nextSkill.key);
+                          };
 
                           const handleToggleCell = (colName, newValue) => {
                             if (!skillRow || !activeKey || !canEdit) return;
                             setTableHasModifications(true);
 
-                            const phase = table.assessment_phase || '1st assmt';
                             const isQuarterPhase =
-                              phase === '1st Qtr' ||
-                              phase === '2nd Qtr' ||
-                              phase === '3rd Qtr' ||
-                              phase === '4th Qtr';
+                              phase === "1st Qtr" ||
+                              phase === "2nd Qtr" ||
+                              phase === "3rd Qtr" ||
+                              phase === "4th Qtr";
 
-                            setSavedTables(prev => {
+                            setSavedTables((prev) => {
                               const nowIso = new Date().toISOString();
 
-                              const updated = prev.map(t => {
+                              const updated = prev.map((t) => {
                                 if (t !== table) return t;
                                 const rows = t.rows || [];
 
-                                // For nonÃ¢â‚¬â€˜quarter phases (e.g. 1st assmt), edit the base value directly
+                                // For non-quarter phases (e.g. 1st assmt), edit the base value directly
                                 if (!isQuarterPhase) {
                                   const newRows = rows.map((row, idx) =>
-                                    idx === skillRowIndex ? { ...row, [colName]: newValue } : row
+                                    idx === skillRowIndex ? { ...row, [colName]: newValue } : row,
                                   );
                                   return { ...t, rows: newRows, last_edited_at: nowIso };
                                 }
 
-                                // For quarter phases (1stÃ¢â‚¬â€œ4th Qtr): only original B can be changed
+                                // For quarter phases (1st–4th Qtr): only original B can be changed
                                 const row = rows[skillRowIndex] || {};
                                 const rawCurrent = row[colName];
                                 const baseVal =
-                                  typeof rawCurrent === 'string'
+                                  typeof rawCurrent === "string"
                                     ? rawCurrent.trim().toUpperCase()
-                                    : '';
+                                    : "";
 
-                                if (baseVal !== 'B') return t; // ignore nonÃ¢â‚¬â€˜B cells in quarter phases
+                                if (baseVal !== "B") return t; // ignore non-B cells in quarter phases
 
                                 const cellKey = `${skillRowIndex}:${colName}`;
                                 const existingSnapshots = t.quarterSnapshots || {};
                                 const phaseSnapshot = existingSnapshots[phase] || {};
 
                                 let newPhaseSnapshot = phaseSnapshot;
-                                if (newValue === 'A' || newValue === 'B') {
+                                if (newValue === "A" || newValue === "B") {
                                   newPhaseSnapshot = { ...phaseSnapshot, [cellKey]: newValue };
                                 } else {
                                   return t;
@@ -10589,14 +10825,80 @@ const StudentPage = () => {
                               });
 
                               try {
-                                if (typeof window !== 'undefined' && id) {
+                                if (typeof window !== "undefined" && id) {
                                   window.localStorage.setItem(
                                     `special-education-tables:${id}`,
-                                    JSON.stringify(updated)
+                                    JSON.stringify(updated),
                                   );
                                 }
                               } catch (err) {
-                                console.warn('Failed to persist updated Special Education tables', err);
+                                console.warn("Failed to persist updated Special Education tables", err);
+                              }
+
+                              return updated;
+                            });
+                          };
+
+                          const handleBulkToggle = (targetValue) => {
+                            if (!skillRow || !activeKey || !canEdit) return;
+                            setTableHasModifications(true);
+
+                            const isQuarterPhase =
+                              phase === "1st Qtr" ||
+                              phase === "2nd Qtr" ||
+                              phase === "3rd Qtr" ||
+                              phase === "4th Qtr";
+
+                            setSavedTables((prev) => {
+                              const nowIso = new Date().toISOString();
+                              const updated = prev.map((t) => {
+                                if (t !== table) return t;
+                                const rows = t.rows || [];
+
+                                if (!isQuarterPhase) {
+                                  const newRows = rows.map((row, idx) => {
+                                    if (idx !== skillRowIndex) return row;
+                                    const updatedRow = { ...row };
+                                    sessionHeaders.forEach((colName) => {
+                                      updatedRow[colName] = targetValue;
+                                    });
+                                    return updatedRow;
+                                  });
+                                  return { ...t, rows: newRows, last_edited_at: nowIso };
+                                }
+
+                                const row = rows[skillRowIndex] || {};
+                                const existingSnapshots = t.quarterSnapshots || {};
+                                const phaseSnapshot = { ...(existingSnapshots[phase] || {}) };
+
+                                sessionHeaders.forEach((colName) => {
+                                  const rawCurrent = row[colName];
+                                  const baseVal =
+                                    typeof rawCurrent === "string"
+                                      ? rawCurrent.trim().toUpperCase()
+                                      : "";
+                                  if (baseVal === "B") {
+                                    const cellKey = `${skillRowIndex}:${colName}`;
+                                    phaseSnapshot[cellKey] = targetValue;
+                                  }
+                                });
+
+                                return {
+                                  ...t,
+                                  quarterSnapshots: { ...existingSnapshots, [phase]: phaseSnapshot },
+                                  last_edited_at: nowIso,
+                                };
+                              });
+
+                              try {
+                                if (typeof window !== "undefined" && id) {
+                                  window.localStorage.setItem(
+                                    `special-education-tables:${id}`,
+                                    JSON.stringify(updated),
+                                  );
+                                }
+                              } catch (err) {
+                                console.warn("Failed to persist updated Special Education tables", err);
                               }
 
                               return updated;
@@ -10604,13 +10906,125 @@ const StudentPage = () => {
                           };
 
                           return (
-                            <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-xs font-semibold text-gray-700">
-                                  Questionnaire (A = Yes, B = No)
-                                </h4>
-                                <div className="flex items-center gap-2">
-                                  {/* Edit/Save/Saved Toggle button */}
+                            <div className="border-t border-gray-100 bg-gray-50/70 p-3 sm:p-5">
+                              {/* Mobile View Switcher */}
+                              <div className="flex md:hidden items-center bg-gray-200/80 p-1 rounded-xl w-full mb-3">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSpecialEduViewModeByTable((prev) => ({
+                                      ...prev,
+                                      [tableKey]: "questions",
+                                    }))
+                                  }
+                                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                                    viewMode === "questions"
+                                      ? "bg-white text-[#E38B52] shadow-sm"
+                                      : "text-gray-600 hover:text-gray-900"
+                                  }`}
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                  </svg>
+                                  Questions Checklist
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSpecialEduViewModeByTable((prev) => ({
+                                      ...prev,
+                                      [tableKey]: "matrix",
+                                    }))
+                                  }
+                                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                                    viewMode === "matrix"
+                                      ? "bg-white text-[#E38B52] shadow-sm"
+                                      : "text-gray-600 hover:text-gray-900"
+                                  }`}
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  Full Table Matrix
+                                </button>
+                              </div>
+
+                              {/* Main Toolbar */}
+                              <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-gray-200/80">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-sm sm:text-base font-bold text-gray-800 flex items-center gap-1.5">
+                                    <span>Evaluation Checklist</span>
+                                    <span className="text-xs font-normal text-gray-500">
+                                      (A = Yes, B = No)
+                                    </span>
+                                  </h4>
+                                  <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-[#FFF3E8] text-[#E38B52] border border-[#E38B52]/20">
+                                    Phase: {phase}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {/* Phase selector if editable */}
+                                  {table.isEditable && (
+                                    <div className="flex items-center gap-2">
+                                      <select
+                                        value={table.assessment_phase || "1st assmt"}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onChange={(e) => {
+                                          const phaseVal = e.target.value;
+                                          if (!isPhaseUnlocked(table, phaseVal)) {
+                                            showToast(
+                                              `Complete ${SPECIAL_EDU_ASSESSMENT_PHASES[SPECIAL_EDU_ASSESSMENT_PHASES.indexOf(phaseVal) - 1]} before accessing this quarter`,
+                                              "warning",
+                                            );
+                                            return;
+                                          }
+                                          e.stopPropagation();
+                                          const nowIso = new Date().toISOString();
+                                          setSavedTables((prev) => {
+                                            const updated = prev.map((t) =>
+                                              t === table ? { ...t, assessment_phase: phaseVal, last_edited_at: nowIso } : t,
+                                            );
+                                            try {
+                                              if (typeof window !== "undefined" && id) {
+                                                const key = `special-education-tables:${id}`;
+                                                window.localStorage.setItem(key, JSON.stringify(updated));
+                                              }
+                                            } catch (err) {
+                                              console.warn("Failed to persist assessment phase", err);
+                                            }
+                                            return updated;
+                                          });
+                                        }}
+                                        className="text-xs font-semibold bg-white text-[#170F49] border border-gray-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#E38B52]/30 shadow-sm"
+                                      >
+                                        {SPECIAL_EDU_ASSESSMENT_PHASES.map((p) => {
+                                          const isUnlocked = isPhaseUnlocked(table, p);
+                                          return (
+                                            <option key={p} value={p} disabled={!isUnlocked}>
+                                              {p} {!isUnlocked ? "(Locked)" : ""}
+                                            </option>
+                                          );
+                                        })}
+                                      </select>
+
+                                      {table.assessment_phase !== "1st assmt" && (
+                                        <input
+                                          type="date"
+                                          value={(table.quarterEditDates || {})[table.assessment_phase] || ""}
+                                          max={new Date().toISOString().slice(0, 10)}
+                                          onMouseDown={(e) => e.stopPropagation()}
+                                          onClick={(e) => e.stopPropagation()}
+                                          onChange={(e) =>
+                                            handleQuarterEditDateChange(table, table.assessment_phase, e.target.value)
+                                          }
+                                          className="text-xs bg-white text-[#170F49] border border-gray-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#E38B52]/30 shadow-sm"
+                                        />
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Edit/Save/Saved Button */}
                                   <button
                                     type="button"
                                     id={`spec-table-save-btn-${tableIndex}`}
@@ -10620,7 +11034,6 @@ const StudentPage = () => {
 
                                       if (table.isEditable) {
                                         const phaseToSave = table.assessment_phase || "1st assmt";
-
                                         if (phaseToSave !== "1st assmt") {
                                           const dateVal = (table.quarterEditDates || {})[phaseToSave];
                                           if (!dateVal) {
@@ -10645,7 +11058,7 @@ const StudentPage = () => {
                                       }
                                     }}
                                     className={
-                                      "px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 shadow-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap " +
+                                      "px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all duration-200 shadow-sm flex items-center gap-1.5 cursor-pointer whitespace-nowrap " +
                                       (tableSavedStatus[tableIndex]
                                         ? "bg-green-600 text-white border-green-600 shadow-green-200"
                                         : pulsatingEditButton[tableIndex]
@@ -10667,272 +11080,298 @@ const StudentPage = () => {
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                                         </svg>
-                                        Save
+                                        Save Table
                                       </span>
                                     ) : (
                                       <span className="flex items-center gap-1.5">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                         </svg>
-                                        Edit
+                                        Edit Table
                                       </span>
                                     )}
                                   </button>
-
-                                  {table.isEditable && (
-                                    <div className="flex flex-col gap-2">
-                                      <select
-                                        value={table.assessment_phase || "1st assmt"}
-                                        onMouseDown={(e) => e.stopPropagation()}
-
-                                        onChange={(e) => {
-                                          const phase = e.target.value;
-                                          const tableKey = savedTables.indexOf(table);
-
-                                          if (!isPhaseUnlocked(table, phase)) {
-                                            showToast(
-                                              `Complete ${SPECIAL_EDU_ASSESSMENT_PHASES[SPECIAL_EDU_ASSESSMENT_PHASES.indexOf(phase) - 1]} before accessing this quarter`,
-                                              "warning",
-                                            );
-                                            return;
-                                          }
-
-                                          e.stopPropagation();
-                                          const nowIso = new Date().toISOString();
-                                          setSavedTables((prev) => {
-                                            const updated = prev.map((t) =>
-                                              t === table ? { ...t, assessment_phase: phase, last_edited_at: nowIso } : t,
-                                            );
-                                            try {
-                                              if (typeof window !== "undefined" && id) {
-                                                const key = `special-education-tables:${id}`;
-                                                window.localStorage.setItem(key, JSON.stringify(updated));
-                                              }
-                                            } catch (err) {
-                                              console.warn("Failed to persist assessment phase", err);
-                                            }
-                                            return updated;
-                                          });
-                                        }}
-                                        className="text-[10px] bg-white text-[#170F49] border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#E38B52] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                      >
-                                        {SPECIAL_EDU_ASSESSMENT_PHASES.map((phase) => {
-                                          const isUnlocked = isPhaseUnlocked(table, phase);
-                                          return (
-                                            <option key={phase} value={phase} disabled={!isUnlocked}>
-                                              {phase} {!isUnlocked ? "(Locked)" : ""}
-                                            </option>
-                                          );
-                                        })}
-                                      </select>
-
-                                      {table.assessment_phase !== "1st assmt" && (
-                                        <input
-                                          type="date"
-                                          value={(table.quarterEditDates || {})[table.assessment_phase] || ""}
-                                          max={new Date().toISOString().slice(0, 10)}
-                                          onMouseDown={(e) => e.stopPropagation()}
-                                          onClick={(e) => e.stopPropagation()}
-                                          onChange={(e) =>
-                                            handleQuarterEditDateChange(table, table.assessment_phase, e.target.value)
-                                          }
-                                          className="text-[10px] bg-white text-[#170F49] border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#E38B52] shadow-sm"
-                                        />
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {/* Show/Hide questions only makes sense when a skill is selected */}
-                                  {activeKey && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (warnIfUnsavedOther(tableKey, "opening questions in this table")) return;
-                                        setQuestionsOpenByTable((prev) => ({ ...prev, [tableKey]: !prev[tableKey] }));
-                                      }}
-                                      className="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-100"
-                                    >
-                                      {questionsOpenByTable[tableKey] ? "Hide questions" : "Show questions"}
-                                    </button>
-                                  )}
                                 </div>
                               </div>
-                              {!canEdit && (
-                                <p className="text-[11px] text-gray-500 mb-1">
-                                  This table is read-only. Click "Edit" in the
-                                  header to modify.
-                                </p>
-                              )}
 
-                              {/* Questions for the currently selected skill only */}
-                              <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-                                {!activeKey ? (
-                                  <div className="text-[11px] text-gray-500">
-                                    Click a skill in the Skill Area column to
-                                    view its questions.
-                                  </div>
-                                ) : !skillRow ? (
-                                  <div className="text-[11px] text-gray-500">
-                                    No data for this skill in this table.
-                                  </div>
-                                ) : !isQuestionsOpen ? (
-                                  <div className="text-[11px] text-gray-500">
-                                    Questions are hidden. Click "Show questions"
-                                    to view them.
-                                  </div>
-                                ) : (
-                                  <div
-                                    className="space-y-1 max-h-64 overflow-y-auto overflow-x-hidden pr-1"
-                                    id={`questions-container-${tableKey}`}
-                                  >
-                                    {questions
-                                      .slice(0, sessionHeaders.length)
-                                      .map((questionText, idx) => {
-                                        const colName = sessionHeaders[idx];
-                                        const phase =
-                                          table.assessment_phase || "1st assmt";
-                                        const quarterOverrides =
-                                          table.quarterOverrides || {};
-                                        const cellKey = `${skillRowIndex}:${colName}`;
-
-                                        const rawValue = skillRow[colName];
-                                        const baseVal =
-                                          typeof rawValue === 'string'
-                                            ? rawValue.trim().toUpperCase()
-                                            : '';
-
-                                        const snapshots = table.quarterSnapshots || {};
-                                        const effectiveVal = getEffectiveValueForPhase(
-                                          baseVal,
-                                          cellKey,
-                                          phase,
-                                          snapshots
+                              {/* Skill Switcher Navigation Header */}
+                              <div className="mb-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-2.5">
+                                  <div className="flex items-center gap-2 flex-1">
+                                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">
+                                      Skill Area:
+                                    </label>
+                                    <select
+                                      value={activeKey}
+                                      onChange={(e) => handleSelectSkill(e.target.value)}
+                                      className="flex-1 sm:max-w-xs text-xs sm:text-sm font-semibold bg-white text-gray-800 border border-[#E38B52]/30 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#E38B52]/30"
+                                    >
+                                      {SPECIAL_EDU_SKILLS.map((skill, sIdx) => {
+                                        const rIdx = table.rows.findIndex(
+                                          (row) => normalizeSectionKey(row[skillColumn]) === skill.key,
                                         );
-
-                                        const isYes = effectiveVal === 'A';
-                                        const isNo = effectiveVal === 'B';
-                                        const isActiveQuestion =
-                                          activeQuestionByTable[tableKey] ===
-                                          idx;
-
+                                        const counts = rIdx >= 0
+                                          ? getPhaseCounts(table.rows[rIdx], rIdx, phase, sessionHeaders, snapshots)
+                                          : { aCount: 0, bCount: 0 };
                                         return (
-                                          <div
-                                            key={idx}
-                                            ref={(el) => {
-                                              if (
-                                                !questionRefs.current[tableKey]
-                                              ) {
-                                                questionRefs.current[tableKey] =
-                                                  {};
-                                              }
-                                              questionRefs.current[tableKey][
-                                                idx
-                                              ] = el;
-                                            }}
-                                            className={
-                                              "flex flex-wrap items-center gap-2 text-[11px] rounded-lg px-2 py-1.5 border transition-all duration-200 " +
-                                              (isActiveQuestion
-                                                ? "bg-[#E38B52]/20 border-[#E38B52] shadow-md"
-                                                : "bg-gray-50 border-gray-100")
-                                            }
-                                          >
-                                            <span className="flex-1 min-w-0 break-words">
-                                              <span className="font-semibold mr-1">
-                                                {idx + 1}.
-                                              </span>
-                                              {questionText}
-                                            </span>
-                                            <div className="flex items-center gap-1 flex-shrink-0">
-                                              <span
-                                                role="button"
-                                                onClick={() => {
-                                                  if (canEdit) {
-                                                    handleToggleCell(
-                                                      colName,
-                                                      "A",
-                                                    );
-                                                  } else {
-                                                    // Trigger pulsate animation on edit button
-                                                    setPulsatingEditButton(
-                                                      (prev) => ({
-                                                        ...prev,
-                                                        [tableKey]: true,
-                                                      }),
-                                                    );
-                                                    setTimeout(() => {
-                                                      setPulsatingEditButton(
-                                                        (prev) => ({
-                                                          ...prev,
-                                                          [tableKey]: false,
-                                                        }),
-                                                      );
-                                                    }, 3000);
-                                                  }
-                                                }}
-                                                className={
-                                                  "px-2 py-[1px] rounded-full border text-[10px] " +
-                                                  (canEdit
-                                                    ? "cursor-pointer "
-                                                    : "cursor-not-allowed opacity-60 ") +
-                                                  (isYes
-                                                    ? "bg-green-100 text-green-700 border-green-300"
-                                                    : "text-gray-500 border-gray-200 hover:bg-green-50")
-                                                }
-                                              >
-                                                Yes
-                                              </span>
-
-                                              <span
-                                                role="button"
-                                                onClick={() => {
-                                                  if (canEdit) {
-                                                    handleToggleCell(
-                                                      colName,
-                                                      "B",
-                                                    );
-                                                  } else {
-                                                    // Trigger pulsate animation on edit button
-                                                    setPulsatingEditButton(
-                                                      (prev) => ({
-                                                        ...prev,
-                                                        [tableKey]: true,
-                                                      }),
-                                                    );
-                                                    setTimeout(() => {
-                                                      setPulsatingEditButton(
-                                                        (prev) => ({
-                                                          ...prev,
-                                                          [tableKey]: false,
-                                                        }),
-                                                      );
-                                                    }, 3000);
-                                                  }
-                                                }}
-                                                className={
-                                                  "px-2 py-[1px] rounded-full border text-[10px] " +
-                                                  (canEdit
-                                                    ? "cursor-pointer "
-                                                    : "cursor-not-allowed opacity-60 ") +
-                                                  (isNo
-                                                    ? "bg-red-100 text-red-700 border-red-300"
-                                                    : "text-gray-500 border-gray-200 hover:bg-red-50")
-                                                }
-                                              >
-                                                No
-                                              </span>
-                                            </div>
-                                          </div>
+                                          <option key={skill.key} value={skill.key}>
+                                            {sIdx + 1}. {skill.label} ({counts.aCount} Yes / {counts.bCount} No)
+                                          </option>
                                         );
                                       })}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      disabled={!prevSkill}
+                                      onClick={handlePrevSkill}
+                                      className="p-2 rounded-xl bg-white border border-gray-200 text-gray-600 hover:bg-orange-50 hover:text-[#E38B52] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                      title="Previous skill"
+                                      aria-label="Previous skill"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={!nextSkill}
+                                      onClick={handleNextSkill}
+                                      className="p-2 rounded-xl bg-white border border-gray-200 text-gray-600 hover:bg-orange-50 hover:text-[#E38B52] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                      title="Next skill"
+                                      aria-label="Next skill"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </button>
                                   </div>
-                                )}
+
+                                  {/* Live Score for Active Skill */}
+                                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                                    <span className="text-xs px-2.5 py-1 rounded-lg font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      ✓ Yes (A): {currentSkillCounts.aCount}
+                                    </span>
+                                    <span className="text-xs px-2.5 py-1 rounded-lg font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                      ✗ No (B): {currentSkillCounts.bCount}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Horizontal Scrollable Skill Chips */}
+                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+                                  {SPECIAL_EDU_SKILLS.map((skill, sIdx) => {
+                                    const isSel = skill.key === activeKey;
+                                    const rIdx = table.rows.findIndex(
+                                      (row) => normalizeSectionKey(row[skillColumn]) === skill.key,
+                                    );
+                                    const c = rIdx >= 0
+                                      ? getPhaseCounts(table.rows[rIdx], rIdx, phase, sessionHeaders, snapshots)
+                                      : { aCount: 0, bCount: 0 };
+                                    return (
+                                      <button
+                                        key={skill.key}
+                                        type="button"
+                                        onClick={() => handleSelectSkill(skill.key)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 flex-shrink-0 cursor-pointer ${
+                                          isSel
+                                            ? "bg-[#E38B52] text-white shadow-md shadow-[#E38B52]/25 scale-[1.02]"
+                                            : "bg-white text-gray-700 border border-gray-200 hover:border-[#E38B52]/40 hover:bg-orange-50/50"
+                                        }`}
+                                      >
+                                        <span>{sIdx + 1}. {skill.label}</span>
+                                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                          isSel ? "bg-white/25 text-white" : "bg-gray-100 text-gray-600"
+                                        }`}>
+                                          {c.aCount}A
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
+
+                              {/* Question Cards Container */}
+                              {viewMode === "questions" && (
+                                <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm p-3.5 sm:p-5">
+                                  {/* Quick Fill Action Strip */}
+                                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-3 border-b border-gray-100">
+                                    <div className="text-xs font-semibold text-gray-600">
+                                      Evaluating: <span className="text-[#E38B52] font-bold">{currentSkillMeta?.label}</span> ({questions.length} Items)
+                                    </div>
+                                    {canEdit ? (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[11px] text-gray-500 hidden sm:inline">Quick Fill:</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleBulkToggle("A")}
+                                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                        >
+                                          ✓ All Yes (A)
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleBulkToggle("B")}
+                                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
+                                        >
+                                          ✗ All No (B)
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                                        🔒 Read-only. Click "Edit Table" above to change answers.
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Questions List */}
+                                  <div
+                                    className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1"
+                                    id={`questions-container-${tableKey}`}
+                                  >
+                                    {questions.slice(0, sessionHeaders.length).map((questionText, idx) => {
+                                      const colName = sessionHeaders[idx];
+                                      const cellKey = `${skillRowIndex}:${colName}`;
+                                      const rawValue = skillRow ? skillRow[colName] : "";
+                                      const baseVal =
+                                        typeof rawValue === "string" ? rawValue.trim().toUpperCase() : "";
+                                      const effectiveVal = getEffectiveValueForPhase(
+                                        baseVal,
+                                        cellKey,
+                                        phase,
+                                        snapshots,
+                                      );
+
+                                      const isYes = effectiveVal === "A";
+                                      const isNo = effectiveVal === "B";
+                                      const isActiveQuestion = activeQuestionByTable[tableKey] === idx;
+
+                                      return (
+                                        <div
+                                          key={idx}
+                                          ref={(el) => {
+                                            if (!questionRefs.current[tableKey]) {
+                                              questionRefs.current[tableKey] = {};
+                                            }
+                                            questionRefs.current[tableKey][idx] = el;
+                                          }}
+                                          className={`p-3 rounded-xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                                            isActiveQuestion
+                                              ? "bg-[#FFF3E8] border-[#E38B52] shadow-sm ring-1 ring-[#E38B52]/40"
+                                              : "bg-gray-50/60 border-gray-200/80 hover:bg-white hover:border-gray-300"
+                                          }`}
+                                        >
+                                          <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                                            <span className="w-6 h-6 rounded-full bg-[#E38B52]/10 text-[#E38B52] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                                              {idx + 1}
+                                            </span>
+                                            <p className="text-xs sm:text-sm text-gray-800 leading-relaxed font-medium">
+                                              {questionText}
+                                            </p>
+                                          </div>
+
+                                          <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                if (canEdit) {
+                                                  handleToggleCell(colName, "A");
+                                                } else {
+                                                  setPulsatingEditButton((prev) => ({ ...prev, [tableKey]: true }));
+                                                  showToast("Click 'Edit Table' in the toolbar to change answers", "info");
+                                                  setTimeout(() => {
+                                                    setPulsatingEditButton((prev) => ({ ...prev, [tableKey]: false }));
+                                                  }, 2500);
+                                                }
+                                              }}
+                                              className={`min-w-[70px] sm:min-w-[80px] py-1.5 sm:py-2 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all duration-150 flex items-center justify-center gap-1 cursor-pointer ${
+                                                isYes
+                                                  ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-200 scale-105"
+                                                  : "bg-white text-gray-700 border-gray-300 hover:bg-emerald-50 hover:border-emerald-400"
+                                              } ${!canEdit ? "opacity-75" : ""}`}
+                                            >
+                                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                              </svg>
+                                              <span>Yes (A)</span>
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                if (canEdit) {
+                                                  handleToggleCell(colName, "B");
+                                                } else {
+                                                  setPulsatingEditButton((prev) => ({ ...prev, [tableKey]: true }));
+                                                  showToast("Click 'Edit Table' in the toolbar to change answers", "info");
+                                                  setTimeout(() => {
+                                                    setPulsatingEditButton((prev) => ({ ...prev, [tableKey]: false }));
+                                                  }, 2500);
+                                                }
+                                              }}
+                                              className={`min-w-[70px] sm:min-w-[80px] py-1.5 sm:py-2 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all duration-150 flex items-center justify-center gap-1 cursor-pointer ${
+                                                isNo
+                                                  ? "bg-rose-500 text-white border-rose-500 shadow-md shadow-rose-200 scale-105"
+                                                  : "bg-white text-gray-700 border-gray-300 hover:bg-rose-50 hover:border-rose-400"
+                                              } ${!canEdit ? "opacity-75" : ""}`}
+                                            >
+                                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                                              </svg>
+                                              <span>No (B)</span>
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Bottom Skill Pager */}
+                                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
+                                    <button
+                                      type="button"
+                                      disabled={!prevSkill}
+                                      onClick={handlePrevSkill}
+                                      className="px-3.5 py-2 rounded-xl text-xs font-semibold border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                      <span>←</span>
+                                      <span className="hidden sm:inline">Previous:</span>
+                                      <span>{prevSkill?.label || "Start"}</span>
+                                    </button>
+
+                                    <span className="text-xs font-semibold text-gray-500">
+                                      Skill {currentSkillIndex + 1} of {SPECIAL_EDU_SKILLS.length}
+                                    </span>
+
+                                    <button
+                                      type="button"
+                                      disabled={!nextSkill}
+                                      onClick={handleNextSkill}
+                                      className="px-3.5 py-2 rounded-xl text-xs font-semibold border border-[#E38B52]/30 bg-[#FFF3E8] text-[#E38B52] hover:bg-[#FFE8D6] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                      <span className="hidden sm:inline">Next:</span>
+                                      <span>{nextSkill?.label || "Finish"}</span>
+                                      <span>→</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}
 
-                        {/* Original table view with grouped totals/quarters */}
-                        <div className="overflow-x-auto">
+                        {/* Table Matrix View */}
+                        <div className={`overflow-x-auto ${viewMode === "matrix" ? "block" : "hidden md:block"}`}>
+                          {/* Mobile matrix helper strip */}
+                          <div className="md:hidden px-3.5 py-2 bg-orange-50 text-[#E38B52] text-xs font-semibold flex items-center justify-between border-b border-orange-100">
+                            <span>👉 Swipe horizontally for all 20 sessions</span>
+                            <button
+                              type="button"
+                              onClick={() => setSpecialEduViewModeByTable((prev) => ({ ...prev, [tableKey]: "questions" }))}
+                              className="font-bold underline text-[#E38B52] cursor-pointer"
+                            >
+                              Back to Questions
+                            </button>
+                          </div>
                           {(() => {
                             const rawHeaders =
                               table.headers && table.headers.length
@@ -11005,11 +11444,6 @@ const StudentPage = () => {
                             // Build leaf columns (second header row + body)
                             const leafColumns = [];
 
-
-
-
-
-
                             // Base columns: one cell, spanning both header rows
                             baseHeaders.forEach(h => {
                               const isSkillCol = h === skillColumn;
@@ -11063,7 +11497,8 @@ const StudentPage = () => {
                             if (!leafColumns.length) return null;
 
                             return (
-                              <table className="min-w-full divide-y divide-gray-200">
+                              <div className="overflow-x-auto w-full">
+                                <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                   {/* Top header row: base cols (rowSpan=2) + grouped headings */}
                                   <tr>
@@ -11078,7 +11513,11 @@ const StudentPage = () => {
                                             <th
                                               key={`h1-${i}`}
                                               rowSpan={2}
-                                              className="px-2 py-1.5 text-left text-[10px] font-medium text-gray-500 uppercase tracking-wider"
+                                              className={`px-2.5 py-2 text-left text-xs font-bold text-gray-700 uppercase tracking-wider ${
+                                                col.isSkill
+                                                  ? "sticky left-0 bg-gray-100 z-30 shadow-[2px_0_4px_rgba(0,0,0,0.06)] min-w-[150px] sm:min-w-[180px]"
+                                                  : "min-w-[34px] sm:min-w-[38px] text-center"
+                                              }`}
                                             >
                                               {col.header}
                                             </th>
@@ -11086,7 +11525,7 @@ const StudentPage = () => {
                                           i += 1;
                                           continue;
                                         }
-                                        // Grouped columns (1st Assessment, I Qr, Ã¢â‚¬Â¦)
+                                        // Grouped columns (1st Assessment, I Qr, …)
                                         const group = col.group;
                                         let span = 0;
                                         while (
@@ -11099,7 +11538,7 @@ const StudentPage = () => {
                                           <th
                                             key={`group-${group}-${i}`}
                                             colSpan={span}
-                                            className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-600 uppercase tracking-wider"
+                                            className="px-2 py-1.5 text-center text-xs font-bold text-[#E38B52] bg-orange-50/70 border-b border-orange-200/60 uppercase tracking-wider"
                                           >
                                             {group}
                                           </th>
@@ -11115,7 +11554,7 @@ const StudentPage = () => {
                                       col.group ? (
                                         <th
                                           key={`h2-${idx}`}
-                                          className="px-2 py-1.5 text-center text-[10px] font-medium text-gray-500 uppercase tracking-wider"
+                                          className="px-2 py-1.5 text-center text-[10px] font-bold text-gray-600 uppercase tracking-wider bg-orange-50/40"
                                         >
                                           {col.subLabel || col.header}
                                         </th>
@@ -11131,7 +11570,6 @@ const StudentPage = () => {
                                     const isRowSelected = rowSkillKey && activeKey === rowSkillKey;
                                     const phase = table.assessment_phase || '1st assmt';
                                     const snapshots = table.quarterSnapshots || {};
-
 
                                     // Function to calculate A/B counts for any specific phase
                                     const getCountsForPhase = (targetPhase) => {
@@ -11184,7 +11622,6 @@ const StudentPage = () => {
                                                 cellValue = '-';
                                               }
                                             } else {
-                                              // quadrant not edited yet Ã¢â€ â€™ show "-"
                                               cellValue = '-';
                                             }
                                           } else {
@@ -11212,7 +11649,6 @@ const StudentPage = () => {
                                             );
                                             hasQuadrantChange = baseVal === 'B' && effectiveVal === 'A';
 
-                                            // Find which quarter made the change (for correct strike pattern)
                                             if (hasQuadrantChange) {
                                               const phaseOrder = ['1st Qtr', '2nd Qtr', '3rd Qtr', '4th Qtr'];
                                               const idx = phaseOrder.indexOf(phase);
@@ -11236,11 +11672,10 @@ const StudentPage = () => {
                                           let textClass;
                                           if (isSummaryCell) textClass = 'text-gray-900 ';
                                           else if (isAVisual) textClass = 'text-blue-600 ';
-                                          else if (isBVisual) textClass = 'text-red-600 '; // B stays red even when overridden
+                                          else if (isBVisual) textClass = 'text-red-600 ';
                                           else textClass = 'text-gray-900 ';
 
                                           let cellInner = cellValue;
-                                          // Show B with strikethrough pattern based on WHICH quarter the override was made in
                                           if (
                                             isSessionBaseCell &&
                                             cellValue === "B" &&
@@ -11248,7 +11683,6 @@ const StudentPage = () => {
                                             !isSummaryCell
                                           ) {
                                             if (overrideQuarter === "1st Qtr") {
-                                              // 1st Qtr override: horizontal lines
                                               cellInner = (
                                                 <span className="absolute inset-0 flex items-center justify-center">
                                                   <span className="relative z-10 font-semibold">
@@ -11259,10 +11693,7 @@ const StudentPage = () => {
                                                   <span className="pointer-events-none absolute left-0 right-0 h-[1px] bg-blue-600 top-[70%]" />
                                                 </span>
                                               );
-                                            } else if (
-                                              overrideQuarter === "2nd Qtr"
-                                            ) {
-                                              // 2nd Qtr override: vertical lines
+                                            } else if (overrideQuarter === "2nd Qtr") {
                                               cellInner = (
                                                 <span className="absolute inset-0 flex items-center justify-center">
                                                   <span className="relative z-10 font-semibold">
@@ -11273,10 +11704,7 @@ const StudentPage = () => {
                                                   <span className="pointer-events-none absolute top-0 bottom-0 w-[1px] bg-blue-600 left-[70%]" />
                                                 </span>
                                               );
-                                            } else if (
-                                              overrideQuarter === "3rd Qtr"
-                                            ) {
-                                              // 3rd Qtr override: grid (horizontal + vertical)
+                                            } else if (overrideQuarter === "3rd Qtr") {
                                               cellInner = (
                                                 <span className="absolute inset-0 flex items-center justify-center">
                                                   <span className="relative z-10 font-semibold">
@@ -11290,10 +11718,7 @@ const StudentPage = () => {
                                                   <span className="pointer-events-none absolute top-0 bottom-0 w-[1px] bg-blue-600 left-[70%]" />
                                                 </span>
                                               );
-                                            } else if (
-                                              overrideQuarter === "4th Qtr"
-                                            ) {
-                                              // 4th Qtr override: diagonal lines
+                                            } else if (overrideQuarter === "4th Qtr") {
                                               cellInner = (
                                                 <span className="absolute inset-0 flex items-center justify-center overflow-hidden">
                                                   <span className="relative z-10 font-semibold">
@@ -11334,41 +11759,23 @@ const StudentPage = () => {
                                                 showToast("Save the current table before switching skills", "warning");
                                                 return;
                                               }
-                                              setActiveSkillByTable((prev) => {
-                                                const isSame =
-                                                  prev[tableKey] ===
-                                                  rowSkillKey;
-                                                const nextKey = isSame
-                                                  ? undefined
-                                                  : rowSkillKey;
-
-                                                setQuestionsOpenByTable(
-                                                  (prevOpen) => ({
-                                                    ...prevOpen,
-                                                    [tableKey]: !!nextKey,
-                                                  }),
-                                                );
-
-                                                // Clear active question when toggling skill
-                                                if (!nextKey) {
-                                                  setActiveQuestionByTable(
-                                                    (prevQ) => ({
-                                                      ...prevQ,
-                                                      [tableKey]: undefined,
-                                                    }),
-                                                  );
-                                                }
-
-                                                return {
-                                                  ...prev,
-                                                  [tableKey]: nextKey,
-                                                };
-                                              });
+                                              setActiveSkillByTable((prev) => ({
+                                                ...prev,
+                                                [tableKey]: rowSkillKey,
+                                              }));
+                                              setQuestionsOpenByTable((prev) => ({
+                                                ...prev,
+                                                [tableKey]: true,
+                                              }));
+                                              setSpecialEduViewModeByTable((prev) => ({
+                                                ...prev,
+                                                [tableKey]: "questions",
+                                              }));
                                             };
                                             extraClass =
                                               " cursor-pointer " +
                                               (isRowSelected
-                                                ? "font-semibold text-gray-900 border-l-4 border-[#E38B52]"
+                                                ? "font-bold text-gray-900 border-l-4 border-[#E38B52] bg-orange-50/60"
                                                 : "hover:bg-orange-50");
                                           }
 
@@ -11391,20 +11798,21 @@ const StudentPage = () => {
                                                 [tableKey]: rowSkillKey,
                                               }));
 
-                                              setQuestionsOpenByTable(
-                                                (prev) => ({
-                                                  ...prev,
-                                                  [tableKey]: true,
-                                                }),
-                                              );
+                                              setQuestionsOpenByTable((prev) => ({
+                                                ...prev,
+                                                [tableKey]: true,
+                                              }));
+
+                                              setSpecialEduViewModeByTable((prev) => ({
+                                                ...prev,
+                                                [tableKey]: "questions",
+                                              }));
 
                                               // Set the active question
-                                              setActiveQuestionByTable(
-                                                (prev) => ({
-                                                  ...prev,
-                                                  [tableKey]: questionIdx,
-                                                }),
-                                              );
+                                              setActiveQuestionByTable((prev) => ({
+                                                ...prev,
+                                                [tableKey]: questionIdx,
+                                              }));
 
                                               // Scroll to the question after a brief delay to ensure rendering
                                               setTimeout(() => {
@@ -11430,10 +11838,13 @@ const StudentPage = () => {
                                               key={cellIdx}
                                               onClick={onClick}
                                               className={
-                                                `relative px-2 py-1 whitespace-nowrap text-xs font-semibold ` +
+                                                `relative px-2.5 py-1.5 whitespace-nowrap text-xs font-semibold ` +
                                                 (col.group
                                                   ? "text-center "
                                                   : "text-left ") +
+                                                (col.isSkill
+                                                  ? "sticky left-0 bg-white z-20 shadow-[2px_0_4px_rgba(0,0,0,0.06)] min-w-[150px] sm:min-w-[180px] "
+                                                  : "min-w-[34px] sm:min-w-[38px] ") +
                                                 textClass +
                                                 extraClass
                                               }
@@ -11447,11 +11858,13 @@ const StudentPage = () => {
                                   })}
                                 </tbody>
                               </table>
+                              </div>
                             );
                           })()}
                         </div>
                       </details>
-                    ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="mt-4 rounded-2xl border border-dashed border-[#E38B52]/30 bg-white/70 p-6 text-center text-sm text-[#6F6C90]">
@@ -12043,6 +12456,7 @@ const StudentPage = () => {
                           </div>
                         </div>
                       </div>
+                      {renderCaseSectionNav("identification")}
                     </div>
                   )}
 
@@ -12286,6 +12700,7 @@ const StudentPage = () => {
                           </div>
                         </div>
                       </div>
+                      {renderCaseSectionNav("demographic")}
                     </div>
                   )}
 
@@ -12401,6 +12816,7 @@ const StudentPage = () => {
                           )}
                         </div>
                       </div>
+                      {renderCaseSectionNav("contact")}
                     </div>
                   )}
 
@@ -12935,6 +13351,7 @@ const StudentPage = () => {
                           </div>
                         </div>
                       </div>
+                      {renderCaseSectionNav("family")}
                     </div>
                   )}
 
@@ -13129,6 +13546,7 @@ const StudentPage = () => {
                           </div>
                         </div>
                       </div>
+                      {renderCaseSectionNav("development")}
                     </div>
                   )}
 
@@ -13154,7 +13572,7 @@ const StudentPage = () => {
                       </h2>
 
                       {/* Horizontal Navigation for Subsections */}
-                      <div className="w-full max-w-[calc(100vw-32px)] md:max-w-full overflow-x-auto pill-scroll mb-4 pb-2">
+                      <div className="w-full max-w-[calc(100vw-32px)] md:max-w-full overflow-x-auto pill-scroll mb-4 pb-2" data-subpills-container>
                         <div className="flex gap-2 min-w-max pr-6">
                           {[
                             { id: "self-help", label: "Self Help" },
@@ -13168,10 +13586,11 @@ const StudentPage = () => {
                           ].map((subsection) => (
                             <button
                               key={subsection.id}
+                              data-subpill-id={subsection.id}
                               onClick={(e) => {
                                 setActiveEducationSubsection(subsection.id);
                                 const btn = e.currentTarget;
-                                const scrollable = btn.parentElement?.parentElement;
+                                const scrollable = btn.closest('[data-subpills-container]');
                                 if (scrollable) {
                                   const scrollLeft = btn.offsetLeft - (scrollable.clientWidth / 2) + (btn.offsetWidth / 2);
                                   scrollable.scrollTo({ left: scrollLeft, behavior: 'smooth' });
@@ -14101,6 +14520,7 @@ const StudentPage = () => {
                           </div>
                         </div>
                       )}
+                      {renderCaseSectionNav("education")}
                     </div>
                   )}
 
@@ -14434,6 +14854,7 @@ const StudentPage = () => {
                           </div>
                         </div>
                       </div>
+                      {renderCaseSectionNav("medical")}
                     </div>
                   )}
 
@@ -14584,6 +15005,7 @@ const StudentPage = () => {
                           </div>
                         </div>
                       </div>
+                      {renderCaseSectionNav("documents")}
                     </div>
                   )}
                 </div>
@@ -14963,13 +15385,13 @@ const StudentPage = () => {
 
       {/* Consolidated 6-Month Report Modal */}
       {showConsolidatedModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 md:p-8 border border-[#E38B52]/20 relative my-8 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-2xl w-full p-4 sm:p-6 md:p-8 border border-[#E38B52]/20 relative my-auto max-h-[94vh] sm:max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#E38B52] to-[#F5A572] flex items-center justify-center text-white shadow-md">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="flex items-start justify-between pb-3 sm:pb-4 border-b border-gray-100 gap-2">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#E38B52] to-[#F5A572] flex items-center justify-center text-white shadow-md shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                     <polyline points="14 2 14 8 20 8"></polyline>
                     <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -14977,18 +15399,18 @@ const StudentPage = () => {
                     <polyline points="10 9 9 9 8 9"></polyline>
                   </svg>
                 </div>
-                <div>
-                  <h2 className="text-xl md:text-2xl font-bold text-[#170F49] font-baskervville">
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-xl md:text-2xl font-bold text-[#170F49] font-baskervville leading-snug">
                     Multi-Disciplinary Consolidated Report
                   </h2>
-                  <p className="text-xs md:text-sm text-[#6F6C90]">
+                  <p className="text-[11px] sm:text-xs md:text-sm text-[#6F6C90] truncate sm:whitespace-normal">
                     Consolidating 6-month progress across Therapies, Academics, ADL & Functional Skills
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowConsolidatedModal(false)}
-                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 flex items-center justify-center transition-colors cursor-pointer shrink-0 text-sm"
                 title="Close"
               >
                 ✕
@@ -14996,89 +15418,89 @@ const StudentPage = () => {
             </div>
 
             {/* Scrollable Content */}
-            <div className="overflow-y-auto flex-1 py-4 space-y-5 pr-1">
+            <div className="overflow-y-auto flex-1 py-3 sm:py-4 space-y-3.5 sm:space-y-5 pr-1">
               {/* Student quick info banner */}
-              <div className="bg-[#FFF8F4] border border-[#E38B52]/20 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-                <div>
-                  <span className="text-gray-500 text-xs uppercase tracking-wider block">Student</span>
-                  <span className="font-bold text-[#170F49] text-base">{student?.name || "Student"}</span>
+              <div className="bg-[#FFF8F4] border border-[#E38B52]/20 rounded-xl sm:rounded-2xl p-3 sm:p-4 grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-between gap-2.5 sm:gap-3 text-xs sm:text-sm">
+                <div className="col-span-2 sm:col-auto">
+                  <span className="text-gray-500 text-[10px] sm:text-xs uppercase tracking-wider block font-medium">Student</span>
+                  <span className="font-bold text-[#170F49] text-sm sm:text-base">{student?.name || "Student"}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 text-xs uppercase tracking-wider block">Class / Division</span>
-                  <span className="font-semibold text-gray-700">{student?.class_name || "N/A"} - {student?.division || "N/A"}</span>
+                  <span className="text-gray-500 text-[10px] sm:text-xs uppercase tracking-wider block font-medium">Class / Division</span>
+                  <span className="font-semibold text-gray-700 text-xs sm:text-sm">{student?.class_name || "N/A"} - {student?.division || "N/A"}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 text-xs uppercase tracking-wider block">Roll / ID</span>
-                  <span className="font-semibold text-gray-700">{student?.roll_no || student?.student_id || "N/A"}</span>
+                  <span className="text-gray-500 text-[10px] sm:text-xs uppercase tracking-wider block font-medium">Roll / ID</span>
+                  <span className="font-semibold text-gray-700 text-xs sm:text-sm">{student?.roll_no || student?.student_id || "N/A"}</span>
                 </div>
               </div>
 
               {/* Evaluation Span Selection */}
               <div>
-                <label className="block text-sm font-bold text-[#170F49] mb-2">
+                <label className="block text-xs sm:text-sm font-bold text-[#170F49] mb-1.5 sm:mb-2">
                   1. Quick Choose Term (6-Month Semester):
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-3 sm:mb-4">
                   <button
                     type="button"
                     onClick={() => handleSelectTermPreset(1)}
-                    className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                    className={`p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border-2 text-left transition-all cursor-pointer ${
                       isTerm1Preset
                         ? "border-[#E38B52] bg-[#FFF5EE] shadow-md ring-2 ring-[#E38B52]/20"
                         : "border-gray-200 bg-white hover:border-[#E38B52]/40"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-[#170F49]">⭐️ Term 1 (June – November)</span>
+                      <span className="font-bold text-xs sm:text-sm text-[#170F49]">⭐️ Term 1 (June – November)</span>
                       {isTerm1Preset && (
-                        <span className="text-[10px] bg-[#E38B52] text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                        <span className="text-[9px] sm:text-[10px] bg-[#E38B52] text-white px-1.5 sm:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                           Selected
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Semester 1 (6 Months)</p>
+                    <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1">Semester 1 (6 Months)</p>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleSelectTermPreset(2)}
-                    className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                    className={`p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border-2 text-left transition-all cursor-pointer ${
                       isTerm2Preset
                         ? "border-[#E38B52] bg-[#FFF5EE] shadow-md ring-2 ring-[#E38B52]/20"
                         : "border-gray-200 bg-white hover:border-[#E38B52]/40"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm text-[#170F49]">⭐️ Term 2 (December – May)</span>
+                      <span className="font-bold text-xs sm:text-sm text-[#170F49]">⭐️ Term 2 (December – May)</span>
                       {isTerm2Preset && (
-                        <span className="text-[10px] bg-[#E38B52] text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                        <span className="text-[9px] sm:text-[10px] bg-[#E38B52] text-white px-1.5 sm:px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
                           Selected
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Semester 2 (6 Months)</p>
+                    <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1">Semester 2 (6 Months)</p>
                   </button>
                 </div>
 
                 {/* Fine-tune Months: Dropdowns & Month Pills */}
-                <div className="bg-[#FAF9F6] border border-gray-200 rounded-2xl p-4 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-[#170F49] uppercase tracking-wider">
+                <div className="bg-[#FAF9F6] border border-gray-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 space-y-2.5 sm:space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                    <span className="text-[11px] sm:text-xs font-bold text-[#170F49] uppercase tracking-wider">
                       2. Included Months ({selectedMonthsCount} / 6 Max):
                     </span>
-                    <span className="text-[11px] text-[#6F6C90]">
+                    <span className="text-[10px] sm:text-[11px] text-[#6F6C90]">
                       Adjust months below if your term dates differ (up to 6 months)
                     </span>
                   </div>
 
                   {/* Dropdowns */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Starting Month:</label>
+                      <label className="block text-[10px] sm:text-xs font-semibold text-gray-600 mb-1">Starting Month:</label>
                       <select
                         value={startMonthIdx}
                         onChange={(e) => handleStartMonthChange(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-sm font-medium text-[#170F49] focus:ring-2 focus:ring-[#E38B52]"
+                        className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg sm:rounded-xl bg-white text-xs sm:text-sm font-medium text-[#170F49] focus:ring-2 focus:ring-[#E38B52]"
                       >
                         {academicMonthsList.map((m, idx) => (
                           <option key={m.key} value={idx}>
@@ -15088,11 +15510,11 @@ const StudentPage = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Ending Month:</label>
+                      <label className="block text-[10px] sm:text-xs font-semibold text-gray-600 mb-1">Ending Month:</label>
                       <select
                         value={endMonthIdx}
                         onChange={(e) => handleEndMonthChange(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-sm font-medium text-[#170F49] focus:ring-2 focus:ring-[#E38B52]"
+                        className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg sm:rounded-xl bg-white text-xs sm:text-sm font-medium text-[#170F49] focus:ring-2 focus:ring-[#E38B52]"
                       >
                         {academicMonthsList.map((m, idx) => {
                           const tooFar = idx - startMonthIdx > 5;
@@ -15107,15 +15529,15 @@ const StudentPage = () => {
                     </div>
                   </div>
 
-                  {/* Visual Month Pills */}
+                  {/* Visual Month Pills (6-cols: Term 1 Row 1, Term 2 Row 2) */}
                   <div>
-                    <div className="text-[11px] text-gray-500 mb-1.5 font-medium flex items-center justify-between">
+                    <div className="text-[10px] sm:text-[11px] text-gray-500 mb-1.5 font-medium flex flex-wrap items-center justify-between gap-1">
                       <span>Click any month to include or remove it:</span>
-                      <span className="text-emerald-700 font-semibold flex items-center gap-1 text-[10px]">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Green badge = reports saved for this student
+                      <span className="text-emerald-700 font-semibold flex items-center gap-1 text-[9px] sm:text-[10px]">
+                        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 inline-block"></span> Green = reports saved
                       </span>
                     </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                    <div className="grid grid-cols-6 gap-1 sm:gap-1.5">
                       {academicMonthsList.map((m, idx) => {
                         const inRange = idx >= startMonthIdx && idx <= endMonthIdx;
                         const hasData = hasMonthData(m);
@@ -15124,22 +15546,25 @@ const StudentPage = () => {
                             key={m.key}
                             type="button"
                             onClick={() => handleMonthChipClick(idx)}
-                            className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all flex flex-col items-center justify-center relative cursor-pointer border ${
+                            className={`py-1.5 px-0.5 sm:py-2 sm:px-1 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-semibold transition-all flex flex-col items-center justify-center relative cursor-pointer border ${
                               inRange
                                 ? "bg-gradient-to-r from-[#E38B52] to-[#f29359] text-white shadow-sm border-transparent scale-[1.02]"
                                 : "bg-white text-gray-700 border-gray-200 hover:border-[#E38B52]/50"
                             }`}
                             title={`${m.label}${hasData ? ' - Records found' : ''}`}
                           >
-                            <span>{m.name}</span>
+                            <span className="truncate w-full text-center">
+                              {m.name.slice(0, 3)}
+                              <span className="hidden md:inline">{m.name.slice(3)}</span>
+                            </span>
                             {hasData ? (
-                              <span className={`text-[9px] mt-0.5 px-1 rounded font-bold ${
+                              <span className={`text-[8px] sm:text-[9px] mt-0.5 px-1 rounded font-bold leading-tight ${
                                 inRange ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-800"
                               }`}>
-                                ✓ Data
+                                ✓<span className="hidden sm:inline"> Data</span>
                               </span>
                             ) : (
-                              <span className="text-[9px] mt-0.5 opacity-0">-</span>
+                              <span className="text-[8px] sm:text-[9px] mt-0.5 opacity-0 leading-tight">-</span>
                             )}
                           </button>
                         );
@@ -15151,46 +15576,46 @@ const StudentPage = () => {
 
               {/* Data Inventory & Dynamic Support Overview */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                <label className="block text-[11px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 sm:mb-2">
                   Records Detected for {consolidatedPeriodInfo.title}:
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                    <span className="text-xl font-bold text-[#170F49] block">{consolidatedStats.therapiesCount}</span>
-                    <span className="text-[11px] text-gray-600">Therapy Sessions</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 sm:p-3 text-center">
+                    <span className="text-lg sm:text-xl font-bold text-[#170F49] block">{consolidatedStats.therapiesCount}</span>
+                    <span className="text-[10px] sm:text-[11px] text-gray-600 block mt-0.5 leading-tight">Therapy Sessions</span>
                   </div>
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                    <span className="text-xl font-bold text-[#170F49] block">{consolidatedStats.monthlyIepCount}</span>
-                    <span className="text-[11px] text-gray-600">Monthly Evaluations</span>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 sm:p-3 text-center">
+                    <span className="text-lg sm:text-xl font-bold text-[#170F49] block">{consolidatedStats.monthlyIepCount}</span>
+                    <span className="text-[10px] sm:text-[11px] text-gray-600 block mt-0.5 leading-tight">Monthly Evaluations</span>
                   </div>
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                    <span className="text-xl font-bold text-[#170F49] block">{consolidatedStats.iepProgramCount}</span>
-                    <span className="text-[11px] text-gray-600">IEP Goal Programs</span>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 sm:p-3 text-center">
+                    <span className="text-lg sm:text-xl font-bold text-[#170F49] block">{consolidatedStats.iepProgramCount}</span>
+                    <span className="text-[10px] sm:text-[11px] text-gray-600 block mt-0.5 leading-tight">IEP Goal Programs</span>
                   </div>
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                    <span className="text-xl font-bold text-[#170F49] block">{consolidatedStats.facpCount}</span>
-                    <span className="text-[11px] text-gray-600">FACP Skill Domains</span>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 sm:p-3 text-center">
+                    <span className="text-lg sm:text-xl font-bold text-[#170F49] block">{consolidatedStats.facpCount}</span>
+                    <span className="text-[10px] sm:text-[11px] text-gray-600 block mt-0.5 leading-tight">FACP Skill Domains</span>
                   </div>
                 </div>
               </div>
 
               {/* AI Multi-Disciplinary Synthesis Toggle */}
-              <div className="p-3 bg-gradient-to-r from-orange-50/70 to-amber-50/70 border border-orange-200/80 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-[#E38B52] text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
+              <div className="p-2.5 sm:p-3 bg-gradient-to-r from-orange-50/70 to-amber-50/70 border border-orange-200/80 rounded-xl sm:rounded-2xl flex items-center justify-between gap-2.5 sm:gap-3 shadow-xs">
+                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-[#E38B52] text-white flex items-center justify-center font-bold text-sm sm:text-base shadow-xs shrink-0">
                     ✨
                   </div>
-                  <div>
-                    <div className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                      AI Multi-Disciplinary Clinical Synthesis
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">Gemini Powered</span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-gray-900 flex flex-wrap items-center gap-1 sm:gap-1.5">
+                      <span>AI Multi-Disciplinary Synthesis</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-semibold bg-emerald-100 text-emerald-800 shrink-0">Gemini Powered</span>
                     </div>
-                    <div className="text-[11px] text-gray-500">
-                      Synthesizes 6-month therapy progress, interdisciplinary synergy, and next term targets.
+                    <div className="text-[10px] sm:text-[11px] text-gray-500 leading-tight sm:leading-normal mt-0.5">
+                      Synthesizes 6-month therapy progress, synergy, and next term targets.
                     </div>
                   </div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
                   <input
                     type="checkbox"
                     checked={includeConsolidatedAi}
@@ -15202,26 +15627,26 @@ const StudentPage = () => {
               </div>
 
               {/* Expandable Information (Small "i" Toggle) */}
-              <div className="pt-1">
+              <div className="pt-0.5">
                 <button
                   type="button"
                   onClick={() => setShowConsolidatedInfo((prev) => !prev)}
-                  className="inline-flex items-center gap-2 text-xs font-semibold text-[#E38B52] hover:text-[#c46f38] transition-colors cursor-pointer bg-[#FFF5EE] px-3 py-1.5 rounded-xl border border-[#E38B52]/20 shadow-sm"
+                  className="inline-flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-semibold text-[#E38B52] hover:text-[#c46f38] transition-colors cursor-pointer bg-[#FFF5EE] px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl border border-[#E38B52]/20 shadow-sm"
                 >
-                  <span className="w-4 h-4 rounded-full bg-[#E38B52] text-white flex items-center justify-center text-[10px] font-bold">
+                  <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-[#E38B52] text-white flex items-center justify-center text-[9px] sm:text-[10px] font-bold shrink-0">
                     i
                   </span>
                   <span>{showConsolidatedInfo ? "Hide report details & structure" : "What is included in this report? (Click for info)"}</span>
                 </button>
 
                 {showConsolidatedInfo && (
-                  <div className="mt-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-3 animate-in fade-in duration-150">
-                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 flex items-start gap-2">
+                  <div className="mt-2 p-2.5 sm:p-3.5 bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs space-y-2.5 sm:space-y-3 animate-in fade-in duration-150">
+                    <div className="p-2 sm:p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg sm:rounded-xl text-emerald-900 flex items-start gap-1.5 sm:gap-2 leading-relaxed">
                       <span className="font-bold text-emerald-800 shrink-0">✓ Partial-Span Intelligence:</span>
                       <span>Even if only 1, 2, or 3 months are presently recorded, the generator automatically adapts and synthesizes all available multi-disciplinary data into a unified, publication-grade document without gaps or blank pages.</span>
                     </div>
 
-                    <div className="space-y-1 text-gray-700 pl-0.5">
+                    <div className="space-y-1 text-gray-700 pl-0.5 leading-relaxed">
                       <div className="font-bold text-gray-900 mb-1">The generated PDF will include:</div>
                       <div className="flex items-center gap-1.5">✓ Official St. Martha's Institution Banner & Student Demographics</div>
                       <div className="flex items-center gap-1.5">✓ Multi-Disciplinary Therapy Progress (Physiotherapy, Speech, OT, Behavioral)</div>
@@ -15235,11 +15660,11 @@ const StudentPage = () => {
             </div>
 
             {/* Footer Actions */}
-            <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+            <div className="pt-3 sm:pt-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setShowConsolidatedModal(false)}
-                className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium text-sm transition-all cursor-pointer"
+                className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium text-xs sm:text-sm transition-all cursor-pointer text-center justify-center"
                 disabled={generatingConsolidated}
               >
                 Cancel
@@ -15248,7 +15673,7 @@ const StudentPage = () => {
                 type="button"
                 onClick={handleGenerateConsolidatedReport}
                 disabled={generatingConsolidated}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#E38B52] to-[#F5A572] hover:from-[#d17a42] hover:to-[#e38b52] text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto px-5 sm:px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#E38B52] to-[#F5A572] hover:from-[#d17a42] hover:to-[#e38b52] text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {generatingConsolidated ? (
                   <>

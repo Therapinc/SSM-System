@@ -536,11 +536,11 @@ const AddTeacher = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-md:gap-4">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-[#170F49] ml-4">
-                    Class <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex gap-3 items-center">
+                  <div className="flex gap-3 items-end">
                     <div className="w-[70%]">
+                      <label className="block text-sm font-medium text-[#170F49] ml-4 mb-2">
+                        Class <span className="text-red-500">*</span>
+                      </label>
                       <select
                         id="class_assignment_class"
                         value={classAssignment.class}

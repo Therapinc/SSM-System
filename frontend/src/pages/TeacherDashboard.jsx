@@ -18,8 +18,6 @@ const CLASS_OPTIONS = [
   "Vocational 18-35 years",
 ];
 
-
-
 const TeacherDashboard = () => {
   const navigate = useNavigate();
   const [userName, setUserName] = useState("        ");
@@ -718,45 +716,62 @@ const TeacherDashboard = () => {
 
           {activeTab === "therapists" && (
             <div className="px-4">
-            <div className="mb-4">
-              <h2 className="text-2xl font-semibold text-[#170F49]">Therapist List</h2>
-              <p className="text-sm text-[#6F6C8F] mt-1">Assign students to therapists. Details, add, and delete are admin-only.</p>
-            </div>
-            {therapistsLoading ? (
-              <div className="text-center text-[#6F6C8F]">Loading therapists...</div>
-            ) : therapists.length === 0 ? (
-              <div className="text-center text-[#6F6C8F]">No therapists found.</div>
-            ) : (
+              <div className="mb-6">
+                <h2 className="text-2xl font-semibold text-[#170F49]">Therapist Directory</h2>
+                <p className="text-sm text-[#6F6C8F] mt-1">Assign students from your class to therapists.</p>
+              </div>
+
               <div className="grid grid-cols-1 gap-4">
-                {therapists.map((therapist) => (
-                  <div
-                    key={therapist.id}
-                    className="bg-white rounded-2xl p-6 shadow-md transition-all duration-300"
-                  >
-                    <div className="flex items-center justify-between gap-4 text-[#170F49]">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="w-14 h-14 shrink-0 rounded-lg overflow-hidden">
-                          <img src={therapist.photo_url || therapist.photoUrl || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
+                {therapistsLoading ? (
+                  <div className="text-center text-[#6F6C8F]">Loading therapists...</div>
+                ) : therapists.length === 0 ? (
+                  <div className="text-center text-[#6F6C8F]">No therapists found.</div>
+                ) : (
+                  therapists.map((therapist) => (
+                    <div
+                      key={therapist.id}
+                      className="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02]"
+                    >
+                      <div className="flex items-center space-x-4 text-[#170F49]">
+                        <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0">
+                          <img
+                            src={
+                              therapist.photo_url ||
+                              therapist.photoUrl ||
+                              `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`
+                            }
+                            alt="Therapist"
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-semibold text-[#170F49] truncate">{therapist.name || "-"}</h3>
-                          <div className="mt-1 flex items-center text-sm text-[#6F6C8F] truncate">
-                            <span className="text-sm mr-1.5">🩺</span> {therapist.specialization || "Not provided"}
+                          <h3 className="text-lg font-semibold text-[#170F49] truncate">{therapist.name}</h3>
+                          <div className="space-y-1 mt-1">
+                            <p className="text-sm text-[#6F6C8F]">
+                              <span className="font-medium text-[#170F49]">Specialization:</span>{" "}
+                              <span className="font-semibold text-[#E38B52]">{therapist.specialization || "Not specified"}</span>
+                            </p>
+                            {therapist.qualifications_details && (
+                              <p className="text-sm text-[#6F6C8F] line-clamp-2 break-words">
+                                <span className="font-medium">Qualifications:</span> {therapist.qualifications_details}
+                              </p>
+                            )}
                           </div>
                         </div>
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <button
+                            onClick={() => handleAssignStudents(therapist)}
+                            className="px-4 py-2 rounded-lg border border-[#E38B52] text-sm font-semibold text-[#E38B52] bg-white hover:bg-[#E38B52] hover:text-white transition-colors whitespace-nowrap cursor-pointer"
+                            title="Assign"
+                          >
+                            Assign
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleAssignStudents(therapist)}
-                        className="px-5 py-2 text-sm font-semibold bg-[#E38B52] text-white rounded-xl shadow-sm hover:bg-[#E38B52]/90 transition-all hover:scale-[1.02] whitespace-nowrap"
-                      >
-                        Assign Students
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
-            )}
             </div>
           )}
         </div>
@@ -1282,50 +1297,61 @@ const TeacherDashboard = () => {
           )}
 
           {activeTab === "therapists" && (
-            <div className="px-4">
-            <div className="mb-4">
-              <h2 className="text-2xl font-semibold text-[#170F49]">Therapist List</h2>
-              <p className="text-sm text-[#6F6C8F] mt-1">Assign students to therapists. Details, add, and delete are admin-only.</p>
-            </div>
-            {therapistsLoading ? (
-              <div className="text-center text-[#6F6C8F]">Loading therapists...</div>
-            ) : therapists.length === 0 ? (
-              <div className="text-center text-[#6F6C8F]">No therapists found.</div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4">
-                {therapists.map((therapist) => (
-                  <div
-                    key={therapist.id}
-                    className="bg-white rounded-2xl py-3 px-3.5 sm:p-4 shadow-[0_2px_10px_rgba(0,0,0,0.06)] hover:shadow-md transition-all duration-300 mb-1.5"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 text-[#170F49]">
-                      <div className="flex items-center gap-3 sm:gap-4 flex-1">
-                        <div className="w-[46px] h-[46px] sm:w-[50px] sm:h-[50px] rounded-lg overflow-hidden shrink-0">
-                          <img src={therapist.photo_url || therapist.photoUrl || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
+            <div className="px-0 sm:px-2">
+              <div className="mb-4 px-2">
+                <h2 className="text-xl font-semibold text-[#170F49]">Therapist Directory</h2>
+                <p className="text-sm text-[#6F6C8F] mt-0.5">Assign students from your class to therapists.</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 px-0 sm:px-2">
+                {therapistsLoading ? (
+                  <div className="text-center text-[#6F6C8F]">Loading therapists...</div>
+                ) : therapists.length === 0 ? (
+                  <div className="text-center text-[#6F6C8F]">No therapists found.</div>
+                ) : (
+                  therapists.map((therapist) => (
+                    <div
+                      key={therapist.id}
+                      className="bg-white rounded-2xl py-2.5 px-3 sm:p-4 shadow-[0_2px_10px_rgba(0,0,0,0.08)] hover:shadow-md transition-all duration-300 mb-1.5"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4 text-[#170F49]">
+                        <div className="w-[50px] h-[50px] rounded-lg overflow-hidden shrink-0">
+                          <img
+                            src={
+                              therapist.photo_url ||
+                              therapist.photoUrl ||
+                              `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`
+                            }
+                            alt="Therapist"
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                         <div className="flex-1 min-w-0 py-0.5">
-                          <h3 className="text-[16px] sm:text-[17px] font-semibold text-[#170F49] truncate pr-2">
-                            {therapist.name || "-"}
-                          </h3>
-                          <div className="mt-0.5 flex items-center text-[12px] sm:text-[13px] text-[#6F6C8F] truncate">
-                            <span className="text-sm mr-1.5">🩺</span> {therapist.specialization || "Not provided"}
+                          <h3 className="text-[16px] sm:text-[17px] font-semibold text-[#170F49] truncate">{therapist.name}</h3>
+                          <div className="space-y-1">
+                            <p className="text-sm text-[#6F6C8F]">
+                              <span className="font-medium text-[#170F49]">Specialization:</span>{" "}
+                              <span className="font-semibold text-[#E38B52]">{therapist.specialization || "Not specified"}</span>
+                            </p>
+                            {therapist.qualifications_details && (
+                              <p className="text-sm text-[#6F6C8F] line-clamp-1"><span className="font-medium">Qualifications:</span> {therapist.qualifications_details}</p>
+                            )}
                           </div>
                         </div>
                       </div>
-                      <div className="mt-2.5 sm:mt-0 flex justify-end items-center">
+                      <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-end">
                         <button
-                          type="button"
                           onClick={() => handleAssignStudents(therapist)}
-                          className="px-4 py-1.5 sm:px-5 sm:py-2 text-[13px] sm:text-sm font-semibold bg-[#E38B52] text-white rounded-xl shadow-sm hover:bg-[#E38B52]/90 transition-all hover:scale-[1.02] whitespace-nowrap"
+                          className="bg-[#E38B52] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#E38B52]/90 transition-colors shadow-sm cursor-pointer whitespace-nowrap active:scale-95"
+                          title="Assign"
                         >
-                          Assign Students
+                          Assign
                         </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
-            )}
             </div>
           )}
         </div>

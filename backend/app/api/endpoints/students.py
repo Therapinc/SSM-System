@@ -1,6 +1,6 @@
 import base64
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
-from sqlalchemy import false
+from sqlalchemy import false, func
 from sqlalchemy.orm import Session
 from typing import List, Optional, Any, Dict
 
@@ -132,6 +132,7 @@ def read_students(
     total = query.count()
     students_from_db = (
         query.options(load_only(*STUDENT_LIST_LOAD_COLUMNS))
+        .order_by(func.lower(crud_student.model.name).asc())
         .offset(pagination.skip)
         .limit(pagination.limit)
         .all()

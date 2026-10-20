@@ -67,6 +67,27 @@ const ScrollToTopButton = () => {
   );
 };
 
+const getTeacherAssignedClassDisplay = (teacher) => {
+  const assignments = teacher?.class_assignments || teacher?.classes;
+  if (Array.isArray(assignments) && assignments.length > 0) {
+    const formatted = assignments
+      .map((item) => {
+        const cls = item.class || item.class_name;
+        if (!cls) return null;
+        return item.division ? `${cls} (${item.division})` : cls;
+      })
+      .filter(Boolean);
+    if (formatted.length > 0) {
+      return formatted.join(", ");
+    }
+  }
+  if (teacher?.class_name || teacher?.className || teacher?.class) {
+    const cls = teacher.class_name || teacher.className || teacher.class;
+    return teacher.division ? `${cls} (${teacher.division})` : cls;
+  }
+  return "Not assigned";
+};
+
 const HeadMaster = () => {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
@@ -944,9 +965,11 @@ const HeadMaster = () => {
                         </div>
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-[#170F49]">{teacher.name}</h3>
-                          <div className="space-y-1">
-                            <p className="text-sm text-[#6F6C8F]"><span className="font-medium">Mobile:</span> {teacher.mobile_number}</p>
-                            <p className="text-sm text-[#6F6C8F] line-clamp-2 break-words"><span className="font-medium">Qualifications:</span> {teacher.qualifications_details}</p>
+                          <div className="space-y-1 mt-1">
+                            <p className="text-sm text-[#6F6C8F]">
+                              <span className="font-medium text-[#170F49]">Class Assigned:</span>{" "}
+                              <span className="font-semibold text-[#E38B52]">{getTeacherAssignedClassDisplay(teacher)}</span>
+                            </p>
                           </div>
                         </div>
                         <div className="flex space-x-2">
@@ -1042,70 +1065,68 @@ const HeadMaster = () => {
                   <div className="text-center text-[#6F6C8F]">No therapists found.</div>
                 ) : (
                   therapists.map((therapist) => (
-                                        <div
+                    <div
                       key={therapist.id}
                       onClick={() => handleTherapistClick(therapist.id)}
-                      className="bg-white rounded-2xl p-4 sm:p-6 shadow-[0_2px_10px_rgba(0,0,0,0.08)] sm:shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] cursor-pointer mb-2 sm:mb-0"
+                      className="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] cursor-pointer"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-[#170F49]">
-                        <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1">
-                          <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-lg overflow-hidden mt-0.5 sm:mt-0">
-                            <img src={therapist.photo_url || therapist.photoUrl || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start w-full">
-                              <h3 className="text-[17px] sm:text-lg font-semibold text-[#170F49] truncate pr-2">{therapist.name}</h3>
-                              {/* Mobile Chevron indicator */}
-                              <span className="sm:hidden text-slate-300 mt-0.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                                </svg>
-                              </span>
-                            </div>
-                            
-                            {/* Desktop Info (Hidden on mobile) */}
-                            <div className="hidden sm:block space-y-1 mt-1">
-                              <p className="text-sm text-[#6F6C8F] truncate"><span className="font-medium">Mobile:</span> {therapist.mobile_number || "Not provided"}</p>
-                              {therapist.specialization && <p className="text-sm text-[#6F6C8F] truncate"><span className="font-medium">Specialization:</span> {therapist.specialization}</p>}
-                              {therapist.qualifications_details && <p className="text-sm text-[#6F6C8F] line-clamp-2 break-words"><span className="font-medium">Qualifications:</span> {therapist.qualifications_details}</p>}
-                            </div>
-                            
-                            {/* Mobile Info (Compact layout) */}
-                            <div className="sm:hidden space-y-1 mt-1.5">
-                              {therapist.specialization && <p className="text-[13px] text-slate-500 truncate flex items-center gap-1.5"><span className="text-sm">🩺</span> {therapist.specialization}</p>}
-                              <p className="text-[13px] text-slate-500 truncate flex items-center gap-1.5"><span className="text-sm">📞</span> {therapist.mobile_number || "Not provided"}</p>
-                              {therapist.qualifications_details && <p className="text-[13px] text-slate-500 flex items-start gap-1.5"><span className="text-sm mt-0.5 flex-shrink-0">🎓</span> <span className="line-clamp-2 break-words">{therapist.qualifications_details}</span></p>}
-                            </div>
+                      <div className="flex items-center space-x-4 text-[#170F49]">
+                        <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0">
+                          <img
+                            src={
+                              therapist.photo_url ||
+                              therapist.photoUrl ||
+                              `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`
+                            }
+                            alt="Therapist"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-semibold text-[#170F49] truncate">{therapist.name}</h3>
+                          <div className="space-y-1 mt-1">
+                            <p className="text-sm text-[#6F6C8F]">
+                              <span className="font-medium text-[#170F49]">Specialization:</span>{" "}
+                              <span className="font-semibold text-[#E38B52]">{therapist.specialization || "Not specified"}</span>
+                            </p>
+                            {therapist.qualifications_details && (
+                              <p className="text-sm text-[#6F6C8F] line-clamp-2 break-words">
+                                <span className="font-medium">Qualifications:</span> {therapist.qualifications_details}
+                              </p>
+                            )}
                           </div>
                         </div>
-                        
-                        <div className="flex space-x-3 sm:space-x-2 w-full sm:w-auto justify-end mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-slate-100 items-center">
-                          {/* Desktop Chevron */}
+                        <div className="flex items-center space-x-2 shrink-0">
+                          {isAdmin && (
+                            <button
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleAssignStudentsClick(therapist, event);
+                              }}
+                              className="px-4 py-2 rounded-lg border border-[#E38B52] text-sm font-semibold text-[#E38B52] bg-white hover:bg-[#E38B52] hover:text-white transition-colors whitespace-nowrap"
+                              title="Assign"
+                            >
+                              Assign
+                            </button>
+                          )}
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleTherapistClick(therapist.id); }}
-                            className="hidden sm:block text-[#E38B52] hover:text-[#E38B52]/90 transition-colors p-2 rounded-lg hover:bg-[#E38B52]/10"
+                            onClick={() => handleTherapistClick(therapist.id)}
+                            className="text-[#E38B52] hover:text-[#E38B52]/90 transition-colors p-2 rounded-lg hover:bg-[#E38B52]/10"
                             title="View Therapist Details"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                           </button>
-                          
-                          {isAdmin && (
-                            <button
-                              onClick={(event) => { event.stopPropagation(); handleAssignStudentsClick(therapist, event); }}
-                              className="px-4 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-[#E38B52] text-[13px] sm:text-sm font-semibold text-[#E38B52] bg-white hover:bg-[#E38B52] hover:text-white transition-colors"
-                              title="Assign Students"
-                            >
-                              Assign Students
-                            </button>
-                          )}
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteTherapist(therapist.id, therapist.name); }}
-                            className="text-red-500 hover:text-red-700 transition-colors p-1.5 sm:p-2 rounded-lg hover:bg-[rgba(227,139,82,0.2)]"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTherapist(therapist.id, therapist.name);
+                            }}
+                            className="text-red-500 hover:text-red-700 transition-colors p-2 rounded-lg hover:bg-[rgba(227,139,82,0.2)]"
                             title="Delete Therapist"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-[18px] w-[18px] sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
                           </button>
@@ -1591,8 +1612,10 @@ const HeadMaster = () => {
                         <div className="flex-1 min-w-0 py-0.5">
                           <h3 className="text-[16px] sm:text-[17px] font-semibold text-[#170F49] truncate">{teacher.name}</h3>
                           <div className="space-y-1">
-                            <p className="text-sm text-[#6F6C8F]"><span className="font-medium">Mobile:</span> {teacher.mobile_number}</p>
-                            <p className="text-sm text-[#6F6C8F]"><span className="font-medium">Qualifications:</span> {teacher.qualifications_details}</p>
+                            <p className="text-sm text-[#6F6C8F]">
+                              <span className="font-medium text-[#170F49]">Class Assigned:</span>{" "}
+                              <span className="font-semibold text-[#E38B52]">{getTeacherAssignedClassDisplay(teacher)}</span>
+                            </p>
                           </div>
                         </div>
                         <div className="flex space-x-2">
@@ -1688,75 +1711,75 @@ const HeadMaster = () => {
                   <div className="text-center text-[#6F6C8F]">No therapists found.</div>
                 ) : (
                   therapists.map((therapist) => (
-                                        <div
+                    <div
                       key={therapist.id}
                       onClick={() => handleTherapistClick(therapist.id)}
-                      className="bg-white rounded-2xl p-4 sm:p-6 shadow-[0_2px_10px_rgba(0,0,0,0.08)] sm:shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] cursor-pointer mb-2 sm:mb-0"
+                      className="bg-white rounded-2xl py-2.5 px-3 sm:p-4 shadow-[0_2px_10px_rgba(0,0,0,0.08)] hover:shadow-md transition-all duration-300 cursor-pointer mb-1.5"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-[#170F49]">
-                        <div className="flex items-start sm:items-center gap-3 sm:gap-4 flex-1">
-                          <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-lg overflow-hidden mt-0.5 sm:mt-0">
-                            <img src={therapist.photo_url || therapist.photoUrl || `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`} alt="Therapist" className="w-full h-full object-cover" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start w-full">
-                              <h3 className="text-[17px] sm:text-lg font-semibold text-[#170F49] truncate pr-2">{therapist.name}</h3>
-                              {/* Mobile Chevron indicator */}
-                              <span className="sm:hidden text-slate-300 mt-0.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                                </svg>
-                              </span>
-                            </div>
-                            
-                            {/* Desktop Info (Hidden on mobile) */}
-                            <div className="hidden sm:block space-y-1 mt-1">
-                              <p className="text-sm text-[#6F6C8F] truncate"><span className="font-medium">Mobile:</span> {therapist.mobile_number || "Not provided"}</p>
-                              {therapist.specialization && <p className="text-sm text-[#6F6C8F] truncate"><span className="font-medium">Specialization:</span> {therapist.specialization}</p>}
-                              {therapist.qualifications_details && <p className="text-sm text-[#6F6C8F] truncate"><span className="font-medium">Qualifications:</span> {therapist.qualifications_details}</p>}
-                            </div>
-                            
-                            {/* Mobile Info (Compact layout) */}
-                            <div className="sm:hidden space-y-1 mt-1.5">
-                              {therapist.specialization && <p className="text-[13px] text-slate-500 truncate flex items-center gap-1.5"><span className="text-sm">🩺</span> {therapist.specialization}</p>}
-                              <p className="text-[13px] text-slate-500 truncate flex items-center gap-1.5"><span className="text-sm">📞</span> {therapist.mobile_number || "Not provided"}</p>
-                              {therapist.qualifications_details && <p className="text-[13px] text-slate-500 truncate flex items-center gap-1.5"><span className="text-sm">🎓</span> {therapist.qualifications_details}</p>}
-                            </div>
+                      <div className="flex items-center gap-3 sm:gap-4 text-[#170F49]">
+                        <div className="w-[50px] h-[50px] rounded-lg overflow-hidden shrink-0">
+                          <img
+                            src={
+                              therapist.photo_url ||
+                              therapist.photoUrl ||
+                              `https://eu.ui-avatars.com/api/?name=${encodeURIComponent(therapist.name || "Therapist")}&size=250`
+                            }
+                            alt="Therapist"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0 py-0.5">
+                          <h3 className="text-[16px] sm:text-[17px] font-semibold text-[#170F49] truncate">{therapist.name}</h3>
+                          <div className="space-y-1">
+                            <p className="text-sm text-[#6F6C8F]">
+                              <span className="font-medium text-[#170F49]">Specialization:</span>{" "}
+                              <span className="font-semibold text-[#E38B52]">{therapist.specialization || "Not specified"}</span>
+                            </p>
+                            {therapist.qualifications_details && (
+                              <p className="text-sm text-[#6F6C8F] line-clamp-1"><span className="font-medium">Qualifications:</span> {therapist.qualifications_details}</p>
+                            )}
                           </div>
                         </div>
-                        
-                        <div className="flex space-x-3 sm:space-x-2 w-full sm:w-auto justify-end mt-2 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-slate-100 items-center">
-                          {/* Desktop Chevron */}
+                        <div className="flex space-x-2 shrink-0">
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleTherapistClick(therapist.id); }}
-                            className="hidden sm:block text-[#E38B52] hover:text-[#E38B52]/90 transition-colors p-2 rounded-lg hover:bg-[#E38B52]/10"
+                            onClick={() => handleTherapistClick(therapist.id)}
+                            className="text-[#E38B52] hover:text-[#E38B52]/90 transition-colors p-2 rounded-lg hover:bg-[#E38B52]/10"
                             title="View Therapist Details"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                           </button>
-                          
                           {isAdmin && (
                             <button
-                              onClick={(event) => { event.stopPropagation(); handleAssignStudentsClick(therapist, event); }}
-                              className="px-4 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-[#E38B52] text-[13px] sm:text-sm font-semibold text-[#E38B52] bg-white hover:bg-[#E38B52] hover:text-white transition-colors"
-                              title="Assign Students"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTherapist(therapist.id, therapist.name);
+                              }}
+                              className="text-red-500 hover:text-red-700 transition-colors p-2 rounded-lg hover:bg-[rgba(227,139,82,0.2)]"
+                              title="Delete Therapist"
                             >
-                              Assign Students
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
                             </button>
                           )}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteTherapist(therapist.id, therapist.name); }}
-                            className="text-red-500 hover:text-red-700 transition-colors p-1.5 sm:p-2 rounded-lg hover:bg-[rgba(227,139,82,0.2)]"
-                            title="Delete Therapist"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-[18px] w-[18px] sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
                         </div>
                       </div>
+                      {isAdmin && (
+                        <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-end">
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleAssignStudentsClick(therapist, event);
+                            }}
+                            className="bg-[#E38B52] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#E38B52]/90 transition-colors shadow-sm whitespace-nowrap cursor-pointer active:scale-95"
+                            title="Assign"
+                          >
+                            Assign
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}

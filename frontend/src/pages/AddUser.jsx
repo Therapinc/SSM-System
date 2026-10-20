@@ -108,7 +108,7 @@ const AddUser = () => {
       <div className="absolute top-0 -left-40 w-[500px] h-[600px] bg-[#E38B52] rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-float animation-delay-7000" />
 
       {/* Back Button */}
-      <div className="absolute top-6 left-6 z-50">
+      <div className="absolute top-6 left-6 z-50 max-lg:hidden">
         <button
           onClick={() => navigate('/headmaster')}
           className="px-6 max-md:px-4 py-3  bg-[#E38B52] max-md:truncate text-white rounded-xl hover:bg-[#C8742F] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2"

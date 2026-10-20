@@ -57,7 +57,7 @@ const LandingPage = () => {
           {/* Login Button - Top Right - Final Adjusted Style */}
           <button
             onClick={handleNavigation}
-            className="px-8 py-3 text-base bg-[#E38B52] text-white rounded-lg hover:bg-[#C8742F] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2 active:scale-95" // Match LoginPage sign in button color
+            className="px-4 py-2 sm:px-8 sm:py-3 text-sm sm:text-base bg-[#E38B52] text-white rounded-lg hover:bg-[#C8742F] transition-all duration-200 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_4px_8px_rgba(255,255,255,0.2)] hover:-translate-y-1 hover:scale-105 flex items-center gap-2 active:scale-95" // Match LoginPage sign in button color
           >
             {/* Added Login Icon (Arrow entering door) */}
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -302,7 +302,7 @@ const LandingPage = () => {
         </div>
 
         {/* Teachers Image Section - Moved inside the centered container */}
-        <div className="relative w-full h-[900px] overflow-hidden group my-16 bg-gray-100"> {/* Added margin top/bottom */}
+        <div className="relative w-full h-[320px] sm:h-[500px] md:h-[900px] overflow-hidden group my-8 md:my-16 bg-gray-100"> {/* Added margin top/bottom */}
           <img
             src={teachers}
             alt="Our Teachers"

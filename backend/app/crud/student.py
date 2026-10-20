@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, defer
-from sqlalchemy import or_, desc
+from sqlalchemy import or_, desc, func
 from typing import List, Optional, Dict, Any, Union
 
 from app.models.student import Student
@@ -49,7 +49,7 @@ class CRUDStudent(CRUDBase[Student, StudentCreate, StudentUpdate]):
         if class_name:
             query = query.filter(Student.class_name == class_name)
         
-        return query.offset(skip).limit(limit).all()
+        return query.order_by(func.lower(Student.name).asc()).offset(skip).limit(limit).all()
     
     def create(self, db: Session, *, obj_in: StudentCreate) -> Student:
         """
